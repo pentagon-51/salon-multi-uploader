@@ -1,0 +1,3275 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>헤어살롱 SNS 멀티 업로더</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; margin: 0; padding: 14px; color: #1e293b; }
+  .app-layout { max-width: 1360px; margin: 0 auto; display: grid; grid-template-columns: 1fr 310px; gap: 16px; align-items: start; }
+  .container { background: #fff; border-radius: 14px; padding: 18px 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .log-sidebar { position: sticky; top: 14px; background: #0f172a; border-radius: 14px; padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.12); display: flex; flex-direction: column; height: calc(100vh - 28px); box-sizing: border-box; }
+  .log-header { color: #f8fafc; font-size: 13px; font-weight: 700; padding-bottom: 10px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .log-badge { font-size: 10.5px; background: #059669; color: #fff; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+  .log-badge.busy { background: #f59e0b; }
+  .btn-stop-mini { background: #dc2626; color: #fff; border: none; border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+  .btn-stop-mini:hover { background: #b91c1c; }
+  .log-box { flex: 1; margin-top: 10px; color: #a5b4fc; font-size: 12px; font-family: ui-monospace, SFMono-Regular, monospace; overflow-y: auto; white-space: pre-wrap; line-height: 1.55; word-break: break-all; }
+
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+  .title { font-size: 19px; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .brand-mark { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #0f172a, #1e3a8a); color: #fff; font-size: 15px; font-weight: 900; box-shadow: 0 2px 5px rgba(15,23,42,0.2); position: relative; flex-shrink: 0; }
+  .brand-mark::after { content: ''; position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: #03c75a; border: 2px solid #fff; }
+  .brand-sub-pill { font-size: 11.5px; font-weight: 700; color: #1d4ed8; background: #eff6ff; border: 1px solid #bfdbfe; padding: 2px 8px; border-radius: 99px; }
+  .header-actions { display: flex; gap: 6px; align-items: center; }
+  .btn-tool { padding: 6px 11px; font-size: 12px; font-weight: 600; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 7px; cursor: pointer; color: #334155; }
+  .btn-tool:hover { background: #e2e8f0; }
+
+  .section-title { font-size: 13.5px; font-weight: 700; color: #0f172a; margin-bottom: 8px; margin-top: 0; display: flex; align-items: center; justify-content: space-between; }
+  .top-workspace { display: grid; grid-template-columns: minmax(560px, 1.55fr) minmax(300px, 1fr); gap: 14px; align-items: stretch; }
+  .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .right-col { display: flex; flex-direction: column; min-width: 0; }
+
+  .drop-zone { border: 2px dashed #94a3b8; border-radius: 10px; padding: 14px 12px; text-align: center; background: #f8fafc; cursor: pointer; position: relative; transition: all 0.2s; }
+  .drop-zone:hover { border-color: #2563eb; background: #eff6ff; }
+  .drop-zone input[type="file"] { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 10; }
+
+  .platforms-container { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .platform-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 8px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; gap: 5px; min-width: 0; box-sizing: border-box; }
+  .platform-label { display: flex; align-items: center; gap: 4px; font-weight: 600; font-size: 12px; cursor: pointer; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .platform-label input[type="checkbox"] { margin: 0; flex-shrink: 0; }
+  .btn-shortcut { font-size: 10.5px; padding: 3px 6px; color: #475569; background: #e2e8f0; border-radius: 5px; font-weight: 700; text-decoration: none; white-space: nowrap; flex-shrink: 0; }
+  .btn-shortcut:hover { background: #cbd5e1; color: #0f172a; }
+  @media (max-width: 1180px) {
+    .top-workspace { grid-template-columns: 1fr; }
+  }
+
+  textarea, input[type="text"], select { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 13px; line-height: 1.5; box-sizing: border-box; font-family: inherit; background: #fff; }
+  textarea { resize: vertical; }
+  #sourceText { flex: 1; min-height: 175px; font-size: 13.5px; line-height: 1.55; }
+
+  .btn-submit { display: block; width: 100%; padding: 11px; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
+  .btn-submit:hover { opacity: 0.92; }
+
+  .preview-area { margin-top: 16px; padding-top: 16px; border-top: 2px solid #e2e8f0; display: none; }
+  .preview-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; align-items: start; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; gap: 8px; }
+  .card-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 6px; border-bottom: 1px solid #f1f5f9; }
+  .card-title { margin: 0; font-size: 14px; font-weight: 800; }
+  .field-label { font-size: 11.5px; font-weight: 700; color: #475569; margin-bottom: 2px; display: block; }
+  .btn-single { font-size: 11.5px; padding: 5px 10px; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+  .marketing-options { background: #f8fafc; border: 1px dashed #cbd5e1; padding: 8px 10px; border-radius: 7px; margin-top: 2px; }
+  .marketing-title { font-size: 11px; font-weight: bold; color: #2563eb; margin-bottom: 4px; display: block; }
+  .opt-row { display: flex; gap: 8px; }
+  .opt-row > div { flex: 1; }
+
+  /* 블로그 10장 추출 썸네일 갤러리 */
+  .thumb-gallery-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-top: 2px; }
+  .thumb-header { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 700; color: #0f172a; margin-bottom: 8px; flex-wrap: wrap; gap: 4px; }
+  .thumb-count-badge { background: #03c75a; color: #fff; padding: 2px 8px; border-radius: 99px; font-size: 10.5px; }
+  .thumb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .thumb-grid.is-landscape { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .thumb-grid.is-square { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .thumb-item { position: relative; border-radius: 6px; overflow: hidden; border: 2px solid #03c75a; aspect-ratio: 9 / 16; background: #0f172a; cursor: grab; transition: transform 0.15s, opacity 0.15s, border-color 0.15s; user-select: none; }
+  .thumb-grid.is-landscape .thumb-item { aspect-ratio: var(--thumb-aspect, 16 / 9); }
+  .thumb-grid.is-square .thumb-item { aspect-ratio: 1 / 1; }
+  .thumb-item:active { cursor: grabbing; }
+  .thumb-item.drag-over { border: 2px dashed #2563eb; transform: scale(1.04); }
+  .thumb-item.target-slot { box-shadow: 0 0 0 2.5px #2563eb; border-color: #2563eb; }
+  .thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+  .thumb-item.disabled { border-color: #cbd5e1; opacity: 0.35; filter: grayscale(100%); }
+  .thumb-order { position: absolute; top: 4px; left: 4px; max-width: calc(100% - 28px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(3, 199, 90, 0.94); color: #fff; font-size: 9.5px; font-weight: 800; padding: 1.5px 5px; border-radius: 4px; pointer-events: none; line-height: 1.3; }
+  .thumb-order.is-gif { background: rgba(124, 58, 237, 0.95); }
+  .thumb-item.disabled .thumb-order { background: rgba(100, 116, 139, 0.92); }
+  .thumb-btn-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(220, 38, 38, 0.92); color: #fff; font-size: 11px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 5; }
+  .thumb-item.disabled .thumb-btn-x { background: rgba(15, 23, 42, 0.85); }
+  .thumb-move-bar { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(15, 23, 42, 0.72); display: flex; justify-content: space-between; align-items: center; padding: 2px 4px; z-index: 5; }
+  .thumb-btn-move { background: transparent; border: none; color: #fff; font-size: 10px; font-weight: bold; cursor: pointer; padding: 1px 4px; border-radius: 3px; }
+  .thumb-btn-move:hover { background: rgba(255, 255, 255, 0.25); }
+  .thumb-orig-num { color: #cbd5e1; font-size: 8.5px; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
+
+  /* 인스타 방식 영상 드래그 캡처 & GIF 생성 스튜디오 */
+  .scrubber-studio-box { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 9px; margin-bottom: 8px; display: none; }
+  .scrubber-studio-header { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; font-size: 11.5px; font-weight: 800; color: #0f172a; }
+  .scrubber-orient-pill { font-size: 10px; font-weight: 700; color: #334155; background: #e2e8f0; padding: 1.5px 6px; border-radius: 99px; margin-left: 4px; }
+  .scrubber-studio-body { display: grid; grid-template-columns: 108px 1fr; gap: 8px; align-items: start; }
+  .scrubber-studio-box.is-landscape .scrubber-studio-body { grid-template-columns: 1fr; gap: 7px; }
+  .scrubber-studio-box.is-square .scrubber-studio-body { grid-template-columns: 144px 1fr; gap: 8px; }
+  .scrubber-video-wrap { position: relative; background: #0f172a; border-radius: 7px; overflow: hidden; aspect-ratio: 9 / 16; display: flex; align-items: center; justify-content: center; border: 1px solid #334155; }
+  .scrubber-studio-box.is-landscape .scrubber-video-wrap { aspect-ratio: var(--video-aspect, 16 / 9); width: 100%; max-height: 220px; margin: 0 auto; }
+  .scrubber-studio-box.is-square .scrubber-video-wrap { aspect-ratio: 1 / 1; }
+  .scrubber-video-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .scrubber-studio-box.is-landscape .scrubber-video-wrap video { object-fit: contain; }
+  .scrubber-time-pill { position: absolute; bottom: 4px; left: 4px; right: 4px; text-align: center; background: rgba(15, 23, 42, 0.8); color: #f8fafc; font-size: 9px; font-weight: 700; padding: 2px 3px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, monospace; }
+  .scrubber-controls { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .scrub-sub-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px; }
+  .scrub-sub-title { font-size: 10.5px; font-weight: 800; color: #334155; display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .scrub-slider-row { display: flex; align-items: center; gap: 5px; }
+  .scrub-slider-row input[type="range"] { flex: 1; accent-color: #03c75a; cursor: pointer; margin: 0; }
+  .scrub-btn-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .btn-scrub-mini { padding: 3.5px 7px; font-size: 10.5px; font-weight: 700; border: 1px solid #cbd5e1; background: #fff; color: #1e293b; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+  .btn-scrub-mini:hover { background: #e2e8f0; }
+  .btn-scrub-primary { padding: 4px 9px; font-size: 11px; font-weight: 800; border: none; background: #03c75a; color: #fff; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+  .btn-scrub-primary:hover { opacity: 0.92; }
+  .btn-scrub-gif { padding: 4px 9px; font-size: 11px; font-weight: 800; border: none; background: #7c3aed; color: #fff; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+  .btn-scrub-gif:hover { opacity: 0.92; }
+  .gif-speed-select { width: auto !important; padding: 3px 6px !important; font-size: 10.5px !important; font-weight: 800; color: #5b21b6; background: #f5f3ff; border: 1px solid #c4b5fd !important; border-radius: 5px; cursor: pointer; }
+  .gif-timeline-track { position: relative; height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+  .gif-timeline-fill { position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, #7c3aed, #a855f7); border-radius: 99px; left: 0%; width: 20%; }
+  .gif-range-sliders { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .gif-range-sliders label { font-size: 10px; color: #475569; font-weight: 700; display: flex; flex-direction: column; gap: 1px; }
+  .gif-range-sliders input[type="range"] { accent-color: #7c3aed; cursor: pointer; margin: 0; }
+
+  .progress-bg { width: 100%; background: #e2e8f0; border-radius: 6px; height: 12px; margin-top: 8px; overflow: hidden; position: relative; }
+  .progress-fill { width: 0%; background: #2563eb; height: 100%; transition: width 0.3s ease; }
+  .progress-text { position: absolute; width: 100%; text-align: center; top: -1px; font-size: 10px; color: #fff; font-weight: bold; }
+
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.6); z-index: 9999; justify-content: center; align-items: center; }
+  .modal-content { background: #fff; width: 90%; max-width: 640px; max-height: 80vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+  .modal-header { padding: 12px 18px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+  .modal-body { padding: 14px 18px; overflow-y: auto; }
+  .history-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+  /* 접이식 개인화 바 */
+  .profile-accordion { border: 1px solid #cbd5e1; border-radius: 10px; margin-bottom: 14px; background: #f8fafc; overflow: hidden; }
+  .profile-toggle-bar { width: 100%; background: #f8fafc; border: none; padding: 9px 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-size: 13px; font-weight: 700; color: #0f172a; text-align: left; }
+  .profile-toggle-bar:hover { background: #eff6ff; }
+  .profile-panel { display: none; padding: 14px 16px; border-top: 1px solid #e2e8f0; background: #fff; }
+  .profile-panel.open { display: block; }
+  .branch-readonly-box { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+  .branch-readonly-title { font-size: 11.5px; font-weight: 800; color: #475569; margin-bottom: 6px; display: block; }
+  .profile-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .profile-hint { font-size: 11px; color: #64748b; margin-top: 2px; display: block; }
+  .input-disabled { background: #e2e8f0 !important; color: #475569 !important; cursor: not-allowed; }
+
+  /* 신호등 도트 & 무료 한도 바 */
+  .status-dot { font-size: 10px; line-height: 1; cursor: help; display: inline-flex; align-items: center; }
+  .quota-bar-box { margin-top: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .quota-top-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: #0f172a; }
+  .quota-yt-wrap { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 280px; }
+  .quota-progress-bg { flex: 1; max-width: 240px; height: 9px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+  .quota-progress-fill { height: 100%; width: 0%; background: #2563eb; border-radius: 99px; transition: width 0.3s ease, background 0.3s ease; }
+  .quota-progress-fill.warn { background: #dc2626; }
+  .quota-sub-row { font-size: 11.5px; color: #475569; line-height: 1.5; }
+
+  /* 초보자 초기 설정 가이드 모달 */
+  .guide-modal-content { max-width: 760px; max-height: 88vh; }
+  .guide-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px 16px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
+  .guide-tab-btn { padding: 8px 6px; border: 1px solid #cbd5e1; background: #fff; border-radius: 7px; font-size: 12px; font-weight: 700; color: #334155; cursor: pointer; }
+  .guide-tab-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .guide-pane { display: none; }
+  .guide-pane.active { display: block; }
+  .guide-status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 14px; }
+  .guide-status-item { border: 1px solid #e2e8f0; border-radius: 8px; padding: 9px 11px; background: #f8fafc; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 700; }
+  .guide-step-list { margin: 10px 0; padding-left: 18px; font-size: 13px; line-height: 1.75; color: #1e293b; }
+  .guide-badge-pill { display: inline-block; padding: 3px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 700; }
+  .pill-ok { background: #dcfce7; color: #166534; }
+  .pill-no { background: #fee2e2; color: #991b1b; }
+  .manual-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px; }
+  .manual-card { border: 1px solid #e2e8f0; border-radius: 9px; padding: 12px; background: #f8fafc; }
+  .manual-card h4 { margin: 0 0 6px; font-size: 13.5px; color: #0f172a; }
+  .manual-card p { margin: 0; font-size: 12.5px; color: #475569; line-height: 1.55; }
+
+  /* 영상 규격 사전 검사 배지 영역 */
+  .video-meta-box { display: none; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: #f8fafc; border: 1px solid #cbd5e1; font-size: 11.5px; }
+  .video-meta-pills { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .meta-pill { display: inline-block; padding: 2px 7px; border-radius: 99px; background: #e2e8f0; color: #1e293b; font-weight: 700; font-size: 11px; }
+  .meta-pill.ok { background: #dcfce7; color: #166534; }
+  .meta-warn-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .meta-warn-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; font-weight: 700; font-size: 11px; }
+
+  /* 발행 결과 요약 & 실패 재시도 박스 */
+  .publish-result-box { display: none; margin-bottom: 14px; padding: 11px 14px; border-radius: 10px; background: #f8fafc; border: 1px solid #cbd5e1; }
+  .publish-result-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12.5px; font-weight: 800; color: #0f172a; }
+  .publish-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .res-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 700; }
+  .res-chip.ok { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  .res-chip.fail { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  .btn-retry-failed { background: #ea580c; color: #fff; border: none; border-radius: 7px; padding: 6px 12px; font-size: 12px; font-weight: 800; cursor: pointer; }
+  .btn-retry-failed:hover { background: #c2410c; }
+
+  /* 미설정 안내 배너 & 동적 게시판 칩 */
+  .unconfigured-banner { display: none; margin-bottom: 12px; padding: 11px 14px; border-radius: 10px; background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; font-size: 12.5px; font-weight: 700; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .cat-chip-wrap { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; min-height: 26px; }
+  .cat-chip { display: inline-flex; align-items: center; gap: 5px; background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 99px; }
+  .cat-chip button { border: none; background: transparent; color: #1d4ed8; font-weight: 900; cursor: pointer; padding: 0 2px; font-size: 12px; line-height: 1; }
+  .cat-chip button:hover { color: #dc2626; }
+  .cat-input-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .cat-input-row input { flex: 1; min-width: 140px; }
+  .platform-box.plat-hidden { display: none; }
+
+  /* 0~4단계 온보딩 마법사 */
+  .wiz-modal-content { max-width: 840px; width: 94%; max-height: 91vh; }
+  .wiz-header-right { display: flex; align-items: center; gap: 8px; }
+  .wiz-autosave-pill { font-size: 11px; font-weight: 700; color: #059669; background: #dcfce7; padding: 3px 8px; border-radius: 99px; }
+  .wiz-progress-wrap { padding: 10px 18px 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .wiz-progress-top { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-weight: 800; color: #334155; margin-bottom: 6px; }
+  .wiz-progress-track { width: 100%; height: 7px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-bottom: 8px; }
+  .wiz-progress-fill { height: 100%; width: 20%; background: linear-gradient(90deg, #2563eb, #059669); border-radius: 99px; transition: width 0.25s ease; }
+  .wiz-step-pills { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .wiz-step-pill { padding: 6px 4px; border: 1px solid #cbd5e1; background: #fff; border-radius: 7px; font-size: 11px; font-weight: 700; color: #475569; cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wiz-step-pill.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+  .wiz-step-pill.done { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+  .wiz-footer { padding: 11px 18px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .wiz-plat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 12px; }
+  .wiz-plat-card { border: 1.5px solid #cbd5e1; border-radius: 9px; padding: 10px 11px; background: #fff; cursor: pointer; display: flex; align-items: flex-start; gap: 8px; transition: all 0.15s; }
+  .wiz-plat-card.selected { border-color: #2563eb; background: #eff6ff; }
+  .wiz-plat-card input { margin-top: 2px; flex-shrink: 0; }
+  .wiz-plat-name { font-size: 12.5px; font-weight: 800; color: #0f172a; display: block; }
+  .wiz-plat-desc { font-size: 11px; color: #64748b; display: block; margin-top: 2px; }
+  .wiz-section-box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; background: #f8fafc; margin-bottom: 12px; }
+  .wiz-section-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 8px; display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
+  .wiz-preset-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+  .wiz-btn-preset { padding: 5px 10px; font-size: 11.5px; font-weight: 700; border: 1px solid #93c5fd; background: #eff6ff; color: #1d4ed8; border-radius: 99px; cursor: pointer; }
+  .wiz-btn-preset:hover { background: #dbeafe; }
+  .wiz-id-badge { display: inline-block; margin-top: 4px; font-size: 11px; font-weight: 700; color: #059669; word-break: break-all; }
+  .prefix-input-wrap { display: flex; align-items: stretch; border: 1px solid #cbd5e1; border-radius: 7px; overflow: hidden; background: #fff; }
+  .prefix-input-wrap:focus-within { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12); }
+  .prefix-addon { background: #f1f5f9; color: #64748b; font-size: 11.5px; font-weight: 700; padding: 0 8px; display: flex; align-items: center; border-right: 1px solid #cbd5e1; white-space: nowrap; user-select: none; }
+  .prefix-input-wrap input { border: none !important; border-radius: 0 !important; outline: none; flex: 1; min-width: 0; box-shadow: none !important; }
+  .wiz-inline-btn-row { display: flex; gap: 6px; align-items: stretch; flex-wrap: wrap; }
+  .wiz-inline-btn-row input { flex: 1; min-width: 200px; }
+  .inpock-modal-content { max-width: 680px; width: 92%; max-height: 88vh; }
+  .wiz-preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+  .wiz-preview-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 9px 11px; }
+  .wiz-preview-card h5 { margin: 0 0 5px; font-size: 11.5px; color: #2563eb; }
+  .wiz-preview-card pre { margin: 0; font-family: inherit; font-size: 11.5px; white-space: pre-wrap; color: #334155; line-height: 1.5; }
+  .wiz-copy-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 9px; padding: 10px 12px; margin-bottom: 10px; }
+  .wiz-copy-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 6px; font-size: 12.5px; font-weight: 800; color: #0f172a; }
+  .wiz-copy-pre { margin: 0; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: 9px 10px; font-family: inherit; font-size: 12px; white-space: pre-wrap; line-height: 1.55; color: #1e293b; max-height: 220px; overflow-y: auto; }
+  .wiz-check-list { display: flex; flex-direction: column; gap: 6px; }
+  .wiz-check-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border: 1px solid #e2e8f0; border-radius: 7px; padding: 8px 10px; font-size: 12px; }
+  .wiz-ready-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 10px 0; }
+  .wiz-ready-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 11px; border-radius: 8px; background: #fff; border: 1px solid #cbd5e1; font-size: 12px; font-weight: 700; }
+  .wiz-mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .wiz-mode-tab { padding: 9px 10px; border: 1.5px solid #cbd5e1; border-radius: 8px; background: #fff; color: #334155; font-size: 12.5px; font-weight: 800; cursor: pointer; text-align: center; transition: all 0.15s; }
+  .wiz-mode-tab:hover { border-color: #93c5fd; background: #f8fafc; }
+  .wiz-mode-tab.active { border-color: #2563eb; background: #2563eb; color: #fff; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2); }
+  .wiz-mode-pane { display: none; }
+  .wiz-mode-pane.active { display: block; }
+  .wiz-substep-card { background: #fff; border: 1px solid #cbd5e1; border-radius: 9px; padding: 10px 12px; margin-bottom: 10px; }
+  .wiz-substep-card:last-child { margin-bottom: 0; }
+  .wiz-substep-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .wiz-substep-title { font-size: 12.5px; font-weight: 800; color: #0f172a; display: inline-flex; align-items: center; gap: 6px; }
+  .wiz-substep-badge { display: inline-block; padding: 2px 7px; border-radius: 99px; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; font-weight: 800; }
+  /* 원클릭 자동 업데이트 배너 & 공식 채널 1줄 슬림 바 & 토스트 */
+  .update-banner { display: none; margin-bottom: 12px; padding: 11px 14px; border-radius: 10px; background: linear-gradient(90deg, #eff6ff, #ecfdf5); border: 1.5px solid #3b82f6; color: #0f172a; font-size: 12.5px; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1); }
+  .update-banner-text { display: flex; flex-direction: column; gap: 2px; }
+  .update-banner-title { font-weight: 800; color: #1d4ed8; font-size: 13px; }
+  .update-banner-sub { font-size: 11.5px; color: #475569; }
+  .btn-update-now { background: #2563eb; color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 12.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+  .btn-update-now:hover { background: #1d4ed8; }
+  .btn-update-now:disabled { opacity: 0.6; cursor: wait; }
+  .official-slim-bar { margin-top: 18px; padding: 9px 12px; border-top: 1px solid #e2e8f0; background: #f8fafc; border-radius: 8px; font-size: 11.5px; color: #475569; display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; text-align: center; line-height: 1.5; }
+  .official-slim-bar-modal { margin-top: 0; border-radius: 0; border-top: 1px solid #e2e8f0; padding: 7px 14px; font-size: 11px; background: #f1f5f9; }
+  .official-slim-bar a { color: #1d4ed8; font-weight: 700; text-decoration: none; padding: 1px 4px; border-radius: 4px; }
+  .official-slim-bar a:hover { background: #dbeafe; text-decoration: underline; }
+  .official-ver-tag { font-weight: 800; color: #0f172a; }
+  .app-toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(16px); background: #0f172a; color: #fff; padding: 10px 18px; border-radius: 99px; font-size: 12.5px; font-weight: 700; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.28); opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 12000; max-width: 90vw; text-align: center; }
+  .app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (max-width: 720px) {
+    .wiz-step-pills { grid-template-columns: repeat(3, 1fr); }
+    .wiz-plat-grid, .wiz-preview-grid, .wiz-ready-grid, .wiz-mode-tabs { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="app-layout">
+  <!-- 좌측 메인 대시보드 -->
+  <div class="container">
+    <div class="header">
+      <h1 class="title"><span class="brand-mark" aria-hidden="true">H</span><span id="brandTitleText">헤어살롱 SNS 멀티 업로더</span><span class="brand-sub-pill" id="brandSubPill">초기 설정 필요</span></h1>
+      <div class="header-actions">
+        <button class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8;" onclick="openSetupGuide()">📘 초기 설정 &amp; 온보딩 마법사</button>
+        <button class="btn-tool" id="btnCheckUpdate" onclick="checkForUpdates(true)">🔄 업데이트 확인</button>
+        <button class="btn-tool" id="btnCleanAll" onclick="runCleanAll()">🧹 파일 정리</button>
+        <button class="btn-tool" onclick="toggleHistoryPanel()">📜 지난 기록</button>
+      </div>
+    </div>
+
+    <!-- 새 버전 감지 시 상단 원클릭 업데이트 배너 -->
+    <div class="update-banner" id="updateAvailableBanner">
+      <div class="update-banner-text">
+        <span class="update-banner-title" id="updateBannerTitle">🎉 새 버전이 출시되었습니다!</span>
+        <span class="update-banner-sub" id="updateBannerSub">개인 설정(auth_data·로그인·크롬 프로필)은 100% 보호되며 코드 파일만 안전하게 업데이트됩니다.</span>
+      </div>
+      <button type="button" class="btn-update-now" id="btnApplyUpdate" onclick="runOneClickUpdate()">🚀 원클릭 업데이트</button>
+    </div>
+
+    <!-- 기본정보 미설정 시 안전 안내 배너 -->
+    <div class="unconfigured-banner" id="unconfiguredBanner">
+      <span>⚠️ 매장 기본 정보가 아직 비어 있습니다. 실수 발행을 막기 위해 초기 설정 마법사에서 매장명과 기본 정보를 먼저 입력해 주세요.</span>
+      <button type="button" class="btn-tool" style="background:#2563eb; color:#fff; border-color:#2563eb; font-weight:800;" onclick="openSetupGuide(0)">📘 5분 초기 설정 시작하기</button>
+    </div>
+
+    <!-- 접이식(+/-) 기본정보 입력 바 -->
+    <div class="profile-accordion">
+      <button type="button" class="profile-toggle-bar" id="profileToggleBtn" onclick="toggleProfileAccordion()">
+        <span id="profileSummaryLabel">[+ 기본정보 입력 (현재: 매장 미설정)]</span>
+        <span style="font-size:11.5px; color:#64748b;" id="profileToggleHint">클릭하여 펼치기 ▼</span>
+      </button>
+      <div class="profile-panel" id="profilePanel">
+        <div class="profile-grid">
+          <div>
+            <span class="field-label">1) 매장명 (필수)</span>
+            <input type="text" id="profSalonName" placeholder="예: 라벨르헤어 강남점">
+            <span class="profile-hint">네이버 스마트플레이스(지도) 검색명과 동일하게 입력해주세요</span>
+          </div>
+          <div>
+            <span class="field-label">2) 대표 지역/상권 키워드 (지역명만 입력, '미용실' 제외)</span>
+            <input type="text" id="profRegionKeyword" placeholder="예: 강남역, 홍대입구, 성수동">
+            <span class="profile-hint">지역 해시태그(#OO미용실)와 제목·당근 문구에 자동 반영됩니다.</span>
+          </div>
+          <div>
+            <span class="field-label">3) 디자이너 이름·직책</span>
+            <input type="text" id="profDesignerName" placeholder="예: 홍길동 실장">
+          </div>
+          <div>
+            <span class="field-label">4) 주력 시술·전문 분야 (선택)</span>
+            <input type="text" id="profSpecialty" placeholder="예: 남자 다운펌·드롭컷 / 레이어드펌">
+          </div>
+          <div style="grid-column: span 2;">
+            <span class="field-label">5) 대표 통합 링크 (인포크링크 URL)</span>
+            <div class="wiz-inline-btn-row">
+              <input type="text" id="profBookingUrl" placeholder="예: https://link.inpock.co.kr/myid">
+              <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; font-weight:700; white-space:nowrap;" onclick="openInpockGuideModal()">🔗 인포크링크 만들기 가이드</button>
+            </div>
+          </div>
+          <div>
+            <span class="field-label">6) 네이버 블로그 주소 (또는 ID)</span>
+            <div class="prefix-input-wrap">
+              <span class="prefix-addon">blog.naver.com/</span>
+              <input type="text" id="profNaverId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('profNaverId', 'naver', 'profNaverIdStatus', false, false)" onblur="smartExtractIdInput('profNaverId', 'naver', 'profNaverIdStatus', false, true)" onchange="smartExtractIdInput('profNaverId', 'naver', 'profNaverIdStatus', false, true)">
+            </div>
+            <span class="wiz-id-badge" id="profNaverIdStatus"></span>
+          </div>
+          <div>
+            <span class="field-label">7) 핀터레스트 주소 (또는 ID)</span>
+            <div class="prefix-input-wrap">
+              <span class="prefix-addon">pinterest.com/</span>
+              <input type="text" id="profPinId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('profPinId', 'pin', 'profPinIdStatus', false, false)" onblur="smartExtractIdInput('profPinId', 'pin', 'profPinIdStatus', false, true)" onchange="smartExtractIdInput('profPinId', 'pin', 'profPinIdStatus', false, true)">
+            </div>
+            <span class="wiz-id-badge" id="profPinIdStatus"></span>
+          </div>
+          <div>
+            <span class="field-label">8) 핀터레스트 보드명</span>
+            <input type="text" id="profPinBoard" placeholder="빈칸 시 첫 번째 보드 자동 선택">
+          </div>
+          <div>
+            <span class="field-label">9) 매장 주소</span>
+            <input type="text" id="profSalonAddress" placeholder="예: 서울 강남구 테헤란로 123, 3층">
+          </div>
+          <div>
+            <span class="field-label">10) 위치/도보 안내</span>
+            <input type="text" id="profLocationGuide" placeholder="예: 강남역 3번 출구 도보 3분">
+          </div>
+          <div>
+            <span class="field-label">11) 주차 안내</span>
+            <input type="text" id="profParkingGuide" placeholder="예: 건물 지하 주차장 2시간 무료">
+          </div>
+          <div style="grid-column: span 2;">
+            <span class="field-label">12) 네이버 블로그 게시판 목록 (현재 블로그에 있는 게시판 중 자동 업로드를 할 게시판들만 등록해주세요)</span>
+            <div class="cat-chip-wrap" id="barBlogCatChips"></div>
+            <div class="cat-input-row">
+              <input type="text" id="barBlogCatInput" placeholder="추가할 게시판명 입력 (예: Men, Women, 복구클리닉)" onkeydown="if(event.key==='Enter'){event.preventDefault();addBlogCategoryFromInput('barBlogCatInput');}">
+              <button type="button" class="btn-tool" onclick="addBlogCategoryFromInput('barBlogCatInput')">+ 추가</button>
+              <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8;" onclick="fillDefaultBlogCategories()">✨ 기본 추천 채우기 (Men, Women)</button>
+            </div>
+          </div>
+          <div style="grid-column: span 2;">
+            <span class="field-label">13) 개인 제외 해시태그 (선택 · 쉼표로 구분)</span>
+            <input type="text" id="profPersonalBanned" placeholder="예: 홍길동실장, 홍길동">
+            <span class="profile-hint">디자이너 이름(띄어쓰기 제거)과 공통 제외 태그는 자동으로 함께 제외됩니다.</span>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <button type="button" class="btn-tool" onclick="openSetupGuide(0)">⚙️ 사용할 플랫폼 선택(0단계) 열기</button>
+          <button type="button" class="btn-submit" style="width:auto; padding:9px 18px; background:#2563eb; font-size:13px;" onclick="saveProfileFromBar()">💾 기본정보 저장</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-workspace">
+      <div class="left-col">
+        <div>
+          <div class="section-title">1. 영상 파일 첨부</div>
+          <div class="drop-zone" id="dropZone">
+            <div style="font-weight:700; font-size:13px; color:#334155;">영상을 끌어다 놓거나 클릭</div>
+            <div style="font-size:11.5px; color:#64748b; margin-top:3px;" id="fileNameDisplay">(.mp4, .mov 지원)</div>
+            <div class="progress-bg" id="mainUploadProgressBg" style="display:none;">
+              <div class="progress-fill" id="mainUploadProgress"></div>
+              <div class="progress-text" id="mainUploadText">0%</div>
+            </div>
+            <input type="file" id="videoFile" accept="video/mp4,video/quicktime">
+          </div>
+          <div class="video-meta-box" id="videoMetaBox"></div>
+        </div>
+
+        <div>
+          <div class="section-title">
+            <span>3. 업로드 플랫폼 선택 및 바로가기</span>
+            <button type="button" class="btn-tool" style="padding:2px 8px; font-size:11px;" onclick="openSetupGuide(0)">⚙️ 플랫폼 표시 설정</button>
+          </div>
+          <div class="platforms-container">
+            <div class="platform-box" data-platform="yt"><label class="platform-label"><input type="checkbox" id="chkYt" checked style="accent-color:#ff0000;"><span class="status-dot" id="dotYt" title="상태 확인 중">🔴</span> 유튜브 쇼츠</label><a href="https://studio.youtube.com/" target="_blank" class="btn-shortcut">스튜디오</a></div>
+            <div class="platform-box" data-platform="naver"><label class="platform-label"><input type="checkbox" id="chkNaver" checked style="accent-color:#03c75a;"><span class="status-dot" id="dotNaver" title="상태 확인 중">🔴</span> 네이버 블로그</label><a id="linkNaverBlog" href="https://blog.naver.com/" target="_blank" class="btn-shortcut">블로그 홈</a></div>
+            <div class="platform-box" data-platform="clip"><label class="platform-label"><input type="checkbox" id="chkClip" checked style="accent-color:#03c75a;"><span class="status-dot" id="dotClip" title="상태 확인 중">🔴</span> 네이버 클립</label><a href="https://clipcreators.naver.com/web" target="_blank" class="btn-shortcut">스튜디오</a></div>
+            <div class="platform-box" data-platform="tt"><label class="platform-label"><input type="checkbox" id="chkTt" checked style="accent-color:#000000;"><span class="status-dot" id="dotTt" title="상태 확인 중">🔴</span> 틱톡</label><a href="https://www.tiktok.com/tiktokstudio/content" target="_blank" class="btn-shortcut">스튜디오</a></div>
+            <div class="platform-box" data-platform="ig"><label class="platform-label"><input type="checkbox" id="chkIg" checked style="accent-color:#e1306c;"><span class="status-dot" id="dotIg" title="상태 확인 중">🔴</span> 인스타그램</label><a href="https://www.instagram.com/" target="_blank" class="btn-shortcut">인스타 홈</a></div>
+            <div class="platform-box" data-platform="pin"><label class="platform-label"><input type="checkbox" id="chkPin" checked style="accent-color:#e60023;"><span class="status-dot" id="dotPin" title="상태 확인 중">🔴</span> 핀터레스트</label><a id="linkPinterest" href="https://kr.pinterest.com/" target="_blank" class="btn-shortcut">핀터레스트</a></div>
+            <div class="platform-box" data-platform="threads"><label class="platform-label"><input type="checkbox" id="chkThreads" checked style="accent-color:#000000;"><span class="status-dot" id="dotThreads" title="상태 확인 중">🔴</span> 쓰레드</label><a href="https://www.threads.net/" target="_blank" class="btn-shortcut">쓰레드</a></div>
+            <div class="platform-box" data-platform="daangn"><label class="platform-label"><input type="checkbox" id="chkDaangn" checked style="accent-color:#ff6f0f;"><span class="status-dot" id="dotDaangn" title="상태 확인 중">🔴</span> 당근 비즈</label><a href="https://business.daangn.com/" target="_blank" class="btn-shortcut">비즈프로필</a></div>
+            <div class="platform-box" data-platform="x"><label class="platform-label"><input type="checkbox" id="chkX" checked style="accent-color:#0f172a;"><span class="status-dot" id="dotX" title="상태 확인 중">🔴</span> 엑스(X)</label><a href="https://x.com/" target="_blank" class="btn-shortcut">X 홈</a></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="right-col">
+        <div class="section-title">2. 기본 소스 입력 (마스터 베이스 본문 또는 짧은 시술 메모)</div>
+        <textarea id="sourceText" rows="8" placeholder="ChatGPT·Gemini 본문뽑기 프롬프트로 생성된 원고([파일제목]/[제목3종]/[해시태그]/[숏폼 전용 본문]/[블로그 전용 본문]) 또는 짧은 시술 메모를 붙여넣으세요."></textarea>
+        <button type="button" class="btn-submit" onclick="transformData(this)" style="background:#334155; margin-top:10px;">✨ 미리보기 생성 (순수 파이썬 맞춤 변환 + 영상 10컷 추출)</button>
+      </div>
+    </div>
+
+    <!-- 오늘의 무료 한도 & 안전 사용량 대시보드 바 -->
+    <div class="quota-bar-box" id="quotaBarBox">
+      <div class="quota-top-row">
+        <span>📊 오늘의 무료 한도 &amp; 안전 사용량</span>
+        <div class="quota-yt-wrap">
+          <span id="quotaYtText">유튜브 API: 0 / 10,000 pt (오늘 0/6건)</span>
+          <div class="quota-progress-bg"><div class="quota-progress-fill" id="quotaYtFill"></div></div>
+        </div>
+      </div>
+      <div class="quota-sub-row" id="quotaPlatformsText">
+        블로그 0/5 · 클립 0/5 · 틱톡 0/5 · 인스타 0/3 · 핀터 0/10 · 쓰레드 0/5 · 당근 0/2 · X 0/5 (API 0원 · 계정 보호 권장선) · 원고변환 무료 무제한
+      </div>
+    </div>
+
+    <div class="preview-area" id="previewSection">
+      <div style="display:flex; gap:10px; margin-bottom:14px;">
+        <button type="button" class="btn-submit" id="btnAuthCheck" style="background:#f59e0b; flex:1;" onclick="startAuthCheck()">🔐 Step 1: 로그인 점검창 띄우기</button>
+        <button type="button" class="btn-submit" id="btnUpload" style="background:#2563eb; flex:1.3;" onclick="startUpload()">🚀 Step 2: 체크된 플랫폼 일괄 업로드</button>
+      </div>
+      <div class="publish-result-box" id="publishResultBox"></div>
+
+      <div class="preview-grid">
+        <!-- 1행: 유튜브 쇼츠 | 네이버 블로그 -->
+        <div class="card" style="border-left:4px solid #ff0000;">
+          <div class="card-header"><h3 class="card-title" style="color:#ff0000;">🔴 유튜브 쇼츠 편집</h3><button class="btn-single" style="background:#ff0000;" onclick="uploadSingle('yt')">개별 업로드</button></div>
+          <div><span class="field-label">제목</span><input type="text" id="ytTitle"></div>
+          <div><span class="field-label">본문</span><textarea id="ytBody" rows="6"></textarea></div>
+          <div><span class="field-label">태그 (10개)</span><input type="text" id="ytTags"></div>
+        </div>
+
+        <div class="card" style="border-left:4px solid #03c75a;">
+          <div class="card-header"><h3 class="card-title" style="color:#03c75a;">🟢 네이버 블로그 편집</h3><button class="btn-single" style="background:#03c75a;" onclick="uploadSingle('naver')">개별 업로드</button></div>
+          <div><span class="field-label">제목</span><input type="text" id="naverTitle"></div>
+          <div><span class="field-label">본문 ([미디어 자료N] 위치에 해당 슬롯의 사진·GIF가 삽입됩니다 · ✕로 끈 번호는 당겨지지 않고 빈자리로 넘어갑니다)</span><textarea id="naverBody" rows="12"></textarea></div>
+
+          <!-- 10장 추출 썸네일: 인스타 방식 드래그 캡처 + GIF 구간 생성 + 고정 슬롯 갤러리 -->
+          <div class="thumb-gallery-box">
+            <div class="thumb-header">
+              <span>📸 영상 드래그 캡처 · GIF 생성 · 순서 변경(드래그 / ◀ ▶) 및 제외(✕)</span>
+              <span class="thumb-count-badge" id="activeThumbCount">선택됨: 0장</span>
+            </div>
+
+            <!-- 인스타 썸네일 방식 영상 드래그 캡처 & GIF 생성 스튜디오 -->
+            <div class="scrubber-studio-box" id="blogScrubberStudio">
+              <div class="scrubber-studio-header">
+                <span>🎬 영상 드래그 캡처 &amp; GIF 만들기 <span class="scrubber-orient-pill" id="scrubberOrientBadge">📱 세로</span></span>
+                <div style="display:flex; align-items:center; gap:5px;">
+                  <span style="font-size:11px; color:#475569;">적용 슬롯:</span>
+                  <select id="scrubberTargetSlot" onchange="onTargetSlotSelectChange()" style="width:auto; padding:3px 7px; font-size:11px; font-weight:700;">
+                    <option value="0">[미디어 자료1]</option>
+                    <option value="1">[미디어 자료2]</option>
+                    <option value="2">[미디어 자료3]</option>
+                    <option value="3">[미디어 자료4]</option>
+                    <option value="4">[미디어 자료5]</option>
+                    <option value="5">[미디어 자료6]</option>
+                    <option value="6">[미디어 자료7]</option>
+                    <option value="7">[미디어 자료8]</option>
+                    <option value="8">[미디어 자료9]</option>
+                    <option value="9">[미디어 자료10]</option>
+                  </select>
+                </div>
+              </div>
+              <div class="scrubber-studio-body">
+                <div class="scrubber-video-wrap">
+                  <video id="blogScrubberVideo" muted playsinline preload="metadata"></video>
+                  <div class="scrubber-time-pill" id="scrubberTimeLabel">00:00.0 / 00:00.0</div>
+                </div>
+                <div class="scrubber-controls">
+                  <!-- 1) 원하는 장면 드래그 캡처 -->
+                  <div class="scrub-sub-card">
+                    <div class="scrub-sub-title">
+                      <span>📸 1) 장면 캡처</span>
+                      <span style="font-size:10px; color:#64748b;">썸네일 클릭으로 슬롯 선택</span>
+                    </div>
+                    <div class="scrub-slider-row">
+                      <button type="button" class="btn-scrub-mini" onclick="stepScrubFrame(-0.2)" title="0.2초 뒤로">◀</button>
+                      <input type="range" id="frameScrubSlider" min="0" max="10" step="0.05" value="0" oninput="onFrameScrubInput(this.value)">
+                      <button type="button" class="btn-scrub-mini" onclick="stepScrubFrame(0.2)" title="0.2초 앞으로">▶</button>
+                    </div>
+                    <div class="scrub-btn-row">
+                      <button type="button" class="btn-scrub-mini" id="btnScrubPlay" onclick="toggleScrubPlay()">▶ 재생</button>
+                      <button type="button" class="btn-scrub-primary" id="btnCaptureFrame" onclick="captureCurrentScrubberFrame()">📸 현재 장면 슬롯 넣기</button>
+                    </div>
+                  </div>
+
+                  <!-- 2) 드래그 구간 GIF 생성 + 재생배속 -->
+                  <div class="scrub-sub-card">
+                    <div class="scrub-sub-title">
+                      <span>🎞️ 2) 구간 GIF</span>
+                      <span id="gifRangeSummary" style="color:#7c3aed; font-size:10px;">0.0~2.5초 (1x → 약 2.5초)</span>
+                    </div>
+                    <div class="gif-timeline-track"><div class="gif-timeline-fill" id="gifTimelineFill"></div></div>
+                    <div class="gif-range-sliders">
+                      <label>
+                        <span>시작 <span id="gifStartVal">0.0</span>초</span>
+                        <input type="range" id="gifStartSlider" min="0" max="10" step="0.1" value="0" oninput="onGifSliderChange('start')">
+                      </label>
+                      <label>
+                        <span>끝 <span id="gifEndVal">2.5</span>초</span>
+                        <input type="range" id="gifEndSlider" min="0" max="10" step="0.1" value="2.5" oninput="onGifSliderChange('end')">
+                      </label>
+                    </div>
+                    <div class="scrub-btn-row">
+                      <select id="gifSpeedSelect" class="gif-speed-select" onchange="onGifSpeedChange(this.value)" title="GIF 재생배속">
+                        <option value="0.5">0.5x</option>
+                        <option value="0.75">0.75x</option>
+                        <option value="1" selected>1x</option>
+                        <option value="1.25">1.25x</option>
+                        <option value="1.5">1.5x</option>
+                        <option value="2">2x</option>
+                      </select>
+                      <button type="button" class="btn-scrub-mini" onclick="setGifPointFromCurrent('start')" title="현재 재생 위치를 시작점으로">시작=현재</button>
+                      <button type="button" class="btn-scrub-mini" onclick="setGifPointFromCurrent('end')" title="현재 재생 위치를 끝점으로">끝=현재</button>
+                      <button type="button" class="btn-scrub-mini" id="btnGifPreview" onclick="toggleGifRangePreview()">🔁 미리보기</button>
+                      <button type="button" class="btn-scrub-gif" id="btnCreateGif" onclick="createGifIntoSelectedSlot()">✨ GIF 생성</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="thumb-grid" id="blogThumbGrid">
+              <div style="grid-column: 1 / -1; text-align: center; color: #64748b; font-size: 11.5px; padding: 14px 0;">
+                영상을 먼저 첨부한 뒤 [✨ 미리보기 생성]을 누르면 10장의 캡처본이 표시됩니다.
+              </div>
+            </div>
+          </div>
+
+          <div><span class="field-label">태그 (최대 10개)</span><input type="text" id="naverTags"></div>
+          <div class="marketing-options">
+            <div class="opt-row">
+              <div style="flex:0.9;">
+                <span class="marketing-title">📂 블로그 카테고리</span>
+                <select id="naverCategory" style="font-weight:700; color:#0f172a;">
+                  <option value="">(블로그 기본 게시판)</option>
+                </select>
+              </div>
+              <div style="flex:1.3;">
+                <span class="marketing-title">📍 스마트플레이스 지도 연동</span>
+                <input type="text" id="naverPlace" value="" placeholder="기본정보 매장명 자동 입력">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2행: 네이버 클립 | 틱톡 -->
+        <div class="card" style="border-left:4px solid #03c75a;">
+          <div class="card-header"><h3 class="card-title" style="color:#03c75a;">🟢 네이버 클립 편집</h3><button class="btn-single" style="background:#03c75a;" onclick="uploadSingle('clip')">개별 업로드</button></div>
+          <div><span class="field-label">제목</span><input type="text" id="clipTitle"></div>
+          <div><span class="field-label">본문</span><textarea id="clipBody" rows="6"></textarea></div>
+          <div class="opt-row">
+            <div><span class="field-label">태그 (5개)</span><input type="text" id="clipTags"></div>
+            <div><span class="field-label">장소 태그</span><input type="text" id="clipPlace" value="" placeholder="기본정보 매장명 자동 입력"></div>
+          </div>
+        </div>
+
+        <div class="card" style="border-left:4px solid #000000;">
+          <div class="card-header"><h3 class="card-title" style="color:#000000;">⚫ 틱톡 편집</h3><button class="btn-single" style="background:#000000;" onclick="uploadSingle('tt')">개별 업로드</button></div>
+          <div><span class="field-label">제목</span><input type="text" id="ttTitle"></div>
+          <div><span class="field-label">본문</span><textarea id="ttBody" rows="6"></textarea></div>
+          <div class="opt-row">
+            <div><span class="field-label">해시태그 (5개)</span><input type="text" id="ttTags"></div>
+            <div><span class="field-label">위치(Location)</span><input type="text" id="ttLocation" value="" placeholder="기본정보 매장명 자동 입력"></div>
+          </div>
+        </div>
+
+        <!-- 3행: 인스타그램 | 핀터레스트 -->
+        <div class="card" style="border-left:4px solid #e1306c;">
+          <div class="card-header"><h3 class="card-title" style="color:#e1306c;">🟣 인스타그램 릴스 편집</h3><button class="btn-single" style="background:#e1306c;" onclick="uploadSingle('ig')">개별 업로드</button></div>
+          <div><span class="field-label">본문</span><textarea id="igBody" rows="7"></textarea></div>
+          <div class="opt-row">
+            <div><span class="field-label">해시태그 (5개)</span><input type="text" id="igTags"></div>
+            <div><span class="field-label">위치 추가</span><input type="text" id="igLocation" value="" placeholder="기본정보 매장명 자동 입력"></div>
+          </div>
+        </div>
+
+        <div class="card" style="border-left:4px solid #e60023;">
+          <div class="card-header"><h3 class="card-title" style="color:#e60023;">🔴 핀터레스트 편집</h3><button class="btn-single" style="background:#e60023;" onclick="uploadSingle('pin')">개별 업로드</button></div>
+          <div><span class="field-label">핀 제목</span><input type="text" id="pinTitle"></div>
+          <div><span class="field-label">핀 설명</span><textarea id="pinBody" rows="4"></textarea></div>
+          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="pinTags"></div>
+          <div class="opt-row">
+            <div><span class="field-label">목적지 링크</span><input type="text" id="pinDestUrl" value=""></div>
+            <div><span class="field-label">보드 이름</span><input type="text" id="pinBoard" value=""></div>
+          </div>
+        </div>
+        <div class="card" style="border-left:4px solid #000000;">
+          <div class="card-header"><h3 class="card-title" style="color:#000000;">🧵 쓰레드(Threads) 편집</h3><button class="btn-single" style="background:#000000;" onclick="uploadSingle('threads')">개별 업로드</button></div>
+          <div><span class="field-label">소통형 본문</span><textarea id="threadsBody" rows="6"></textarea></div>
+          <div><span class="field-label">대표 토픽 태그 (1개 권장)</span><input type="text" id="threadsTags"></div>
+        </div>
+        <div class="card" style="border-left:4px solid #ff6f0f;">
+          <div class="card-header"><h3 class="card-title" style="color:#ff6f0f;">🥕 당근 비즈프로필 소식 편집</h3><button class="btn-single" style="background:#ff6f0f;" onclick="uploadSingle('daangn')">개별 업로드</button></div>
+          <div><span class="field-label">소식 제목</span><input type="text" id="daangnTitle"></div>
+          <div><span class="field-label">동네 이웃 밀착형 본문</span><textarea id="daangnBody" rows="7"></textarea></div>
+        </div>
+        <div class="card" style="border-left:4px solid #0f172a;">
+          <div class="card-header"><h3 class="card-title" style="color:#0f172a;">𝕏 엑스(X / 트위터) 편집</h3><button class="btn-single" style="background:#0f172a;" onclick="uploadSingle('x')">개별 업로드</button></div>
+          <div><span class="field-label">초간결 본문 (140자 제한 맞춤)</span><textarea id="xBody" rows="5"></textarea></div>
+          <div><span class="field-label">핵심 해시태그 (2개)</span><input type="text" id="xTags"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 대시보드 하단 1줄 슬림 공식 채널·버전 푸터 -->
+    <div class="official-slim-bar" id="dashboardOfficialBar"></div>
+  </div>
+
+  <!-- 우측 일자형 실시간 실행 상태 로그 사이드바 -->
+  <div class="log-sidebar">
+    <div class="log-header">
+      <span>🖥️ 실시간 실행 로그</span>
+      <div style="display:flex; gap:5px; align-items:center;">
+        <span class="log-badge" id="statusBadge">대기 중</span>
+        <button type="button" class="btn-stop-mini" onclick="stopCurrentTask()" title="진행 중인 브라우저 즉시 닫기">🛑 강제 중지</button>
+      </div>
+    </div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-content">
+    <div class="modal-header"><h3 style="margin:0; font-size:16px;">📜 지난 업로드 기록</h3><button onclick="toggleHistoryPanel()" style="border:none; background:#e2e8f0; padding:6px 12px; border-radius:6px; cursor:pointer;">닫기</button></div>
+    <div class="modal-body" id="historyListContainer">로딩 중...</div>
+  </div>
+</div>
+
+<!-- 완성형 초보자 온보딩 마법사 모달 (0~4단계 Wizard + 진행률 바 + 자동 임시 저장) -->
+<div class="modal-overlay" id="setupGuideModal">
+  <div class="modal-content wiz-modal-content">
+    <div class="modal-header">
+      <h3 style="margin:0; font-size:16px;">📘 초기 설정 &amp; 온보딩 마법사</h3>
+      <div class="wiz-header-right">
+        <span class="wiz-autosave-pill" id="wizAutosaveBadge">자동 임시 저장 대기</span>
+        <button type="button" onclick="closeSetupGuide()" style="border:none; background:#e2e8f0; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:700;">닫기</button>
+      </div>
+    </div>
+
+    <div class="wiz-progress-wrap">
+      <div class="wiz-progress-top">
+        <span id="wizProgressText">0단계 / 4단계 · 사용할 플랫폼 선택</span>
+        <span id="wizProgressPct">20%</span>
+      </div>
+      <div class="wiz-progress-track"><div class="wiz-progress-fill" id="wizProgressFill"></div></div>
+      <div class="wiz-step-pills">
+        <button type="button" class="wiz-step-pill active" id="wizPill0" onclick="goWizardStep(0)">0. 플랫폼</button>
+        <button type="button" class="wiz-step-pill" id="wizPill1" onclick="goWizardStep(1)">1. 기본정보</button>
+        <button type="button" class="wiz-step-pill" id="wizPill2" onclick="goWizardStep(2)">2. 프로필·블로그</button>
+        <button type="button" class="wiz-step-pill" id="wizPill3" onclick="goWizardStep(3)">3. 로그인·유튜브</button>
+        <button type="button" class="wiz-step-pill" id="wizPill4" onclick="goWizardStep(4)">4. 프롬프트·체험</button>
+      </div>
+    </div>
+
+    <div class="modal-body" id="wizModalBody">
+      <!-- 0단계: 사용할 플랫폼 선택 -->
+      <div class="guide-pane active" id="wizPane0">
+        <div class="wiz-section-box">
+          <div class="wiz-section-title">
+            <span>🎯 0단계: 지금 바로 연결할 플랫폼만 골라주세요</span>
+            <div style="display:flex; gap:5px;">
+              <button type="button" class="btn-tool" style="padding:3px 8px; font-size:11px;" onclick="setWizardPlatformPreset('core')">⭐ 핵심 3종 추천</button>
+              <button type="button" class="btn-tool" style="padding:3px 8px; font-size:11px;" onclick="setWizardPlatformPreset('all')">전체 선택</button>
+            </div>
+          </div>
+          <div style="font-size:12.5px; color:#475569; line-height:1.55;">
+            선택하지 않은 플랫폼은 다음 단계의 입력칸·가이드·로그인 신호등에서 <b>자동으로 숨겨져</b> 부담 없이 시작할 수 있습니다.<br>
+            (나중에 언제든 <b>[⚙️ 플랫폼 표시 설정]</b>에서 다시 켤 수 있습니다.)
+          </div>
+          <div class="wiz-plat-grid" id="wizPlatformGrid"></div>
+        </div>
+      </div>
+
+      <!-- 1단계: 기본 정보 입력 + 스마트 입력 보조 -->
+      <div class="guide-pane" id="wizPane1">
+        <div class="wiz-preset-row">
+          <span style="font-size:12px; font-weight:800; color:#334155;">⚡ 원클릭 분야 프리셋:</span>
+          <button type="button" class="wiz-btn-preset" onclick="applySpecialtyPreset('men')">💈 남자머리 전문</button>
+          <button type="button" class="wiz-btn-preset" onclick="applySpecialtyPreset('women')">💇‍♀️ 여자 펌·염색</button>
+          <button type="button" class="wiz-btn-preset" onclick="applySpecialtyPreset('clinic')">✨ 복구·클리닉</button>
+        </div>
+
+        <div class="wiz-section-box">
+          <div class="wiz-section-title"><span>🏪 핵심 기본 정보</span><span style="font-size:11px; color:#64748b; font-weight:600;">입력하는 즉시 자동 임시 저장됩니다</span></div>
+          <div class="profile-grid">
+            <div>
+              <span class="field-label">매장명 <b style="color:#dc2626;">*필수</b></span>
+              <input type="text" id="wizSalonName" placeholder="예: 라벨르헤어 강남점" oninput="onWizardFieldInput()">
+              <span class="profile-hint">네이버 스마트플레이스(지도) 검색명과 동일하게 입력해주세요</span>
+            </div>
+            <div>
+              <span class="field-label">대표 지역/상권 키워드 (지역명만 입력, '미용실' 제외)</span>
+              <input type="text" id="wizRegionKeyword" placeholder="예: 강남역, 홍대입구, 성수동" oninput="onWizardFieldInput()">
+              <span class="profile-hint">해시태그(#강남역미용실 등)와 블로그 제목·당근 문구에 자동 반영</span>
+            </div>
+            <div>
+              <span class="field-label">디자이너 이름·직책</span>
+              <input type="text" id="wizDesignerName" placeholder="예: 김민수 실장" oninput="onWizardFieldInput()">
+            </div>
+            <div>
+              <span class="field-label">주력 시술·전문 분야 (선택)</span>
+              <input type="text" id="wizSpecialty" placeholder="예: 남자 다운펌·드롭컷 / 레이어드펌" oninput="onWizardFieldInput()">
+            </div>
+            <div style="grid-column: span 2;">
+              <span class="field-label">대표 통합 링크 (인포크링크 URL)</span>
+              <div class="wiz-inline-btn-row">
+                <input type="text" id="wizBookingUrl" placeholder="예: https://link.inpock.co.kr/myid (아직 없다면 우측 가이드 버튼 클릭)" oninput="onWizardFieldInput()">
+                <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; font-weight:800; white-space:nowrap;" onclick="openInpockGuideModal()">🔗 인포크링크 만들기 가이드</button>
+              </div>
+              <span class="profile-hint">네이버 예약·카톡 상담·가격표를 한 번에 묶어두는 통합 링크입니다. 아직 없다면 우측 가이드 버튼으로 3분 만에 만들 수 있어요.</span>
+            </div>
+
+            <!-- 네이버 블로그 선택 시만 표시 -->
+            <div id="wizNaverIdWrap" style="display:block;">
+              <span class="field-label">네이버 블로그 주소 (또는 ID)</span>
+              <div class="prefix-input-wrap">
+                <span class="prefix-addon">blog.naver.com/</span>
+                <input type="text" id="wizNaverId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('wizNaverId', 'naver', 'wizNaverIdStatus', true, false)" onblur="smartExtractIdInput('wizNaverId', 'naver', 'wizNaverIdStatus', true, true)" onchange="smartExtractIdInput('wizNaverId', 'naver', 'wizNaverIdStatus', true, true)">
+              </div>
+              <span class="wiz-id-badge" id="wizNaverIdStatus"></span>
+            </div>
+
+            <!-- 핀터레스트 선택 시만 표시 -->
+            <div id="wizPinIdWrap" style="display:block;">
+              <span class="field-label">핀터레스트 주소 (또는 ID)</span>
+              <div class="prefix-input-wrap">
+                <span class="prefix-addon">pinterest.com/</span>
+                <input type="text" id="wizPinId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('wizPinId', 'pin', 'wizPinIdStatus', true, false)" onblur="smartExtractIdInput('wizPinId', 'pin', 'wizPinIdStatus', true, true)" onchange="smartExtractIdInput('wizPinId', 'pin', 'wizPinIdStatus', true, true)">
+              </div>
+              <span class="wiz-id-badge" id="wizPinIdStatus"></span>
+            </div>
+            <div id="wizPinBoardWrap" style="display:block;">
+              <span class="field-label">핀터레스트 보드명 (빈칸 시 첫 번째 보드)</span>
+              <input type="text" id="wizPinBoard" placeholder="예: 강남역 미용실 헤어스타일" oninput="onWizardFieldInput()">
+            </div>
+
+            <!-- 네이버 블로그 동적 게시판 목록 -->
+            <div id="wizBlogCatsWrap" style="grid-column: span 2;">
+              <span class="field-label">네이버 블로그 게시판 목록 (현재 블로그에 있는 게시판 중 자동 업로드를 할 게시판들만 등록해주세요)</span>
+              <div class="cat-chip-wrap" id="wizBlogCatChips"></div>
+              <div class="cat-input-row">
+                <input type="text" id="wizBlogCatInput" placeholder="게시판명 입력 후 [+ 추가] (예: Men, Women, 복구펌)" onkeydown="if(event.key==='Enter'){event.preventDefault();addBlogCategoryFromInput('wizBlogCatInput');}">
+                <button type="button" class="btn-tool" onclick="addBlogCategoryFromInput('wizBlogCatInput')">+ 추가</button>
+                <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8;" onclick="fillDefaultBlogCategories()">✨ 기본 추천 채우기 (Men, Women)</button>
+              </div>
+              <span class="profile-hint">💡 '오시는 길'은 일상 시술 업로드 목록에 섞지 않고, 2단계 초기 세팅 고정글로 별도 안내해 드립니다.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="wiz-section-box">
+          <div class="wiz-section-title"><span>📍 매장 상세 정보 (블로그 '오시는 길' 고정글 전용)</span></div>
+          <div class="profile-grid">
+            <div style="grid-column: span 2;">
+              <span class="field-label">매장 주소</span>
+              <input type="text" id="wizSalonAddress" placeholder="예: 서울 강남구 테헤란로 123, 3층" oninput="onWizardFieldInput()">
+            </div>
+            <div>
+              <span class="field-label">위치 / 도보 안내</span>
+              <input type="text" id="wizLocationGuide" placeholder="예: 강남역 3번 출구 도보 3분" oninput="onWizardFieldInput()">
+            </div>
+            <div>
+              <span class="field-label">주차 안내</span>
+              <input type="text" id="wizParkingGuide" placeholder="예: 건물 지하 주차장 2시간 무료 지원" oninput="onWizardFieldInput()">
+            </div>
+          </div>
+        </div>
+
+        <div class="wiz-section-box" style="margin-bottom:0; background:#eff6ff; border-color:#bfdbfe;">
+          <div class="wiz-section-title" style="color:#1e3a8a;"><span>👀 실시간 반영 미리보기</span></div>
+          <div class="wiz-preview-grid">
+            <div class="wiz-preview-card">
+              <h5>🟢 네이버 블로그 하단 서명</h5>
+              <pre id="wizLiveBlogSigPreview"></pre>
+            </div>
+            <div class="wiz-preview-card">
+              <h5>🟣 SNS 프로필 소개글</h5>
+              <pre id="wizLiveSnsBioPreview"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2단계: 선택한 플랫폼별 프로필 · 게시판 · 오시는 길 세팅 -->
+      <div class="guide-pane" id="wizPane2">
+        <div id="wizStep2DynamicContainer"></div>
+      </div>
+
+      <!-- 3단계: 통합 로그인 신호등 & 유튜브 API -->
+      <div class="guide-pane" id="wizPane3">
+        <div class="wiz-section-box">
+          <div class="wiz-section-title">
+            <span>🔐 선택한 플랫폼 로그인 신호등</span>
+            <button type="button" class="btn-tool" onclick="refreshSetupAndQuota()">🔄 상태 새로고침</button>
+          </div>
+          <div style="font-size:12.5px; color:#334155; line-height:1.6;">
+            0단계에서 선택한 플랫폼만 표시됩니다. <b>🔴 빨간불</b>인 플랫폼만 최초 1회 로그인하면 전용 크롬 프로필(<code>auth_data/chrome_profile</code>)에 영구 저장됩니다.
+          </div>
+          <div class="guide-status-grid" id="guideStatusGrid">로딩 중...</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-submit" style="flex:1; background:#f59e0b; font-size:13px;" onclick="loginMissingPlatforms()">🔐 미로그인 선택 플랫폼 1창 통합 로그인창 띄우기</button>
+          </div>
+          <div style="margin-top:10px; padding:9px 11px; background:#fff; border-radius:8px; border:1px solid #e2e8f0; font-size:12px; color:#475569; line-height:1.6;">
+            • 전용 크롬 1창에 미로그인 플랫폼 탭들이 한 번에 열립니다. 로그인(로그인 상태 유지 체크)을 마친 뒤 크롬 창 우측 상단 <b>X</b>로 닫으면 영구 저장됩니다.<br>
+            • 네이버 블로그와 네이버 클립은 같은 네이버 로그인 세션을 함께 사용합니다.
+          </div>
+        </div>
+
+        <div class="wiz-section-box" id="wizYtApiSection" style="margin-bottom:0;">
+          <div class="wiz-section-title">
+            <span>🔴 유튜브 쇼츠 무료 공식 API 설정 (선택한 경우)</span>
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <span class="guide-badge-pill pill-no" id="ytSecretBadge">client_secret.json 미등록</span>
+              <span class="guide-badge-pill pill-no" id="ytTokenBadge">youtube_token.json 미인증</span>
+            </div>
+          </div>
+          <div style="background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:9px 11px; font-size:12px; color:#92400e; line-height:1.6; margin-bottom:8px;">
+            <b>🛟 초보자 막힘 방지 핵심 3가지</b><br>
+            1) OAuth 동의 화면에서 <b>[앱 게시]를 누르지 말고</b>, <b>[테스트 사용자]에 본인 Gmail 주소</b>를 추가하세요.<br>
+            2) 첫 유튜브 업로드 인증 시 <b>「Google에서 확인하지 않은 앱」</b> 경고가 뜨면 당황하지 말고 <b>[고급] ➔ [안전하지 않은 페이지로 이동]</b>을 클릭하세요.<br>
+            3) 다운로드한 JSON 파일 이름을 <code>client_secret.json</code>으로 바꿔 <code>auth_data/client_secret.json</code>에 넣으세요. (하루 최대 6건 무료 · 초과 시 과금 없음)
+          </div>
+          <ol class="guide-step-list" style="margin-bottom:0;">
+            <li><a href="https://console.cloud.google.com/" target="_blank" style="color:#2563eb; font-weight:700;">Google Cloud Console</a> 로그인 후 새 <b>프로젝트 생성</b>.</li>
+            <li><b>API 및 서비스 ➔ 라이브러리</b>에서 <code>YouTube Data API v3</code> 검색 후 <b>사용</b> 클릭.</li>
+            <li><b>OAuth 동의 화면</b> ➔ <b>외부(External)</b> 선택 ➔ 필수 항목 입력 ➔ <b>테스트 사용자에 본인 Gmail 추가</b> (앱 게시 불필요).</li>
+            <li><b>사용자 인증 정보 ➔ OAuth 클라이언트 ID 만들기 ➔ 데스크톱 앱</b> 생성 후 JSON 다운로드.</li>
+            <li>파일명을 <code>client_secret.json</code>으로 변경해 <code>auth_data/</code> 폴더에 넣고 상단 <b>[🔄 상태 새로고침]</b> 클릭!</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- 4단계: 나만의 '본문뽑기' 마스터 프롬프트 발급 (2모드: 기본 표준 vs 내 스타일 입히기) & 10초 체험 -->
+      <div class="guide-pane" id="wizPane4">
+        <div class="wiz-section-box">
+          <div class="wiz-section-title">
+            <span>🤖 4단계: 나만의 '본문뽑기' 마스터 프롬프트 발급</span>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <a href="https://chatgpt.com/" target="_blank" class="btn-tool" style="text-decoration:none; font-size:11px;">ChatGPT ↗</a>
+              <a href="https://gemini.google.com/" target="_blank" class="btn-tool" style="text-decoration:none; font-size:11px;">Gemini ↗</a>
+            </div>
+          </div>
+
+          <div class="wiz-mode-tabs">
+            <button type="button" class="wiz-mode-tab active" id="wizPromptTabStandard" onclick="setPromptMode('standard')">📌 기본 표준으로 바로 쓰기</button>
+            <button type="button" class="wiz-mode-tab" id="wizPromptTabCustom" onclick="setPromptMode('custom')">🎨 내 글·기존 프롬프트로 내 스타일 입히기</button>
+          </div>
+
+          <!-- (A) 기본 표준으로 바로 쓰기 -->
+          <div class="wiz-mode-pane active" id="wizPromptPaneStandard">
+            <div class="wiz-substep-card">
+              <div class="wiz-substep-head">
+                <span class="wiz-substep-title">✨ 내 매장 정보가 자동 반영된 표준 '본문뽑기' 마스터 프롬프트</span>
+                <button type="button" class="btn-tool" style="background:#2563eb; color:#fff; border-color:#2563eb; font-weight:800;" onclick="copyTextById('wizMasterPromptBox')">📋 프롬프트 복사</button>
+              </div>
+              <div style="font-size:12px; color:#475569; margin-bottom:8px;">
+                내 매장명·지역 키워드·디자이너·주력 시술이 자동 반영되어 있습니다. ChatGPT(GPTs/프로젝트) 또는 Gemini(Gem)에 한 번만 저장해 두고 매일 시술 원고를 뽑아 쓰세요.
+              </div>
+              <pre class="wiz-copy-pre" id="wizMasterPromptBox" style="max-height:240px;"></pre>
+            </div>
+          </div>
+
+          <!-- (B) 내 글·기존 프롬프트로 내 스타일 입히기 -->
+          <div class="wiz-mode-pane" id="wizPromptPaneCustom">
+            <div class="wiz-substep-card">
+              <div class="wiz-substep-head">
+                <span class="wiz-substep-title"><span class="wiz-substep-badge">1단계</span> 내 스타일 추출 요청 프롬프트 복사</span>
+                <button type="button" class="btn-tool" style="background:#2563eb; color:#fff; border-color:#2563eb; font-weight:800;" onclick="copyStyleExtractPrompt()">📋 내 스타일 추출 요청 프롬프트 복사</button>
+              </div>
+              <div style="font-size:12px; color:#475569; line-height:1.55;">
+                위 버튼을 복사해 ChatGPT/Gemini에 붙여넣고, 그 아래에 <b>평소 쓰던 내 인스타 글(1~3개)이나 기존 프롬프트</b>를 함께 보내세요.<br>
+                과거 시술 내용이나 업로더 규격과 충돌하는 지시는 자동으로 걸러내고, <b>순수 말투·이모지·줄바꿈·영문 병기·하단 서명/DM 형식</b>만 짧은 '스타일 가이드'로 뽑아줍니다.
+              </div>
+              <details style="margin-top:7px;">
+                <summary style="font-size:11.5px; font-weight:700; color:#2563eb; cursor:pointer;">추출 요청 프롬프트 원문 미리보기 ▼</summary>
+                <pre class="wiz-copy-pre" id="wizStyleExtractPromptBox" style="margin-top:6px; max-height:160px;"></pre>
+              </details>
+            </div>
+
+            <div class="wiz-substep-card">
+              <div class="wiz-substep-head">
+                <span class="wiz-substep-title"><span class="wiz-substep-badge">2단계</span> 받아온 '스타일 가이드' 붙여넣기</span>
+                <span style="font-size:11px; color:#059669; font-weight:700;">자동 임시 저장 · 매장 정보 수정 시에도 유지</span>
+              </div>
+              <textarea id="wizCustomStyleGuide" rows="5" placeholder="ChatGPT/Gemini가 요약해 준 '스타일 가이드'를 그대로 붙여넣으세요.&#10;예)&#10;- 말투: 친근하고 담백한 해요체, 짧은 호흡의 문장&#10;- 이모지: ✨🖤✂️📍 중심으로 포인트만 절제 사용&#10;- 영문 병기: 본문 하단에 1~2줄 영문 스타일 요약 추가&#10;- 하단 서명: ✂️ 김민수 실장 @my_salon / 📍 라벨르헤어 강남점 / 📩 예약 문의는 DM 주세요" oninput="onCustomStyleGuideInput()" style="width:100%; font-size:12px; line-height:1.55; padding:8px 10px; border:1px solid #cbd5e1; border-radius:7px; resize:vertical;"></textarea>
+            </div>
+
+            <div class="wiz-substep-card">
+              <div class="wiz-substep-head">
+                <span class="wiz-substep-title"><span class="wiz-substep-badge">3단계</span> 내 스타일 적용 최종 마스터 프롬프트 (실시간 자동 조립)</span>
+                <button type="button" class="btn-tool" style="background:#059669; color:#fff; border-color:#059669; font-weight:800;" onclick="copyTextById('wizCustomMasterPromptBox')">📋 최종 프롬프트 복사</button>
+              </div>
+              <div style="font-size:11.5px; color:#475569; margin-bottom:7px; line-height:1.5;">
+                업로더 필수 규격(역질문 3개 · 6개 구분자 · 블로그 <code>[미디어 자료1~4]</code>)을 <b>1순위 절대 규칙</b>으로 고정하고, <b>[숏폼 전용 본문]은 내 스타일 100% 반영 / [블로그 전용 본문]은 말투의 결만 유지</b>하도록 안전하게 조립됩니다.
+              </div>
+              <pre class="wiz-copy-pre" id="wizCustomMasterPromptBox" style="max-height:240px;"></pre>
+            </div>
+          </div>
+        </div>
+
+        <div class="wiz-section-box" style="margin-bottom:0; background:#f0fdf4; border-color:#86efac;">
+          <div class="wiz-section-title" style="color:#166534;"><span>🚦 설정 준비 상태 &amp; 10초 미리보기 체험</span></div>
+          <div class="wiz-ready-grid" id="wizReadinessGrid"></div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <button type="button" class="btn-submit" style="flex:1.4; background:#7c3aed; font-size:13px;" onclick="runSampleOnboardingPreview()">✨ 내 정보로 샘플 변환해 보기 (10초 체험)</button>
+            <button type="button" class="btn-submit" style="flex:1; background:#059669; font-size:13px;" onclick="completeOnboardingAndClose()">✅ 설정 완료 · 대시보드 시작</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wiz-footer">
+      <button type="button" class="btn-tool" id="wizBtnPrev" style="padding:8px 14px; font-weight:700;" onclick="stepWizard(-1)">◀ 이전 단계</button>
+      <span style="font-size:11.5px; color:#64748b;" id="wizFooterHint">창을 닫아도 현재 단계와 입력값이 자동 저장됩니다.</span>
+      <button type="button" class="btn-submit" id="wizBtnNext" style="width:auto; padding:8px 18px; background:#2563eb; font-size:13px;" onclick="stepWizard(1)">다음 단계 ▶</button>
+    </div>
+    <div class="official-slim-bar official-slim-bar-modal" id="wizardOfficialBar"></div>
+  </div>
+</div>
+
+<!-- 인포크링크 만들기 가이드 보조 팝업 모달 (1단계에서 바로 호출) -->
+<div class="modal-overlay" id="inpockGuideModal" style="z-index: 10050;">
+  <div class="modal-content inpock-modal-content">
+    <div class="modal-header">
+      <h3 style="margin:0; font-size:15.5px;">🔗 나만의 통합 예약 링크 (인포크링크) 만들기 가이드</h3>
+      <button type="button" onclick="closeInpockGuideModal()" style="border:none; background:#e2e8f0; padding:6px 12px; border-radius:6px; cursor:pointer; font-weight:700;">닫기</button>
+    </div>
+    <div class="modal-body">
+      <div class="wiz-section-box" style="margin-bottom:0;">
+        <div class="wiz-section-title">
+          <span>3분 만에 인포크링크 만들고 바로 연결하기</span>
+          <a href="https://link.inpock.co.kr/" target="_blank" class="btn-tool" style="text-decoration:none; background:#2563eb; color:#fff; border-color:#2563eb; font-weight:800;">🌐 인포크링크 바로가기 ↗</a>
+        </div>
+        <div style="font-size:12.5px; color:#334155; line-height:1.6;">
+          인스타·유튜브·쓰레드·블로그 곳곳에 흩어진 예약 링크를 <b>딱 1개의 통합 페이지</b>로 묶어두면 예약 전환율이 훨씬 올라갑니다.
+        </div>
+        <div style="margin-top:8px; padding:8px 10px; background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; font-size:12px; color:#92400e; line-height:1.55;">
+          💡 <b>영업시간·정기 휴무일 관리 팁:</b> 블로그/SNS 글마다 적지 마시고 <b>인포크링크 상단 소개에 직접 입력</b>해 두시면 추후 변경 시 한 곳만 고치면 되어 가장 깔끔합니다.
+        </div>
+        <ol class="guide-step-list">
+          <li><b>가입 및 영문 주소(핸들) 만들기:</b> 인포크링크 가입 후 기억하기 쉬운 영문 주소로 설정하세요. <span style="color:#64748b;">(팁: <code>매장영문_디자이너</code> 또는 <code>지역_이름</code> 형태 추천)</span></li>
+          <li><b>프로필 상단 소개 복붙:</b> 아래 자동 생성 문구를 복사해 인포크링크 소개에 붙여넣고, 필요시 영업시간·휴무일을 직접 덧붙이세요.</li>
+          <li><b>필수 버튼 4종 구성 추천:</b>
+            <div id="wizInpockButtonHints" style="margin-top:5px; font-size:12px; color:#475569; line-height:1.65;"></div>
+          </li>
+          <li><b>완성된 내 인포크링크 복사</b> 후 아래 입력칸에 붙여넣으면 1단계 기본정보와 모든 미리보기에 즉시 반영됩니다!</li>
+        </ol>
+
+        <div class="wiz-copy-card" style="margin-top:8px;">
+          <div class="wiz-copy-head">
+            <span>📋 인포크링크 프로필 상단 소개 템플릿 (매장명·위치·주차 자동 반영)</span>
+            <button type="button" class="btn-tool" onclick="copyTextById('wizInpockBioBox')">📋 복사</button>
+          </div>
+          <pre class="wiz-copy-pre" id="wizInpockBioBox"></pre>
+        </div>
+
+        <div style="margin-top:10px; padding:11px 12px; background:#eff6ff; border:1px solid #93c5fd; border-radius:8px;">
+          <span class="field-label" style="color:#1e40af;">✅ 완성된 내 인포크링크 붙여넣기 (1단계 대표 통합 링크와 실시간 동기화)</span>
+          <input type="text" id="wizStep2InpockUrl" placeholder="예: https://link.inpock.co.kr/myid" oninput="syncInpockUrlFromStep2(this.value)">
+        </div>
+      </div>
+    </div>
+    <div class="wiz-footer" style="justify-content:flex-end;">
+      <button type="button" class="btn-submit" style="width:auto; padding:8px 18px; background:#059669; font-size:13px;" onclick="closeInpockGuideModal()">✅ 링크 적용하고 닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-toast" id="appToast"></div>
+
+<script>
+let currentVideoName = "";
+let currentVideoObjectUrl = "";
+let extractedThumbs = [];
+let selectedThumbSlot = 0;
+let scrubDuration = 0;
+let gifStartSec = 0;
+let gifEndSec = 2.5;
+let gifSpeed = 1.0;
+let isGifLoopPreview = false;
+let currentVideoAspect = { width: 0, height: 0, mode: 'portrait' };
+let draggedThumbIdx = null;
+let currentProfile = {};
+let currentBlogCategories = [];
+let currentEnabledPlatforms = ['yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'daangn', 'x'];
+let isProfileConfigured = false;
+let wizardStep = 0;
+let currentPromptMode = 'standard';
+let wizSaveTimer = null;
+let latestSetupStatus = {};
+let latestPublishResults = {};
+let wasBusy = false;
+
+const CHUNK_SIZE = 5 * 1024 * 1024;
+const dropZone = document.getElementById('dropZone');
+const videoFileInput = document.getElementById('videoFile');
+
+const PLATFORM_META = [
+  { key: 'yt', dotId: 'dotYt', chkId: 'chkYt', label: '유튜브 쇼츠', desc: '공식 무료 API (하루 최대 6건)' },
+  { key: 'naver', dotId: 'dotNaver', chkId: 'chkNaver', label: '네이버 블로그', desc: '검색 유입 핵심 · 사진/GIF 자동 배치' },
+  { key: 'clip', dotId: 'dotClip', chkId: 'chkClip', label: '네이버 클립', desc: '플레이스 연동 숏폼' },
+  { key: 'tt', dotId: 'dotTt', chkId: 'chkTt', label: '틱톡', desc: '글로벌 숏폼 노출' },
+  { key: 'ig', dotId: 'dotIg', chkId: 'chkIg', label: '인스타그램', desc: '릴스 저장/예약 전환 핵심' },
+  { key: 'pin', dotId: 'dotPin', chkId: 'chkPin', label: '핀터레스트', desc: '스타일 검색 + 링크 유입' },
+  { key: 'threads', dotId: 'dotThreads', chkId: 'chkThreads', label: '쓰레드', desc: '대화형 소통 · 인스타 연동' },
+  { key: 'daangn', dotId: 'dotDaangn', chkId: 'chkDaangn', label: '당근 비즈', desc: '동네 이웃 단골 확보' },
+  { key: 'x', dotId: 'dotX', chkId: 'chkX', label: '엑스(X)', desc: '초간결 스타일 피드' }
+];
+
+const WIZARD_STEP_TITLES = [
+  '0단계 / 4단계 · 사용할 플랫폼 선택',
+  '1단계 / 4단계 · 매장 기본 정보 & 게시판 입력',
+  '2단계 / 4단계 · 플랫폼별 프로필·게시판·오시는 길',
+  '3단계 / 4단계 · 통합 로그인 신호등 & 유튜브 API',
+  '4단계 / 4단계 · 본문뽑기 마스터 프롬프트 & 10초 체험'
+];
+
+function statusIconAndTip(key, state, ageDays) {
+  if (state === 'green') {
+    const ageNote = (key !== 'yt' && typeof ageDays === 'number') ? ` (${ageDays}일 전 갱신)` : '';
+    return { icon: '🟢', tip: key === 'yt' ? '유튜브 API 인증 완료 (업로드 준비됨)' : `로그인 쿠키 정상 저장됨${ageNote}` };
+  }
+  if (state === 'yellow') {
+    if (key === 'yt') {
+      return { icon: '🟡', tip: 'client_secret.json 등록됨 · 첫 유튜브 업로드 시 구글 계정 1회 인증 필요' };
+    }
+    const daysText = (typeof ageDays === 'number' && ageDays >= 20) ? `로그인 후 ${ageDays}일 경과 · ` : '로그인 후 20일 경과 · ';
+    return { icon: '🟡', tip: `${daysText}업로드 전 재로그인 권장` };
+  }
+  return { icon: '🔴', tip: key === 'yt' ? '미설정 · 초기 설정 가이드 3단계에서 client_secret.json을 등록해 주세요' : '미로그인 · 로그인 점검창에서 1회 로그인해 주세요' };
+}
+
+function applyVideoAspectLayout(width, height, orientationHint) {
+  const w = Number(width) || 0;
+  const h = Number(height) || 0;
+  let mode = 'portrait';
+  if (w > 0 && h > 0) {
+    const ratio = w / h;
+    if (ratio >= 1.15) mode = 'landscape';
+    else if (ratio <= 0.88) mode = 'portrait';
+    else mode = 'square';
+  } else if (orientationHint === '가로') {
+    mode = 'landscape';
+  } else if (orientationHint === '정방형') {
+    mode = 'square';
+  }
+  currentVideoAspect = { width: w, height: h, mode };
+
+  const studio = document.getElementById('blogScrubberStudio');
+  const grid = document.getElementById('blogThumbGrid');
+  const badge = document.getElementById('scrubberOrientBadge');
+  const clampedRatio = (w > 0 && h > 0) ? Math.max(1.25, Math.min(2.2, w / h)) : (16 / 9);
+
+  if (studio) {
+    studio.classList.toggle('is-landscape', mode === 'landscape');
+    studio.classList.toggle('is-square', mode === 'square');
+    if (mode === 'landscape') {
+      studio.style.setProperty('--video-aspect', clampedRatio.toFixed(3));
+    } else {
+      studio.style.removeProperty('--video-aspect');
+    }
+  }
+  if (grid) {
+    grid.classList.toggle('is-landscape', mode === 'landscape');
+    grid.classList.toggle('is-square', mode === 'square');
+    if (mode === 'landscape') {
+      grid.style.setProperty('--thumb-aspect', clampedRatio.toFixed(3));
+    } else {
+      grid.style.removeProperty('--thumb-aspect');
+    }
+  }
+  if (badge) {
+    badge.innerText = mode === 'landscape' ? '🖥️ 가로' : (mode === 'square' ? '⬜ 정방형' : '📱 세로');
+  }
+}
+
+function renderVideoMeta(meta) {
+  const box = document.getElementById('videoMetaBox');
+  if (!box) return;
+  if (!meta || !meta.ok) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+    return;
+  }
+  if ((meta.width > 0 && meta.height > 0) || (meta.orientation && meta.orientation !== '알 수 없음')) {
+    applyVideoAspectLayout(meta.width, meta.height, meta.orientation);
+  }
+  const pills = [];
+  if (meta.duration_sec > 0) pills.push(`<span class="meta-pill">⏱️ ${meta.duration_sec}초</span>`);
+  if (meta.width > 0 && meta.height > 0) pills.push(`<span class="meta-pill">📐 ${meta.width}×${meta.height}</span>`);
+  if (meta.size_mb > 0) pills.push(`<span class="meta-pill">💾 ${meta.size_mb} MB</span>`);
+  if (meta.orientation && meta.orientation !== '알 수 없음') {
+    const cls = meta.orientation === '세로' ? 'meta-pill ok' : 'meta-pill';
+    pills.push(`<span class="${cls}">📱 ${meta.orientation}</span>`);
+  }
+  const warnings = Array.isArray(meta.warnings) ? meta.warnings : [];
+  const warnHtml = warnings.length
+    ? `<div class="meta-warn-list">${warnings.map(w => `<span class="meta-warn-badge">⚠️ ${w}</span>`).join('')}</div>`
+    : `<div class="meta-warn-list"><span class="meta-pill ok">✅ 주요 숏폼 플랫폼 규격 적합</span></div>`;
+  box.innerHTML = `<div class="video-meta-pills">${pills.join('')}</div>${warnHtml}`;
+  box.style.display = 'block';
+}
+
+function renderPublishResults(results, isBusy) {
+  const box = document.getElementById('publishResultBox');
+  if (!box) return;
+  const entries = results && typeof results === 'object' ? Object.entries(results) : [];
+  if (isBusy || entries.length === 0) {
+    box.style.display = 'none';
+    return;
+  }
+  latestPublishResults = results;
+  const labelMap = {};
+  PLATFORM_META.forEach(p => { labelMap[p.key] = p.label; });
+
+  const failedKeys = entries.filter(([, info]) => !info?.ok).map(([k]) => k);
+  const okCnt = entries.length - failedKeys.length;
+  const chipsHtml = entries.map(([k, info]) => {
+    const ok = !!info?.ok;
+    const lbl = labelMap[k] || k;
+    const msg = info?.msg ? ` (${info.msg})` : '';
+    return `<span class="res-chip ${ok ? 'ok' : 'fail'}" title="${lbl}${msg}">${ok ? '🟢' : '🔴'} ${lbl}${ok ? '' : msg}</span>`;
+  }).join('');
+
+  const retryBtnHtml = failedKeys.length > 0
+    ? `<button type="button" class="btn-retry-failed" onclick="retryFailedPlatforms()">🔁 실패한 플랫폼만 다시 올리기 (${failedKeys.length}개)</button>`
+    : `<span style="font-size:11.5px; color:#059669; font-weight:700;">✅ 모든 선택 플랫폼 성공!</span>`;
+
+  const errorHelpHtml = failedKeys.length > 0
+    ? `<div style="margin-top:8px; font-size:11.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:6px 9px;">💡 플랫폼 화면이 바뀌었나요? 상단 <b>[🔄 업데이트 확인]</b> 또는 하단 <b>[💬 질문·소통방]</b>을 확인하세요.</div>`
+    : '';
+
+  box.innerHTML = `
+    <div class="publish-result-header">
+      <span>📋 직전 업로드 결과 요약 (성공 ${okCnt} / 전체 ${entries.length})</span>
+      ${retryBtnHtml}
+    </div>
+    <div class="publish-chips">${chipsHtml}</div>
+    ${errorHelpHtml}
+  `;
+  box.style.display = 'block';
+}
+
+function retryFailedPlatforms() {
+  if (!currentVideoName) return alert("⚠️ 영상 파일이 아직 첨부되지 않았습니다!");
+  const failedKeys = Object.entries(latestPublishResults || {})
+    .filter(([, info]) => !info?.ok)
+    .map(([k]) => k);
+  if (!failedKeys.length) return;
+  startUpload(failedKeys);
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function copyRawText(text, okMsg) {
+  const val = String(text || '').trim();
+  if (!val) return;
+  const done = () => appendUiLog(okMsg || '📋 클립보드에 복사되었습니다!');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(val).then(() => { done(); alert(okMsg || '✅ 클립보드에 복사되었습니다!'); }).catch(() => fallbackCopyText(val, okMsg));
+  } else {
+    fallbackCopyText(val, okMsg);
+  }
+}
+
+function fallbackCopyText(val, okMsg) {
+  const ta = document.createElement('textarea');
+  ta.value = val;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); alert(okMsg || '✅ 클립보드에 복사되었습니다!'); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+function copyTextById(elId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  copyRawText(el.innerText || el.value || '', '✅ 클립보드에 복사되었습니다!');
+}
+
+function extractNaverBlogId(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  const mq = s.match(/[?&]blogId=([A-Za-z0-9._-]+)/i);
+  if (mq) return mq[1];
+  const mu = s.match(/(?:m\.)?blog\.naver\.com\/([A-Za-z0-9._-]+)/i);
+  if (mu && !['postlist.naver', 'postview.naver', 'goblogwrite.naver', 'myblog.naver'].includes(mu[1].toLowerCase())) {
+    return mu[1];
+  }
+  s = s.replace(/^https?:\/\//i, '').replace(/^\/+/, '').split('/')[0].split('?')[0].trim().replace(/^@/, '');
+  if (s.includes('@')) s = s.split('@')[0].trim();
+  return s;
+}
+
+function extractPinterestId(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  const mu = s.match(/pinterest\.[a-z.]+\/([A-Za-z0-9._-]+)/i);
+  if (mu && !['pin', 'pin-creation-tool', 'pin-builder', 'ideas', 'search', 'settings', 'login'].includes(mu[1].toLowerCase())) {
+    return mu[1];
+  }
+  s = s.replace(/^https?:\/\//i, '').replace(/^\/+/, '').split('/')[0].split('?')[0].trim().replace(/^@/, '');
+  if (s.includes('@')) s = s.split('@')[0].trim();
+  return s;
+}
+
+function formatIdConnectText(type, extracted) {
+  if (!extracted) return '';
+  return type === 'naver'
+    ? `✅ 연결 주소: blog.naver.com/${extracted}`
+    : `✅ 연결 주소: pinterest.com/${extracted}`;
+}
+
+function smartExtractIdInput(inputId, type, statusId, triggerWizardSync = false, forceNormalize = false) {
+  const el = document.getElementById(inputId);
+  const stEl = document.getElementById(statusId);
+  if (!el) return;
+  const raw = (el.value || '').trim();
+  const extracted = (type === 'naver') ? extractNaverBlogId(raw) : extractPinterestId(raw);
+  const looksLikeUrl = /https?:\/\/|blog\.naver\.com|pinterest\.|[/?]/i.test(raw);
+  const looksLikeFullEmail = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(raw);
+
+  if (raw && extracted && raw !== extracted && (forceNormalize || looksLikeUrl || looksLikeFullEmail)) {
+    el.value = extracted;
+  }
+  if (stEl) {
+    stEl.innerText = formatIdConnectText(type, extracted);
+  }
+  if (triggerWizardSync) onWizardFieldInput();
+}
+
+function getDynamicRegionTags(regionKw) {
+  const raw = String(regionKw || '').trim();
+  if (!raw) return [];
+  const clean = raw.replace(/[\s#,·•/]+/g, '').replace(/(?:미용실|헤어샵|헤어살롱|헤어)$/, '').trim();
+  if (!clean) return [];
+  if (clean.endsWith('역') && clean.length >= 3) {
+    return [clean.slice(0, -1) + '미용실', clean + '미용실'];
+  }
+  return [clean + '미용실'];
+}
+
+function renderBlogCategoryChips() {
+  const cats = Array.isArray(currentBlogCategories) ? currentBlogCategories : [];
+  ['barBlogCatChips', 'wizBlogCatChips'].forEach(wrapId => {
+    const wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    if (!cats.length) {
+      wrap.innerHTML = `<span style="font-size:11px; color:#94a3b8;">등록된 게시판이 없습니다 (빈칸이면 블로그 기본 게시판 발행 · 위 [✨ 기본 추천 채우기] 클릭 가능)</span>`;
+      return;
+    }
+    wrap.innerHTML = cats.map((c, idx) =>
+      `<span class="cat-chip">${escapeHtml(c)}<button type="button" title="삭제" onclick="removeBlogCategory(${idx})">×</button></span>`
+    ).join('');
+  });
+  renderNaverCategorySelect();
+}
+
+function addBlogCategoryFromInput(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const raw = (el.value || '').trim();
+  if (!raw) return;
+  const parts = raw.split(/[,\n]+/).map(s => s.trim()).filter(Boolean);
+  let warnedRoute = false;
+  for (const c of parts) {
+    if (c.replace(/\s+/g, '') === '오시는길' || c.replace(/\s+/g, '') === '오시는길안내') {
+      warnedRoute = true;
+      continue;
+    }
+    if (!currentBlogCategories.some(ex => ex.toLowerCase() === c.toLowerCase())) {
+      currentBlogCategories.push(c);
+    }
+  }
+  el.value = '';
+  if (warnedRoute) {
+    alert("💡 '오시는 길'은 일상 시술 업로드 목록에 섞지 않고, 2단계 초기 세팅 고정글로 별도 관리됩니다!");
+  }
+  renderBlogCategoryChips();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function removeBlogCategory(idx) {
+  currentBlogCategories.splice(idx, 1);
+  renderBlogCategoryChips();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function fillDefaultBlogCategories() {
+  ['Men', 'Women'].forEach(c => {
+    if (!currentBlogCategories.some(ex => ex.toLowerCase() === c.toLowerCase())) {
+      currentBlogCategories.push(c);
+    }
+  });
+  renderBlogCategoryChips();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function renderNaverCategorySelect(preferredVal) {
+  const sel = document.getElementById('naverCategory');
+  if (!sel) return;
+  const curVal = preferredVal !== undefined ? String(preferredVal || '') : (sel.value || '');
+  const cats = Array.isArray(currentBlogCategories) ? currentBlogCategories : [];
+  let opts = '';
+  if (cats.length) {
+    opts += cats.map(c => `<option value="${escapeHtml(c)}">📂 ${escapeHtml(c)}</option>`).join('');
+    opts += `<option value="">(블로그 기본 게시판)</option>`;
+  } else {
+    opts = `<option value="">(블로그 기본 게시판 — 기본정보에서 게시판 추가 가능)</option>`;
+  }
+  sel.innerHTML = opts;
+  if (curVal && cats.includes(curVal)) {
+    sel.value = curVal;
+  } else if (preferredVal === '' || !cats.length) {
+    sel.value = '';
+  } else if (cats.length) {
+    sel.value = cats[0];
+  }
+}
+
+function toggleProfileAccordion() {
+  const panel = document.getElementById('profilePanel');
+  const open = !panel.classList.contains('open');
+  panel.classList.toggle('open', open);
+  updateProfileHeaderBar(open);
+}
+
+function updateProfileHeaderBar(isOpen) {
+  const panel = document.getElementById('profilePanel');
+  const opened = (isOpen !== undefined) ? isOpen : panel.classList.contains('open');
+  const sign = opened ? '-' : '+';
+  const salon = (currentProfile.salon_name || '').trim();
+  const designer = (currentProfile.designer_name || '').trim();
+  const summaryText = salon
+    ? `${salon}${designer ? ' · ' + designer : ''}`
+    : '매장 미설정 — 초기 설정 필요';
+  document.getElementById('profileSummaryLabel').innerText = `[${sign} 매장·기본정보 설정 (현재: ${summaryText})]`;
+  document.getElementById('profileToggleHint').innerText = opened ? '클릭하여 접기 ▲' : '클릭하여 펼치기 ▼';
+
+  const titleEl = document.getElementById('brandTitleText');
+  const subEl = document.getElementById('brandSubPill');
+  if (titleEl) titleEl.innerText = salon || '헤어살롱 SNS 멀티 업로더';
+  if (subEl) subEl.innerText = salon ? 'SNS 멀티 업로더' : '초기 설정 필요';
+  document.title = salon ? `${salon} · SNS 멀티 업로더` : '헤어살롱 SNS 멀티 업로더';
+
+  const banner = document.getElementById('unconfiguredBanner');
+  if (banner) banner.style.display = isProfileConfigured ? 'none' : 'flex';
+}
+
+function applyEnabledPlatformsToUI() {
+  const enabledSet = new Set(currentEnabledPlatforms || []);
+  // 대시보드 상단 플랫폼 박스: 미선택 플랫폼은 숨기고 체크 해제 (언제든 0단계에서 복구 가능)
+  document.querySelectorAll('.platform-box[data-platform]').forEach(box => {
+    const key = box.getAttribute('data-platform');
+    const isOn = enabledSet.size === 0 || enabledSet.has(key);
+    box.classList.toggle('plat-hidden', !isOn);
+    const meta = PLATFORM_META.find(p => p.key === key);
+    const chk = meta ? document.getElementById(meta.chkId) : null;
+    if (chk) chk.checked = isOn;
+  });
+
+  // 마법사 1단계: 플랫폼별 조건부 입력칸 숨김/표시
+  const naverOn = enabledSet.has('naver');
+  const pinOn = enabledSet.has('pin');
+  const ytOn = enabledSet.has('yt');
+  const showEl = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? 'block' : 'none'; };
+  showEl('wizNaverIdWrap', naverOn);
+  showEl('wizBlogCatsWrap', naverOn);
+  showEl('wizPinIdWrap', pinOn);
+  showEl('wizPinBoardWrap', pinOn);
+  showEl('wizYtApiSection', ytOn);
+}
+
+function applyProfileToUI(data) {
+  const prof = data.profile || {};
+  currentProfile = prof;
+  isProfileConfigured = Boolean(data.is_configured || (prof.salon_name || '').trim());
+  currentBlogCategories = Array.isArray(prof.blog_categories) ? [...prof.blog_categories] : [];
+  currentEnabledPlatforms = Array.isArray(prof.enabled_platforms) && prof.enabled_platforms.length
+    ? [...prof.enabled_platforms]
+    : PLATFORM_META.map(p => p.key);
+  if (typeof prof.onboarding_step === 'number' && !isNaN(prof.onboarding_step)) {
+    wizardStep = Math.max(0, Math.min(4, prof.onboarding_step));
+  }
+  currentPromptMode = (prof.prompt_mode === 'custom') ? 'custom' : 'standard';
+  const styleGuideEl = document.getElementById('wizCustomStyleGuide');
+  if (styleGuideEl) styleGuideEl.value = prof.custom_style_guide || '';
+  applyPromptModeUI();
+
+  const pairMap = [
+    ['profSalonName', 'wizSalonName', prof.salon_name],
+    ['profRegionKeyword', 'wizRegionKeyword', prof.region_keyword],
+    ['profDesignerName', 'wizDesignerName', prof.designer_name],
+    ['profSpecialty', 'wizSpecialty', prof.specialty],
+    ['profBookingUrl', 'wizBookingUrl', prof.booking_url],
+    ['profPinBoard', 'wizPinBoard', prof.pinterest_board],
+    ['profNaverId', 'wizNaverId', prof.naver_blog_id],
+    ['profPinId', 'wizPinId', prof.pinterest_id],
+    ['profPersonalBanned', null, prof.personal_banned_tags],
+    ['profSalonAddress', 'wizSalonAddress', prof.salon_address],
+    ['profLocationGuide', 'wizLocationGuide', prof.location_guide],
+    ['profParkingGuide', 'wizParkingGuide', prof.parking_guide]
+  ];
+  pairMap.forEach(([barId, wizId, val]) => {
+    const v = val || '';
+    const el1 = barId ? document.getElementById(barId) : null;
+    const el2 = wizId ? document.getElementById(wizId) : null;
+    if (el1) el1.value = v;
+    if (el2) el2.value = v;
+  });
+  const s2Inpock = document.getElementById('wizStep2InpockUrl');
+  if (s2Inpock) s2Inpock.value = prof.booking_url || '';
+
+  // 카드 장소/링크/보드 실시간 동기화 (매장명을 스마트플레이스 검색어로 통합 사용)
+  const placeVal = (prof.salon_name || prof.place_search_keyword || '').trim();
+  ['naverPlace', 'clipPlace', 'ttLocation', 'igLocation'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = placeVal;
+  });
+  const pinDestEl = document.getElementById('pinDestUrl');
+  const pinBoardEl = document.getElementById('pinBoard');
+  if (pinDestEl) pinDestEl.value = prof.booking_url || '';
+  if (pinBoardEl) pinBoardEl.value = prof.pinterest_board || '';
+
+  const naverId = extractNaverBlogId(prof.naver_blog_id || '');
+  const pinId = extractPinterestId(prof.pinterest_id || '');
+  ['profNaverIdStatus', 'wizNaverIdStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = formatIdConnectText('naver', naverId);
+  });
+  ['profPinIdStatus', 'wizPinIdStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = formatIdConnectText('pin', pinId);
+  });
+  const naverLink = document.getElementById('linkNaverBlog');
+  const pinLink = document.getElementById('linkPinterest');
+  if (naverLink) naverLink.href = naverId ? `https://blog.naver.com/${naverId}` : 'https://blog.naver.com/';
+  if (pinLink) pinLink.href = pinId ? `https://kr.pinterest.com/${pinId}/` : 'https://kr.pinterest.com/';
+
+  renderBlogCategoryChips();
+  applyEnabledPlatformsToUI();
+  renderWizardPlatforms();
+  updateProfileHeaderBar();
+  updateWizardLivePreviews();
+}
+
+function loadProfileFromServer(autoOpenGuideIfNeeded) {
+  return fetch('/api/profile').then(r => r.json()).then(d => {
+    if (d && d.ok) {
+      applyProfileToUI(d);
+      if (autoOpenGuideIfNeeded && !d.is_configured) {
+        const resumeStep = typeof d.profile?.onboarding_step === 'number' ? Math.max(0, Math.min(4, d.profile.onboarding_step)) : 0;
+        openSetupGuide(resumeStep);
+      }
+    }
+  }).catch(() => {});
+}
+
+function collectProfilePayload(prefix) {
+  const getVal = id => (document.getElementById(id)?.value || '').trim();
+  const salonName = getVal(prefix + 'SalonName');
+  const payload = {
+    enabled_platforms: [...currentEnabledPlatforms],
+    salon_name: salonName,
+    region_keyword: getVal(prefix + 'RegionKeyword'),
+    designer_name: getVal(prefix + 'DesignerName'),
+    specialty: getVal(prefix + 'Specialty'),
+    booking_url: getVal(prefix + 'BookingUrl'),
+    place_search_keyword: salonName,
+    pinterest_board: getVal(prefix + 'PinBoard'),
+    naver_blog_id: extractNaverBlogId(getVal(prefix + 'NaverId')),
+    pinterest_id: extractPinterestId(getVal(prefix + 'PinId')),
+    salon_address: getVal(prefix + 'SalonAddress'),
+    location_guide: getVal(prefix + 'LocationGuide'),
+    parking_guide: getVal(prefix + 'ParkingGuide'),
+    blog_categories: [...currentBlogCategories],
+    onboarding_step: wizardStep
+  };
+  // 개인 제외 해시태그는 일반 설정 바에 입력칸이 존재할 때만 포함 (마법사 자동 저장 시 기존 값 보호)
+  const bannedEl = document.getElementById(prefix + 'PersonalBanned');
+  if (bannedEl) {
+    payload.personal_banned_tags = (bannedEl.value || '').trim();
+  }
+  // 프롬프트 모드 & 내 스타일 가이드는 마법사 저장 시에만 포함 (상단 바 수정 시 기존 스타일 가이드 보호)
+  if (prefix === 'wiz') {
+    payload.prompt_mode = currentPromptMode === 'custom' ? 'custom' : 'standard';
+    const sgEl = document.getElementById('wizCustomStyleGuide');
+    if (sgEl) {
+      payload.custom_style_guide = (sgEl.value || '').trim();
+    }
+  }
+  return payload;
+}
+
+function saveProfileFromBar() {
+  const payload = collectProfilePayload('prof');
+  if (!payload.salon_name) {
+    return alert('⚠️ 매장명을 입력해 주세요!');
+  }
+  fetch('/api/profile', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+  .then(r => r.json()).then(d => {
+    if (d && d.ok) {
+      applyProfileToUI(d);
+      alert('✅ 매장 및 기본정보가 저장되어 바로 반영되었습니다!');
+    }
+  });
+}
+
+function renderWizardPlatforms() {
+  const grid = document.getElementById('wizPlatformGrid');
+  if (!grid) return;
+  const enabledSet = new Set(currentEnabledPlatforms);
+  grid.innerHTML = PLATFORM_META.map(p => {
+    const checked = enabledSet.has(p.key);
+    return `
+      <label class="wiz-plat-card ${checked ? 'selected' : ''}" onclick="toggleWizardPlatform('${p.key}', event)">
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="event.stopPropagation(); setWizardPlatformState('${p.key}', this.checked)">
+        <div>
+          <span class="wiz-plat-name">${p.label}</span>
+          <span class="wiz-plat-desc">${p.desc || ''}</span>
+        </div>
+      </label>
+    `;
+  }).join('');
+}
+
+function setWizardPlatformState(key, checked) {
+  const set = new Set(currentEnabledPlatforms);
+  if (checked) set.add(key);
+  else set.delete(key);
+  if (set.size === 0) {
+    alert('⚠️ 최소 1개 이상의 플랫폼을 선택해 주세요.');
+    renderWizardPlatforms();
+    return;
+  }
+  currentEnabledPlatforms = PLATFORM_META.map(p => p.key).filter(k => set.has(k));
+  renderWizardPlatforms();
+  applyEnabledPlatformsToUI();
+  refreshSetupStatus();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function toggleWizardPlatform(key, ev) {
+  if (ev && ev.target && ev.target.tagName === 'INPUT') return;
+  if (ev) ev.preventDefault();
+  setWizardPlatformState(key, !currentEnabledPlatforms.includes(key));
+}
+
+function setWizardPlatformPreset(mode) {
+  if (mode === 'core') {
+    currentEnabledPlatforms = ['naver', 'ig', 'yt'];
+  } else {
+    currentEnabledPlatforms = PLATFORM_META.map(p => p.key);
+  }
+  renderWizardPlatforms();
+  applyEnabledPlatformsToUI();
+  refreshSetupStatus();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function applySpecialtyPreset(type) {
+  const presets = {
+    men: {
+      specialty: '남자 다운펌 · 드롭컷 · 가르마펌',
+      cats: ['Men', '다운펌', '남자 스타일링']
+    },
+    women: {
+      specialty: '레이어드컷 · 빌드펌 · 퍼스널 염색',
+      cats: ['Women', '레이어드·펌', '염색·컬러']
+    },
+    clinic: {
+      specialty: '복구매직 · 손상모 클리닉 · 볼륨매직',
+      cats: ['복구매직', '클리닉·케어', 'Before&After']
+    }
+  };
+  const p = presets[type];
+  if (!p) return;
+  const spEl = document.getElementById('wizSpecialty');
+  if (spEl) spEl.value = p.specialty;
+  const profSp = document.getElementById('profSpecialty');
+  if (profSp) profSp.value = p.specialty;
+  p.cats.forEach(c => {
+    if (!currentBlogCategories.some(ex => ex.toLowerCase() === c.toLowerCase())) {
+      currentBlogCategories.push(c);
+    }
+  });
+  renderBlogCategoryChips();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function openInpockGuideModal() {
+  const modal = document.getElementById('inpockGuideModal');
+  if (!modal) return;
+  const setupOpen = document.getElementById('setupGuideModal')?.style.display === 'flex';
+  const curUrl = setupOpen
+    ? (document.getElementById('wizBookingUrl')?.value || '')
+    : (document.getElementById('profBookingUrl')?.value || document.getElementById('wizBookingUrl')?.value || '');
+  const s2 = document.getElementById('wizStep2InpockUrl');
+  if (s2) s2.value = curUrl.trim();
+  updateWizardLivePreviews();
+  modal.style.display = 'flex';
+}
+
+function closeInpockGuideModal() {
+  const modal = document.getElementById('inpockGuideModal');
+  if (modal) modal.style.display = 'none';
+  if (document.getElementById('setupGuideModal')?.style.display === 'flex') {
+    saveWizardDraftNow(false);
+  }
+}
+
+function syncInpockUrlFromStep2(val) {
+  const v = (val || '').trim();
+  const w1 = document.getElementById('wizBookingUrl');
+  const p1 = document.getElementById('profBookingUrl');
+  if (w1) w1.value = v;
+  if (p1) p1.value = v;
+  updateWizardLivePreviews();
+  if (document.getElementById('setupGuideModal')?.style.display === 'flex') {
+    debouncedSaveWizardDraft();
+  }
+}
+
+function onWizardFieldInput() {
+  const wBook = document.getElementById('wizBookingUrl');
+  const s2 = document.getElementById('wizStep2InpockUrl');
+  if (wBook && s2 && document.activeElement !== s2) {
+    s2.value = wBook.value || '';
+  }
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function getLiveWizardValues() {
+  const g = id => (document.getElementById(id)?.value || '').trim();
+  return {
+    salon: g('wizSalonName') || g('profSalonName') || (currentProfile.salon_name || '').trim() || 'OO헤어',
+    salonRaw: g('wizSalonName') || g('profSalonName') || (currentProfile.salon_name || '').trim(),
+    region: g('wizRegionKeyword') || g('profRegionKeyword') || (currentProfile.region_keyword || '').trim(),
+    designer: g('wizDesignerName') || g('profDesignerName') || (currentProfile.designer_name || '').trim(),
+    specialty: g('wizSpecialty') || g('profSpecialty') || (currentProfile.specialty || '').trim(),
+    booking: g('wizBookingUrl') || g('profBookingUrl') || (currentProfile.booking_url || '').trim(),
+    naverId: extractNaverBlogId(g('wizNaverId') || g('profNaverId') || currentProfile.naver_blog_id || ''),
+    pinId: extractPinterestId(g('wizPinId') || g('profPinId') || currentProfile.pinterest_id || ''),
+    pinBoard: g('wizPinBoard') || g('profPinBoard') || (currentProfile.pinterest_board || '').trim(),
+    address: g('wizSalonAddress') || g('profSalonAddress') || (currentProfile.salon_address || '').trim(),
+    locationGuide: g('wizLocationGuide') || g('profLocationGuide') || (currentProfile.location_guide || '').trim(),
+    parking: g('wizParkingGuide') || g('profParkingGuide') || (currentProfile.parking_guide || '').trim(),
+    cats: [...currentBlogCategories]
+  };
+}
+
+function buildSnsShortBio(v) {
+  // 매장명 + 이름/직책 + 주력 시술(선택) + 인포크링크 유도
+  const lines = [];
+  lines.push(`${v.salon}${v.designer ? ' | ' + v.designer : ''}`);
+  if (v.specialty) lines.push(`✂️ ${v.specialty}`);
+  else if (v.region) lines.push(`✂️ ${v.region} 1:1 맞춤 헤어 디자인`);
+  lines.push(v.booking ? `👇 예약·상담·가격표는 아래 링크 클릭\n${v.booking}` : `👇 예약·상담·가격표는 프로필 링크(인포크링크) 클릭`);
+  return lines.join('\n');
+}
+
+function buildChannelIntro(v) {
+  const lines = [];
+  lines.push(`안녕하세요, ${v.salon}${v.designer ? ' ' + v.designer : ''}입니다.`);
+  if (v.specialty) lines.push(`${v.specialty} 중심으로 실제 시술 기록과 손질 팁을 공유합니다.`);
+  else lines.push(`${v.region ? v.region + '에서 ' : ''}고객님 모질과 두상에 맞춘 시술 기록과 손질 팁을 공유합니다.`);
+  lines.push(v.booking ? `📌 1:1 우선 예약·상담: ${v.booking}` : `📌 1:1 우선 예약·상담은 프로필 통합 링크에서 가능합니다.`);
+  return lines.join('\n');
+}
+
+function buildDaangnIntro(v) {
+  const lines = [];
+  lines.push(`안녕하세요, ${v.region ? v.region + ' ' : ''}이웃님들! ${v.salon}${v.designer ? ' ' + v.designer : ''}입니다.`);
+  if (v.specialty) lines.push(`주력 시술: ${v.specialty}`);
+  lines.push(`집에서도 손질 편한 맞춤 스타일로 정성껏 상담해 드려요.`);
+  if (v.booking) lines.push(`예약·가격 확인: ${v.booking}`);
+  return lines.join('\n');
+}
+
+function buildDirectionsPostDraft(v) {
+  const lines = [];
+  lines.push(`안녕하세요, ${v.salon}${v.designer ? ' ' + v.designer : ''}입니다.`);
+  lines.push(`처음 방문하시는 분들도 헤매지 않고 편하게 찾아오실 수 있도록 오시는 길과 주차 안내를 정리해 두었습니다.`);
+  lines.push('');
+  lines.push(`📍 매장명: ${v.salon}`);
+  lines.push(`📍 주소: ${v.address || '(1단계에서 매장 주소를 입력해 주세요)'}`);
+  if (v.locationGuide) lines.push(`🚶 도보 안내: ${v.locationGuide}`);
+  lines.push(`🅿️ 주차 안내: ${v.parking || '(1단계에서 주차 안내를 입력해 주세요)'}`);
+  lines.push('');
+  lines.push(`📌 1:1 우선예약 및 상담 링크`);
+  lines.push(v.booking || '(1단계에서 완성한 인포크링크를 붙여넣어 주세요)');
+  lines.push('');
+  lines.push(`[※ 글 작성 후 에디터 상단 '장소' 버튼으로 ${v.salon} 스마트플레이스 지도를 꼭 첨부해 주세요!]`);
+  return lines.join('\n');
+}
+
+function applyPromptModeUI() {
+  const isCustom = currentPromptMode === 'custom';
+  const tabStd = document.getElementById('wizPromptTabStandard');
+  const tabCus = document.getElementById('wizPromptTabCustom');
+  const paneStd = document.getElementById('wizPromptPaneStandard');
+  const paneCus = document.getElementById('wizPromptPaneCustom');
+  if (tabStd) tabStd.classList.toggle('active', !isCustom);
+  if (tabCus) tabCus.classList.toggle('active', isCustom);
+  if (paneStd) paneStd.classList.toggle('active', !isCustom);
+  if (paneCus) paneCus.classList.toggle('active', isCustom);
+}
+
+function setPromptMode(mode) {
+  currentPromptMode = (mode === 'custom') ? 'custom' : 'standard';
+  applyPromptModeUI();
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function onCustomStyleGuideInput() {
+  updateWizardLivePreviews();
+  debouncedSaveWizardDraft();
+}
+
+function buildStyleExtractPromptText() {
+  return [
+    `당신은 미용실 SNS 카피라이팅 스타일 분석 전문가입니다.`,
+    `아래에 내가 붙여넣는 기존 게시물(또는 기존에 쓰던 프롬프트)을 분석해, 내 고유의 글쓰기 스타일만 뽑아 짧은 '스타일 가이드'로 요약해 주세요.`,
+    ``,
+    `[반드시 제외할 항목]`,
+    `- 과거 시술 내용, 특정 고객 사례, 날짜, 특정 시술명, 해시태그 목록`,
+    `- 업로더 출력 규격과 충돌하는 지시 (예: 출력 구분자 변경, 글자수 강제, 마크다운/표/코드블록 사용 지시 등)`,
+    ``,
+    `[반드시 추출·요약할 5가지 항목 — 총 5~8줄 이내 간결한 목록으로 출력]`,
+    `1. 말투·어투: 존댓말/반존대/친근함 정도, 자주 쓰는 문장 종결 습관`,
+    `2. 이모지 사용 습관: 사용 빈도와 주로 쓰는 이모지 종류`,
+    `3. 줄바꿈·문단 리듬: 한 줄 길이, 빈 줄 간격, 호흡 스타일`,
+    `4. 영문 병기 여부: 영문 한 줄 요약이나 영문 키워드 병기 유무 및 위치`,
+    `5. 하단 서명·DM/예약 푸터 형식: @인스타아이디, 📍/✂️ 등 위치·디자이너 표기, DM·예약 안내 문구 양식`,
+    ``,
+    `※ 불필요한 인사말이나 코드블록 없이 순수 텍스트로 '스타일 가이드' 내용만 바로 출력해 주세요.`,
+    ``,
+    `[여기에 평소 쓰던 내 인스타/블로그 글 1~3개 또는 기존 프롬프트를 붙여넣으세요]`
+  ].join('\n');
+}
+
+function copyStyleExtractPrompt() {
+  copyRawText(buildStyleExtractPromptText(), '✅ 내 스타일 추출 요청 프롬프트가 복사되었습니다! ChatGPT/Gemini에 붙여넣고 내 글을 함께 보내세요.');
+}
+
+function buildMasterPromptText(v) {
+  const regionDisplay = v.region || '(대표 지역 입력)';
+  const regionTags = getDynamicRegionTags(v.region);
+  const regionTagHint = regionTags.length ? regionTags.map(t => '#' + t).join(' ') : '#지역미용실';
+  const designerDisplay = v.designer || '(디자이너 이름·직책)';
+  const specLine = v.specialty ? `\n- 주력 시술/전문 분야: ${v.specialty}` : '';
+
+  return [
+    `당신은 미용실 마케팅 전문 카피라이터이자 '${v.salon}'(${designerDisplay}) 전담 콘텐츠 파트너입니다.`,
+    ``,
+    `[매장 및 디자이너 기본 정보]`,
+    `- 매장명: ${v.salon}`,
+    `- 대표 지역/상권: ${regionDisplay} (대표 지역 태그: ${regionTagHint})`,
+    `- 디자이너: ${designerDisplay}${specLine}`,
+    ``,
+    `[작업 진행 방식 — 반드시 2단계로 진행]`,
+    ``,
+    `■ 1단계: 팩트체크 역질문 3가지`,
+    `내가 시술 사진/영상 설명이나 짧은 메모를 주면, 바로 본문을 쓰지 말고 아래 3가지를 먼저 짧게 역질문하세요.`,
+    `1) 시술 전 고객님의 가장 큰 모발/스타일 고민은 무엇이었나요?`,
+    `2) 오늘 시술에서 핵심적으로 사용한 커트·펌·염색 테크닉(또는 포인트)은 무엇인가요?`,
+    `3) 시술 직후 고객님 반응과 집에서 3분 안에 따라 할 수 있는 손질 팁은 무엇인가요?`,
+    `(단, 내가 이미 3가지 정보를 모두 적어 보냈다면 질문 없이 바로 2단계로 넘어가세요.)`,
+    ``,
+    `■ 2단계: 최종 원고 6개 구분자 출력`,
+    `답변을 받으면 아래 6개 대괄호 구분자를 정확히 지켜 순서대로 출력하세요.`,
+    `[파일제목]`,
+    `[제목3종]`,
+    `[해시태그]`,
+    `[숏폼 전용 본문]`,
+    `[블로그 전용 본문]`,
+    `[대댓글 유도용 텍스트]`,
+    ``,
+    `[절대 준수 규칙]`,
+    `1. 코드블록(\`\`\`), 마크다운 표(|---|), 인용문(>)은 절대 사용하지 말고 순수 텍스트로만 출력하세요.`,
+    `2. 매장명은 반드시 '${v.salon}'으로 정확히 표기하고, 딱딱한 광고체나 과장·반복 없이 담백하고 읽기 쉬운 모바일 호흡(짧은 줄바꿈)으로 작성하세요.`,
+    `3. [블로그 전용 본문]은 공백 포함 1,900~2,200자 내외 정보/후기형으로 작성하고, 문맥 흐름에 맞춰 아래 자리 표시자를 반드시 '단독 줄'로 배치하세요:`,
+    `[미디어 자료1]`,
+    `[미디어 자료2]`,
+    `[미디어 자료3]`,
+    `[미디어 자료4]`,
+    `4. [해시태그]에는 '${regionTagHint}'과 실제 검색량이 높은 자연스러운 시술 키워드 위주로 10개를 작성하세요. ('뜨는옆머리해결' 같은 어색한 합성어 금지)`,
+    ``,
+    `준비되셨으면 "네, 준비되었습니다! 오늘 시술 내용을 편하게 알려주세요."라고 답해 주세요.`
+  ].join('\n');
+}
+
+function buildCustomMasterPromptText(v, customStyleGuide) {
+  const regionDisplay = v.region || '(대표 지역 입력)';
+  const regionTags = getDynamicRegionTags(v.region);
+  const regionTagHint = regionTags.length ? regionTags.map(t => '#' + t).join(' ') : '#지역미용실';
+  const designerDisplay = v.designer || '(디자이너 이름·직책)';
+  const specLine = v.specialty ? `\n- 주력 시술/전문 분야: ${v.specialty}` : '';
+  const styleText = (customStyleGuide || '').trim() || '(2단계 입력칸에 ChatGPT/Gemini에서 추출한 내 스타일 가이드를 붙여넣으면 여기에 자동 조립됩니다)';
+
+  return [
+    `당신은 미용실 마케팅 전문 카피라이터이자 '${v.salon}'(${designerDisplay}) 전담 콘텐츠 파트너입니다.`,
+    ``,
+    `[매장 및 디자이너 기본 정보]`,
+    `- 매장명: ${v.salon}`,
+    `- 대표 지역/상권: ${regionDisplay} (대표 지역 태그: ${regionTagHint})`,
+    `- 디자이너: ${designerDisplay}${specLine}`,
+    ``,
+    `[1순위 절대 규칙 — 업로더 필수 규격 (어떠한 스타일 지시보다 최우선, 절대 변경 불가)]`,
+    `■ 1단계: 팩트체크 역질문 3가지`,
+    `내가 시술 사진/영상 설명이나 짧은 메모를 주면, 바로 본문을 쓰지 말고 아래 3가지를 먼저 짧게 역질문하세요.`,
+    `1) 시술 전 고객님의 가장 큰 모발/스타일 고민은 무엇이었나요?`,
+    `2) 오늘 시술에서 핵심적으로 사용한 커트·펌·염색 테크닉(또는 포인트)은 무엇인가요?`,
+    `3) 시술 직후 고객님 반응과 집에서 3분 안에 따라 할 수 있는 손질 팁은 무엇인가요?`,
+    `(단, 내가 이미 3가지 정보를 모두 적어 보냈다면 질문 없이 바로 2단계로 넘어가세요.)`,
+    ``,
+    `■ 2단계: 최종 원고 6개 구분자 출력`,
+    `답변을 받으면 반드시 아래 6개 대괄호 구분자를 정확한 이름으로 순서대로 출력하세요.`,
+    `[파일제목]`,
+    `[제목3종]`,
+    `[해시태그]`,
+    `[숏폼 전용 본문]`,
+    `[블로그 전용 본문]`,
+    `[대댓글 유도용 텍스트]`,
+    ``,
+    `■ 출력 형식 절대 규칙`,
+    `1. 코드블록(\`\`\`), 마크다운 표(|---|), 인용문(>)은 절대 사용하지 말고 순수 텍스트로만 출력하세요.`,
+    `2. 매장명은 반드시 '${v.salon}'으로 정확히 표기하세요.`,
+    `3. [블로그 전용 본문]은 공백 포함 1,900~2,200자 내외 정보/후기형으로 작성하고, 문맥 흐름에 맞춰 아래 4개 자리 표시자를 반드시 '단독 줄'로 배치하세요:`,
+    `[미디어 자료1]`,
+    `[미디어 자료2]`,
+    `[미디어 자료3]`,
+    `[미디어 자료4]`,
+    `4. [해시태그]에는 '${regionTagHint}'과 실제 검색량이 높은 자연스러운 시술 키워드 위주로 10개를 작성하세요. (해시태그는 [해시태그] 블록에만 모아서 출력)`,
+    ``,
+    `[2순위 영역 분리 규칙 — 내 스타일 안전 적용]`,
+    `- [숏폼 전용 본문]에는 아래 [내 스타일 가이드]의 말투·어투, 이모지 사용 습관, 줄바꿈 리듬, 영문 요약/병기, 하단 커스텀 서명·DM 푸터를 100% 반영해 작성하세요.`,
+    `- [블로그 전용 본문]에는 [내 스타일 가이드]의 말투의 결만 자연스럽게 유지하되, 분량(공백 포함 1,900~2,200자 내외)과 [미디어 자료1~4] 단독 줄 배치는 반드시 위 1순위 업로더 표준 규격을 따르세요.`,
+    `- [내 스타일 가이드]와 1순위 업로더 필수 규격이 충돌할 경우, 항상 1순위 업로더 필수 규격을 우선 적용하세요.`,
+    ``,
+    `[내 스타일 가이드]`,
+    styleText,
+    ``,
+    `준비되셨으면 "네, 준비되었습니다! 오늘 시술 내용을 편하게 알려주세요."라고 답해 주세요.`
+  ].join('\n');
+}
+
+function updateWizardLivePreviews() {
+  const v = getLiveWizardValues();
+
+  // 1단계 실시간 미니 미리보기
+  const sigEl = document.getElementById('wizLiveBlogSigPreview');
+  if (sigEl) {
+    const sigLines = ['━━━━━━━━━━'];
+    if (v.booking) sigLines.push(`[[📌 1:1 우선예약 및 상담]]\n${v.booking}`);
+    sigLines.push(`🔹 매장명: ${v.salon}`);
+    if (v.address) sigLines.push(`🔹 주소: ${v.address}`);
+    if (v.parking) sigLines.push(`🔹 주차: ${v.parking}`);
+    sigEl.innerText = sigLines.join('\n');
+  }
+  const snsPrev = document.getElementById('wizLiveSnsBioPreview');
+  if (snsPrev) snsPrev.innerText = buildSnsShortBio(v);
+
+  // 인포크링크 가이드 팝업 소개 & 버튼 구성 추천
+  const inpockBio = document.getElementById('wizInpockBioBox');
+  if (inpockBio) {
+    const iLines = [`${v.salon}${v.designer ? ' | ' + v.designer : ''}`];
+    if (v.locationGuide) iLines.push(`📍 ${v.locationGuide}`);
+    else if (v.address) iLines.push(`📍 ${v.address}`);
+    if (v.parking) iLines.push(`🅿️ ${v.parking}`);
+    inpockBio.innerText = iLines.join('\n');
+  }
+  const btnHints = document.getElementById('wizInpockButtonHints');
+  if (btnHints) {
+    btnHints.innerHTML = [
+      `① <b>네이버 예약</b> — 매장 네이버 플레이스 예약 URL 연결`,
+      `② <b>1:1 오픈채팅 · 시술 가격표</b> — 카카오톡 오픈채팅방 또는 가격 안내 링크`,
+      `③ <b>주차 · 오시는 길 안내</b> — 2단계에서 작성할 네이버 블로그 '오시는 길' 고정글 링크`,
+      `④ <b>하단 SNS 아이콘</b> — 인스타·유튜브·블로그·쓰레드 등 사용 중인 채널 아이콘 연결`
+    ].join('<br>');
+  }
+
+  // 2단계: 선택한 플랫폼별 프로필·게시판·오시는 길
+  renderWizardStep2(v);
+
+  // 4단계: 본문뽑기 마스터 프롬프트 (기본 표준 + 내 스타일 입히기) & 설정 상태 신호등
+  const promptEl = document.getElementById('wizMasterPromptBox');
+  if (promptEl) promptEl.innerText = buildMasterPromptText(v);
+  const extractEl = document.getElementById('wizStyleExtractPromptBox');
+  if (extractEl) extractEl.innerText = buildStyleExtractPromptText();
+  const styleGuideVal = (document.getElementById('wizCustomStyleGuide')?.value ?? currentProfile.custom_style_guide ?? '').trim();
+  const customPromptEl = document.getElementById('wizCustomMasterPromptBox');
+  if (customPromptEl) customPromptEl.innerText = buildCustomMasterPromptText(v, styleGuideVal);
+  renderWizardReadiness(v);
+}
+
+function renderWizardStep2(v) {
+  const container = document.getElementById('wizStep2DynamicContainer');
+  if (!container) return;
+  const enabled = new Set(currentEnabledPlatforms);
+  const blocks = [];
+
+  // 1) SNS 프로필 소개글 원클릭 복사 (선택한 플랫폼만)
+  const copyCards = [];
+  if (enabled.has('ig') || enabled.has('threads') || enabled.has('tt')) {
+    const names = [enabled.has('ig') && '인스타', enabled.has('threads') && '쓰레드', enabled.has('tt') && '틱톡'].filter(Boolean).join('·');
+    copyCards.push(`
+      <div class="wiz-copy-card">
+        <div class="wiz-copy-head"><span>📱 ${names} 짧은 프로필 바이오</span><button type="button" class="btn-tool" onclick="copyTextById('wizBioShort')">📋 복사</button></div>
+        <pre class="wiz-copy-pre" id="wizBioShort">${escapeHtml(buildSnsShortBio(v))}</pre>
+      </div>
+    `);
+  }
+  if (enabled.has('yt') || enabled.has('naver')) {
+    const names = [enabled.has('yt') && '유튜브', enabled.has('naver') && '네이버 블로그'].filter(Boolean).join('·');
+    copyCards.push(`
+      <div class="wiz-copy-card">
+        <div class="wiz-copy-head"><span>📺 ${names} 채널 소개글</span><button type="button" class="btn-tool" onclick="copyTextById('wizBioChannel')">📋 복사</button></div>
+        <pre class="wiz-copy-pre" id="wizBioChannel">${escapeHtml(buildChannelIntro(v))}</pre>
+      </div>
+    `);
+  }
+  if (enabled.has('daangn')) {
+    copyCards.push(`
+      <div class="wiz-copy-card">
+        <div class="wiz-copy-head"><span>🥕 당근 비즈프로필 동네 이웃 소개</span><button type="button" class="btn-tool" onclick="copyTextById('wizBioDaangn')">📋 복사</button></div>
+        <pre class="wiz-copy-pre" id="wizBioDaangn">${escapeHtml(buildDaangnIntro(v))}</pre>
+      </div>
+    `);
+  }
+  if (copyCards.length) {
+    blocks.push(`<div class="wiz-section-box"><div class="wiz-section-title"><span>✍️ 선택한 SNS 프로필 소개글 원클릭 복사</span></div>${copyCards.join('')}</div>`);
+  }
+
+  // 2) 네이버 블로그 세팅 (선택 시)
+  if (enabled.has('naver')) {
+    const blogManageUrl = v.naverId ? `https://admin.blog.naver.com/${v.naverId}` : 'https://blog.naver.com/';
+    const catChecks = v.cats.length
+      ? v.cats.map(c => `<label class="wiz-check-item"><span><input type="checkbox"> 시술 업로드용 게시판 <b>「${escapeHtml(c)}」</b> 확인</span><span style="font-size:11px; color:#059669; font-weight:700;">자동 업로드용</span></label>`).join('')
+      : `<div style="font-size:12px; color:#64748b;">1단계에서 자동 업로드할 블로그 게시판을 추가하면 여기에 체크리스트가 표시됩니다.</div>`;
+    blocks.push(`
+      <div class="wiz-section-box">
+        <div class="wiz-section-title">
+          <span>🟢 네이버 블로그 게시판 &amp; '오시는 길' 고정글 세팅</span>
+          <a href="${blogManageUrl}" target="_blank" class="btn-tool" style="text-decoration:none;">블로그 관리 열기 ↗</a>
+        </div>
+        <div class="wiz-check-list" style="margin-bottom:10px;">
+          ${catChecks}
+          <label class="wiz-check-item" style="background:#fffbeb; border-color:#fcd34d;">
+            <span><input type="checkbox"> 1회성 고정글 전용 <b>「오시는 길」</b> 카테고리 별도 추가</span>
+            <span style="font-size:11px; color:#b45309; font-weight:700;">인포크링크 연결용</span>
+          </label>
+        </div>
+        <div class="wiz-copy-card" style="margin-bottom:0;">
+          <div class="wiz-copy-head"><span>🗺️ '오시는 길' 고정 게시글 초안 (자동 완성)</span><button type="button" class="btn-tool" onclick="copyTextById('wizDirectionsDraft')">📋 초안 복사</button></div>
+          <pre class="wiz-copy-pre" id="wizDirectionsDraft">${escapeHtml(buildDirectionsPostDraft(v))}</pre>
+          <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12px; font-weight:700; color:#1e40af; cursor:pointer;">
+            <input type="checkbox" id="wizDirectionsMapChecked"> '오시는 길' 글 작성 시 스마트플레이스 지도 첨부까지 완료했습니다
+          </label>
+        </div>
+      </div>
+    `);
+  }
+
+  // 3) 선택한 플랫폼별 사전 준비 체크리스트 & 바로가기
+  const prepItems = [];
+  if (enabled.has('ig')) {
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>인스타그램:</b> 프로페셔널(비즈니스/크리에이터) 계정 전환 &amp; 프로필 링크에 인포크링크 등록</label><a href="https://www.instagram.com/accounts/edit/" target="_blank" class="btn-shortcut">프로필 편집 ↗</a></div>`);
+  }
+  if (enabled.has('clip')) {
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>네이버 클립:</b> 클립 크리에이터 센터 1회 약관 동의 완료</label><a href="https://clipcreators.naver.com/web" target="_blank" class="btn-shortcut">클립 스튜디오 ↗</a></div>`);
+  }
+  if (enabled.has('pin')) {
+    const bNote = v.pinBoard ? `보드 <b>「${escapeHtml(v.pinBoard)}」</b> 생성` : '스타일 모음 보드 1개 이상 생성';
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>핀터레스트:</b> ${bNote} 및 프로필 ID 확인</label><a href="${v.pinId ? 'https://kr.pinterest.com/' + encodeURIComponent(v.pinId) + '/' : 'https://kr.pinterest.com/'}" target="_blank" class="btn-shortcut">핀터레스트 ↗</a></div>`);
+  }
+  if (enabled.has('daangn')) {
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>당근 비즈프로필:</b> 동네 매장 비즈프로필 개설 및 소개글 반영</label><a href="https://business.daangn.com/" target="_blank" class="btn-shortcut">비즈프로필 ↗</a></div>`);
+  }
+  if (enabled.has('tt')) {
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>틱톡:</b> 틱톡 스튜디오 웹 접속 및 프로필 링크 확인</label><a href="https://www.tiktok.com/tiktokstudio" target="_blank" class="btn-shortcut">틱톡 스튜디오 ↗</a></div>`);
+  }
+  if (enabled.has('threads')) {
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>쓰레드:</b> 인스타그램 계정으로 쓰레드 프로필 개설 완료</label><a href="https://www.threads.com/" target="_blank" class="btn-shortcut">쓰레드 ↗</a></div>`);
+  }
+  if (enabled.has('x')) {
+    prepItems.push(`<div class="wiz-check-item"><label><input type="checkbox"> <b>엑스(X):</b> 프로필 소개 및 링크 반영</label><a href="https://x.com/" target="_blank" class="btn-shortcut">X 홈 ↗</a></div>`);
+  }
+  if (prepItems.length) {
+    blocks.push(`<div class="wiz-section-box" style="margin-bottom:0;"><div class="wiz-section-title"><span>✅ 선택한 플랫폼 사전 준비 체크리스트</span></div><div class="wiz-check-list">${prepItems.join('')}</div></div>`);
+  }
+
+  container.innerHTML = blocks.join('') || `<div class="wiz-section-box">0단계에서 사용할 플랫폼을 선택해 주세요.</div>`;
+}
+
+function renderWizardReadiness(v) {
+  const grid = document.getElementById('wizReadinessGrid');
+  if (!grid) return;
+  const st = latestSetupStatus || {};
+  const enabledBrowserPlats = currentEnabledPlatforms.filter(k => k !== 'yt');
+  const loggedInCount = enabledBrowserPlats.filter(k => st[k] === 'green').length;
+  const items = [
+    { label: '매장명 & 기본정보', ok: Boolean(v.salonRaw), detail: v.salonRaw ? v.salonRaw : '1단계에서 매장명 입력 필요' },
+    { label: '대표 통합 링크(인포크)', ok: Boolean(v.booking), detail: v.booking ? '연결됨' : '1단계에서 입력 권장' },
+    { label: '네이버 블로그 게시판', ok: !currentEnabledPlatforms.includes('naver') || v.cats.length > 0, detail: v.cats.length ? `${v.cats.length}개 등록` : '기본 게시판 사용' },
+    { label: '선택 플랫폼 로그인', ok: enabledBrowserPlats.length === 0 || loggedInCount === enabledBrowserPlats.length, detail: `${loggedInCount} / ${enabledBrowserPlats.length} 완료` }
+  ];
+  grid.innerHTML = items.map(it =>
+    `<div class="wiz-ready-item"><span>${it.label}</span><span style="color:${it.ok ? '#166534' : '#b45309'};">${it.ok ? '🟢 준비 완료' : '🟡 확인 필요'} (${escapeHtml(it.detail)})</span></div>`
+  ).join('');
+}
+
+function setAutosaveBadge(text, isSaving) {
+  const el = document.getElementById('wizAutosaveBadge');
+  if (!el) return;
+  el.innerText = text;
+  el.style.background = isSaving ? '#fef3c7' : '#dcfce7';
+  el.style.color = isSaving ? '#92400e' : '#059669';
+}
+
+function saveWizardDraftNow(markCompleted = false) {
+  const payload = collectProfilePayload('wiz');
+  payload.is_draft = !markCompleted;
+  if (markCompleted) {
+    payload.onboarding_completed = true;
+  }
+  setAutosaveBadge('임시 저장 중...', true);
+  return fetch('/api/profile', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d && d.ok) {
+      currentProfile = d.profile || currentProfile;
+      isProfileConfigured = Boolean(d.is_configured || (currentProfile.salon_name || '').trim());
+      updateProfileHeaderBar();
+      // 대시보드 상단 바·장소 입력칸 동기화 (매장명을 스마트플레이스 검색어로 통합 사용)
+      const placeVal = (currentProfile.salon_name || currentProfile.place_search_keyword || '').trim();
+      ['naverPlace', 'clipPlace', 'ttLocation', 'igLocation'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = placeVal;
+      });
+      const pinDestEl = document.getElementById('pinDestUrl');
+      const pinBoardEl = document.getElementById('pinBoard');
+      if (pinDestEl) pinDestEl.value = currentProfile.booking_url || '';
+      if (pinBoardEl) pinBoardEl.value = currentProfile.pinterest_board || '';
+      setAutosaveBadge(markCompleted ? '저장 완료 ✓' : '자동 임시 저장됨 ✓', false);
+    }
+    return d;
+  })
+  .catch(() => setAutosaveBadge('저장 대기', false));
+}
+
+function debouncedSaveWizardDraft() {
+  setAutosaveBadge('입력 중...', true);
+  if (wizSaveTimer) clearTimeout(wizSaveTimer);
+  wizSaveTimer = setTimeout(() => {
+    saveWizardDraftNow(false);
+  }, 500);
+}
+
+function goWizardStep(step) {
+  wizardStep = Math.max(0, Math.min(4, Number(step) || 0));
+  for (let i = 0; i <= 4; i++) {
+    const pill = document.getElementById('wizPill' + i);
+    const pane = document.getElementById('wizPane' + i);
+    if (pill) {
+      pill.classList.toggle('active', i === wizardStep);
+      pill.classList.toggle('done', i < wizardStep);
+    }
+    if (pane) pane.classList.toggle('active', i === wizardStep);
+  }
+  const pct = Math.round(((wizardStep + 1) / 5) * 100);
+  const pText = document.getElementById('wizProgressText');
+  const pPct = document.getElementById('wizProgressPct');
+  const pFill = document.getElementById('wizProgressFill');
+  if (pText) pText.innerText = WIZARD_STEP_TITLES[wizardStep] || '';
+  if (pPct) pPct.innerText = `${pct}%`;
+  if (pFill) pFill.style.width = `${pct}%`;
+
+  const prevBtn = document.getElementById('wizBtnPrev');
+  const nextBtn = document.getElementById('wizBtnNext');
+  if (prevBtn) prevBtn.style.visibility = (wizardStep === 0) ? 'hidden' : 'visible';
+  if (nextBtn) {
+    if (wizardStep === 4) {
+      nextBtn.innerText = '✅ 설정 완료 · 닫기';
+      nextBtn.style.background = '#059669';
+    } else {
+      nextBtn.innerText = '다음 단계 ▶';
+      nextBtn.style.background = '#2563eb';
+    }
+  }
+  const bodyEl = document.getElementById('wizModalBody');
+  if (bodyEl) bodyEl.scrollTop = 0;
+  updateWizardLivePreviews();
+  if (wizardStep === 3 || wizardStep === 4) refreshSetupStatus();
+  debouncedSaveWizardDraft();
+}
+
+function stepWizard(delta) {
+  if (delta > 0 && wizardStep === 4) {
+    completeOnboardingAndClose();
+    return;
+  }
+  goWizardStep(wizardStep + delta);
+}
+
+function openSetupGuide(step) {
+  document.getElementById('setupGuideModal').style.display = 'flex';
+  const targetStep = (step !== undefined && step !== null) ? step : wizardStep;
+  goWizardStep(targetStep);
+  refreshSetupAndQuota();
+}
+
+function closeSetupGuide() {
+  saveWizardDraftNow(false).then(d => {
+    if (d && d.ok) applyProfileToUI(d);
+  });
+  document.getElementById('setupGuideModal').style.display = 'none';
+}
+
+function completeOnboardingAndClose() {
+  const salonVal = (document.getElementById('wizSalonName')?.value || '').trim();
+  if (!salonVal) {
+    alert('⚠️ 1단계에서 매장명을 입력해야 설정이 완료됩니다!');
+    goWizardStep(1);
+    return;
+  }
+  saveWizardDraftNow(true).then(d => {
+    if (d && d.ok) applyProfileToUI(d);
+    document.getElementById('setupGuideModal').style.display = 'none';
+  });
+}
+
+function runSampleOnboardingPreview() {
+  const v = getLiveWizardValues();
+  if (!v.salonRaw) {
+    alert('⚠️ 샘플 변환 체험을 위해 1단계에서 매장명을 먼저 입력해 주세요!');
+    goWizardStep(1);
+    return;
+  }
+  const specSample = v.specialty ? `${v.specialty} 위주로 ` : '';
+  const sampleText = [
+    `아침마다 손질이 번거로웠던 고객님, ${specSample}라인과 결을 깔끔하게 정리해 드렸어요.`,
+    `모발 굵기와 두상 비율에 맞춰 불필요한 무게만 덜어내어 말리기만 해도 형태가 자연스럽게 잡힙니다.`,
+    `샴푸 후 두피부터 털어 말리고 모발 끝에만 에센스를 소량 발라 마무리해 주세요.`,
+    `#레이어드컷 #볼륨매직`
+  ].join('\n');
+
+  saveWizardDraftNow(true).then(d => {
+    if (d && d.ok) applyProfileToUI(d);
+    const srcEl = document.getElementById('sourceText');
+    if (srcEl) srcEl.value = sampleText;
+    document.getElementById('setupGuideModal').style.display = 'none';
+    const previewBtn = document.querySelector('button[onclick="transformData(this)"]');
+    transformData(previewBtn);
+    setTimeout(() => {
+      const sec = document.getElementById('previewSection');
+      if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 500);
+  });
+}
+
+function refreshSetupStatus() {
+  return fetch('/api/setup_status').then(r => r.json()).then(st => {
+    latestSetupStatus = st || {};
+    const ages = st.cookie_ages || {};
+    PLATFORM_META.forEach(p => {
+      const info = statusIconAndTip(p.key, st[p.key] || 'red', ages[p.key]);
+      const dot = document.getElementById(p.dotId);
+      if (dot) {
+        dot.innerText = info.icon;
+        dot.title = `${p.label}: ${info.tip}`;
+      }
+    });
+
+    const enabledSet = new Set(currentEnabledPlatforms || PLATFORM_META.map(p => p.key));
+    const grid = document.getElementById('guideStatusGrid');
+    if (grid) {
+      const filtered = PLATFORM_META.filter(p => enabledSet.has(p.key));
+      grid.innerHTML = filtered.map(p => {
+        const info = statusIconAndTip(p.key, st[p.key] || 'red', ages[p.key]);
+        return `<div class="guide-status-item" title="${info.tip}"><span>${p.label}</span><span>${info.icon}</span></div>`;
+      }).join('');
+    }
+
+    const secBadge = document.getElementById('ytSecretBadge');
+    const tokBadge = document.getElementById('ytTokenBadge');
+    if (secBadge) {
+      secBadge.innerText = st.has_client_secret ? 'client_secret.json 등록됨' : 'client_secret.json 미등록';
+      secBadge.className = 'guide-badge-pill ' + (st.has_client_secret ? 'pill-ok' : 'pill-no');
+    }
+    if (tokBadge) {
+      tokBadge.innerText = st.has_youtube_token ? 'youtube_token.json 인증됨' : 'youtube_token.json 미인증';
+      tokBadge.className = 'guide-badge-pill ' + (st.has_youtube_token ? 'pill-ok' : 'pill-no');
+    }
+    renderWizardReadiness(getLiveWizardValues());
+  }).catch(() => {});
+}
+
+function refreshQuotaStatus() {
+  return fetch('/api/quota_status').then(r => r.json()).then(q => {
+    if (!q || !q.youtube) return;
+    const yt = q.youtube;
+    const pct = Math.min(100, Math.round((yt.used_points / yt.max_points) * 100));
+    const ytText = document.getElementById('quotaYtText');
+    const ytFill = document.getElementById('quotaYtFill');
+    if (ytText) ytText.innerText = `유튜브 API: ${yt.used_points.toLocaleString()} / ${yt.max_points.toLocaleString()} pt (오늘 ${yt.used_count}/${yt.max_count}건)`;
+    if (ytFill) {
+      ytFill.style.width = pct + '%';
+      ytFill.classList.toggle('warn', yt.used_points >= 8000);
+    }
+    const p = q.platforms || {};
+    const fmt = (k, name) => `${name} ${(p[k]?.used ?? 0)}/${(p[k]?.limit ?? 0)}`;
+    const sub = document.getElementById('quotaPlatformsText');
+    if (sub) {
+      sub.innerText = `${fmt('naver', '블로그')} · ${fmt('clip', '클립')} · ${fmt('tt', '틱톡')} · ${fmt('ig', '인스타')} · ${fmt('pin', '핀터')} · ${fmt('threads', '쓰레드')} · ${fmt('daangn', '당근')} · ${fmt('x', 'X')} (API 0원 · 계정 보호 권장선) · 원고변환 무료 무제한`;
+    }
+  }).catch(() => {});
+}
+
+function refreshSetupAndQuota() {
+  refreshSetupStatus();
+  refreshQuotaStatus();
+}
+
+function loginMissingPlatforms() {
+  const st = latestSetupStatus || {};
+  const enabled = new Set(currentEnabledPlatforms || PLATFORM_META.map(p => p.key));
+  const payload = {
+    use_naver: enabled.has('naver') && st.naver !== 'green',
+    use_clip: enabled.has('clip') && st.clip !== 'green',
+    use_tt: enabled.has('tt') && st.tt !== 'green',
+    use_ig: enabled.has('ig') && st.ig !== 'green',
+    use_pin: enabled.has('pin') && st.pin !== 'green',
+    use_threads: enabled.has('threads') && st.threads !== 'green',
+    use_daangn: enabled.has('daangn') && st.daangn !== 'green',
+    use_x: enabled.has('x') && st.x !== 'green'
+  };
+  const anyMissing = Object.values(payload).some(Boolean);
+  if (!anyMissing) {
+    alert('✅ 선택하신 브라우저 기반 플랫폼이 이미 모두 로그인되어 있습니다!\n(유튜브를 선택하셨다면 아래 API 가이드를 확인해 주세요.)');
+    return;
+  }
+  fetch('/api/auth_check', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+  .then(r => r.json()).then(d => {
+    if (!d.ok) alert(d.msg);
+    else alert('🔐 전용 크롬 1창에 미로그인 플랫폼 탭을 한 번에 띄웁니다. 로그인 후 창 X로 닫아주세요!');
+  });
+}
+
+const FIELD_MAP = {
+  ytTitle: ['youtube_title', 'yt_title'], ytBody: ['youtube_body', 'yt_body'], ytTags: ['youtube_tags', 'yt_tags'],
+  naverTitle: ['naver_title'], naverBody: ['naver_body'], naverTags: ['naver_tags'], naverCategory: ['naver_category'],
+  clipTitle: ['clip_title'], clipBody: ['clip_body'], clipTags: ['clip_tags'],
+  ttTitle: ['tiktok_title', 'tt_title'], ttBody: ['tiktok_body', 'tt_body'], ttTags: ['tiktok_tags', 'tt_tags'],
+  igBody: ['instagram_body', 'ig_body'], igTags: ['instagram_tags', 'ig_tags'],
+  pinTitle: ['pin_title'], pinBody: ['pin_body'], pinTags: ['pin_tags'], threadsBody: ['threads_body'], threadsTags: ['threads_tags'], daangnTitle: ['daangn_title'], daangnBody: ['daangn_body'], xBody: ['x_body'], xTags: ['x_tags']
+};
+
+const TAG_INPUT_IDS = ['ytTags', 'naverTags', 'clipTags', 'ttTags', 'igTags', 'pinTags', 'threadsTags', 'xTags'];
+
+function cleanTagsString(raw) {
+  if (!raw) return '';
+  const parts = String(raw).split(/[,\n]+/);
+  const seen = new Set();
+  const out = [];
+  for (const part of parts) {
+    const tok = part.replace(/[\u3164\uffa0\u2800\u200b\u200c\u200d\ufeff\u00a0]/g, '').replace(/#/g, '').replace(/^[,.\s·•|/\\"'\[\]()]+|[,.\s·•|/\\"'\[\]()]+$/g, '').replace(/\s+/g, '');
+    if (tok && !seen.has(tok.toLowerCase())) {
+      seen.add(tok.toLowerCase());
+      out.push(tok);
+    }
+  }
+  return out.join(', ');
+}
+
+function normalizeBranchName(raw) {
+  if (raw === null || raw === undefined) return '';
+  return String(raw);
+}
+
+function appendUiLog(msg) {
+  const b = document.getElementById('logBox');
+  if (!b || !msg) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const line = `[${hh}:${mm}:${ss}] ${msg}`;
+  b.textContent = b.textContent ? (b.textContent + '\n' + line) : line;
+  b.scrollTop = b.scrollHeight;
+}
+
+function fillFormFields(obj) {
+  const data = (obj && typeof obj === 'object') ? obj : {};
+  for (const [elId, keys] of Object.entries(FIELD_MAP)) {
+    try {
+      const el = document.getElementById(elId);
+      if (!el) continue;
+      let val = keys.map(k => data[k]).find(v => v !== undefined && v !== null && v !== '');
+      if (elId === 'naverCategory') {
+        renderNaverCategorySelect(val !== undefined ? val : '');
+        continue;
+      }
+      if (val === undefined || val === null) val = '';
+      if (TAG_INPUT_IDS.includes(elId)) {
+        val = cleanTagsString(val);
+      } else if (typeof val === 'string') {
+        val = normalizeBranchName(val);
+      }
+      el.value = val;
+    } catch (err) {
+      console.warn('fillFormFields skipped:', elId, err);
+    }
+  }
+  const previewSec = document.getElementById('previewSection');
+  if (previewSec) previewSec.style.display = 'block';
+}
+
+function stopCurrentTask() {
+  const stopBtn = document.querySelector('.btn-stop-mini');
+  if (stopBtn) { stopBtn.disabled = true; stopBtn.innerText = '🛑 중지 중...'; }
+  fetch('/api/stop', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}) })
+  .then(r => r.json()).then(d => {
+    if(d.msg) console.log(d.msg);
+    refreshSetupAndQuota();
+  }).finally(() => {
+    if (stopBtn) { stopBtn.disabled = false; stopBtn.innerText = '🛑 강제 중지'; }
+  });
+}
+
+function formatSecLabel(sec) {
+  const s = Math.max(0, Number(sec) || 0);
+  const mins = Math.floor(s / 60);
+  const rem = (s % 60).toFixed(1).padStart(4, '0');
+  return `${String(mins).padStart(2, '0')}:${rem}`;
+}
+
+function updateScrubberUI() {
+  const vid = document.getElementById('blogScrubberVideo');
+  const lbl = document.getElementById('scrubberTimeLabel');
+  const slider = document.getElementById('frameScrubSlider');
+  if (!vid || !lbl || !slider) return;
+  const cur = Number(vid.currentTime || 0);
+  const dur = Number(scrubDuration || vid.duration || 0);
+  lbl.innerText = `${formatSecLabel(cur)} / ${formatSecLabel(dur)}`;
+  if (dur > 0) slider.value = Math.min(dur, cur).toFixed(2);
+}
+
+function updateGifRangeUI() {
+  const dur = Math.max(0.5, Number(scrubDuration || 10));
+  gifStartSec = Math.max(0, Math.min(gifStartSec, Math.max(0, dur - 0.4)));
+  gifEndSec = Math.max(gifStartSec + 0.4, Math.min(gifEndSec, dur));
+  if (gifEndSec - gifStartSec > 8.0) {
+    gifEndSec = Math.min(dur, gifStartSec + 8.0);
+  }
+  const spd = Math.max(0.5, Math.min(2.0, Number(gifSpeed) || 1.0));
+  const sSlider = document.getElementById('gifStartSlider');
+  const eSlider = document.getElementById('gifEndSlider');
+  const sVal = document.getElementById('gifStartVal');
+  const eVal = document.getElementById('gifEndVal');
+  const summary = document.getElementById('gifRangeSummary');
+  const fill = document.getElementById('gifTimelineFill');
+  if (sSlider) { sSlider.max = dur.toFixed(1); sSlider.value = gifStartSec.toFixed(1); }
+  if (eSlider) { eSlider.max = dur.toFixed(1); eSlider.value = gifEndSec.toFixed(1); }
+  if (sVal) sVal.innerText = gifStartSec.toFixed(1);
+  if (eVal) eVal.innerText = gifEndSec.toFixed(1);
+  const span = Math.max(0.4, gifEndSec - gifStartSec);
+  const outSpan = span / spd;
+  const spdLabel = `${Number(spd.toFixed(2))}x`;
+  if (summary) summary.innerText = `${gifStartSec.toFixed(1)}~${gifEndSec.toFixed(1)}초 (${spdLabel} → 약 ${outSpan.toFixed(1)}초)`;
+  if (fill && dur > 0) {
+    const leftPct = (gifStartSec / dur) * 100;
+    const widthPct = Math.max(2, (span / dur) * 100);
+    fill.style.left = leftPct.toFixed(2) + '%';
+    fill.style.width = Math.min(100 - leftPct, widthPct).toFixed(2) + '%';
+  }
+}
+
+function onGifSpeedChange(val) {
+  const parsed = parseFloat(val);
+  gifSpeed = (!isNaN(parsed) && parsed >= 0.5 && parsed <= 2.0) ? parsed : 1.0;
+  const vid = document.getElementById('blogScrubberVideo');
+  if (vid && isGifLoopPreview) {
+    vid.playbackRate = gifSpeed;
+  }
+  updateGifRangeUI();
+}
+
+function loadVideoIntoScrubber(srcUrl) {
+  const studio = document.getElementById('blogScrubberStudio');
+  const vid = document.getElementById('blogScrubberVideo');
+  if (!studio || !vid || !srcUrl) return;
+  isGifLoopPreview = false;
+  scrubDuration = 0;
+  gifStartSec = 0;
+  gifEndSec = 2.5;
+  const pBtn = document.getElementById('btnGifPreview');
+  if (pBtn) pBtn.innerText = '🔁 미리보기';
+  const playBtn = document.getElementById('btnScrubPlay');
+  if (playBtn) playBtn.innerText = '▶ 재생';
+  vid.pause();
+  vid.playbackRate = 1.0;
+  vid.src = srcUrl;
+  vid.load();
+  studio.style.display = 'block';
+  if (vid.readyState >= 1 && vid.duration > 0) {
+    scrubDuration = Number(vid.duration || 0);
+    gifEndSec = Math.min(scrubDuration || 2.5, 2.5);
+    if (vid.videoWidth > 0 && vid.videoHeight > 0) {
+      applyVideoAspectLayout(vid.videoWidth, vid.videoHeight);
+    }
+  }
+  updateScrubberUI();
+  updateGifRangeUI();
+}
+
+function onFrameScrubInput(val) {
+  const vid = document.getElementById('blogScrubberVideo');
+  if (!vid) return;
+  isGifLoopPreview = false;
+  const pBtn = document.getElementById('btnGifPreview');
+  if (pBtn) pBtn.innerText = '🔁 미리보기';
+  vid.pause();
+  vid.playbackRate = 1.0;
+  const playBtn = document.getElementById('btnScrubPlay');
+  if (playBtn) playBtn.innerText = '▶ 재생';
+  vid.currentTime = Math.max(0, Number(val) || 0);
+  updateScrubberUI();
+}
+
+function stepScrubFrame(delta) {
+  const vid = document.getElementById('blogScrubberVideo');
+  if (!vid) return;
+  const dur = Number(scrubDuration || vid.duration || 0);
+  const nextT = Math.max(0, Math.min(dur || 9999, Number(vid.currentTime || 0) + delta));
+  onFrameScrubInput(nextT);
+}
+
+function toggleScrubPlay() {
+  const vid = document.getElementById('blogScrubberVideo');
+  const btn = document.getElementById('btnScrubPlay');
+  if (!vid) return;
+  isGifLoopPreview = false;
+  const pBtn = document.getElementById('btnGifPreview');
+  if (pBtn) pBtn.innerText = '🔁 미리보기';
+  vid.playbackRate = 1.0;
+  if (vid.paused) {
+    vid.play().catch(() => {});
+    if (btn) btn.innerText = '⏸ 일시정지';
+  } else {
+    vid.pause();
+    if (btn) btn.innerText = '▶ 재생';
+  }
+}
+
+function onGifSliderChange(which) {
+  const sEl = document.getElementById('gifStartSlider');
+  const eEl = document.getElementById('gifEndSlider');
+  const vid = document.getElementById('blogScrubberVideo');
+  if (!sEl || !eEl) return;
+  let s = Number(sEl.value) || 0;
+  let e = Number(eEl.value) || 2.5;
+  if (which === 'start') {
+    if (s >= e - 0.4) e = Math.min(scrubDuration || 10, s + 1.5);
+    if (e - s > 8.0) e = s + 8.0;
+    gifStartSec = s;
+    gifEndSec = e;
+    if (vid) { vid.pause(); vid.currentTime = gifStartSec; }
+  } else {
+    if (e <= s + 0.4) s = Math.max(0, e - 1.5);
+    if (e - s > 8.0) s = Math.max(0, e - 8.0);
+    gifStartSec = s;
+    gifEndSec = e;
+    if (vid) { vid.pause(); vid.currentTime = gifEndSec; }
+  }
+  updateGifRangeUI();
+  updateScrubberUI();
+}
+
+function setGifPointFromCurrent(which) {
+  const vid = document.getElementById('blogScrubberVideo');
+  if (!vid) return;
+  const cur = Number(vid.currentTime || 0);
+  if (which === 'start') {
+    gifStartSec = cur;
+    if (gifEndSec <= gifStartSec + 0.4 || gifEndSec - gifStartSec > 8.0) {
+      gifEndSec = Math.min(scrubDuration || (cur + 2.5), cur + 2.5);
+    }
+  } else {
+    gifEndSec = cur;
+    if (gifEndSec <= gifStartSec + 0.4 || gifEndSec - gifStartSec > 8.0) {
+      gifStartSec = Math.max(0, cur - 2.5);
+    }
+  }
+  updateGifRangeUI();
+}
+
+function toggleGifRangePreview() {
+  const vid = document.getElementById('blogScrubberVideo');
+  const btn = document.getElementById('btnGifPreview');
+  const playBtn = document.getElementById('btnScrubPlay');
+  if (!vid) return;
+  if (isGifLoopPreview) {
+    isGifLoopPreview = false;
+    vid.pause();
+    vid.playbackRate = 1.0;
+    if (btn) btn.innerText = '🔁 미리보기';
+    if (playBtn) playBtn.innerText = '▶ 재생';
+  } else {
+    isGifLoopPreview = true;
+    vid.playbackRate = Math.max(0.5, Math.min(2.0, Number(gifSpeed) || 1.0));
+    vid.currentTime = gifStartSec;
+    vid.play().catch(() => {});
+    if (btn) btn.innerText = '⏹ 중지';
+    if (playBtn) playBtn.innerText = '⏸ 일시정지';
+  }
+}
+
+function onTargetSlotSelectChange() {
+  const sel = document.getElementById('scrubberTargetSlot');
+  if (!sel) return;
+  selectedThumbSlot = Math.max(0, Math.min(9, parseInt(sel.value, 10) || 0));
+  renderThumbGallery();
+}
+
+function selectThumbTargetSlot(idx) {
+  selectedThumbSlot = Math.max(0, Math.min(9, idx));
+  const sel = document.getElementById('scrubberTargetSlot');
+  if (sel) sel.value = String(selectedThumbSlot);
+  renderThumbGallery();
+}
+
+function ensureThumbSlotsUpTo(idx) {
+  while (extractedThumbs.length <= idx) {
+    const n = extractedThumbs.length + 1;
+    extractedThumbs.push({ url: '', path: '', active: false, origIdx: n, kind: 'image', tagLabel: `빈 슬롯` });
+  }
+}
+
+function getBlogMediaSlotNumbers(bodyText) {
+  const nums = new Set();
+  const re = /\[(?:미디어\s*자료|사진)\s*(\d+)(?:\s*[·•\-]?\s*GIF)?\]/gi;
+  let m;
+  while ((m = re.exec(bodyText || '')) !== null) {
+    const n = parseInt(m[1], 10);
+    if (n >= 1 && n <= 10) nums.add(n);
+  }
+  return nums;
+}
+
+function ensureBlogPlaceholderForSlot(slotIdx, kind) {
+  const bodyEl = document.getElementById('naverBody');
+  if (!bodyEl) return;
+  const slotNum = slotIdx + 1;
+  const text = bodyEl.value || '';
+  const slotRe = new RegExp(`\\[(?:미디어\\s*자료|사진)\\s*${slotNum}(?:\\s*[·•\\-]?\\s*GIF)?\\]`, 'i');
+  if (slotRe.test(text)) return;
+  if (kind === 'gif' && /\[GIF(?:\s*\d+)?\]/i.test(text)) return;
+
+  const tag = `[미디어 자료${slotNum}]`;
+  const dividerIdx = text.indexOf('━━━');
+  if (dividerIdx >= 0) {
+    const before = text.slice(0, dividerIdx).replace(/\s+$/, '');
+    const after = text.slice(dividerIdx);
+    bodyEl.value = `${before}\n\n${tag}\n\n${after}`;
+  } else if (text.trim()) {
+    bodyEl.value = `${text.replace(/\s+$/, '')}\n\n${tag}`;
+  } else {
+    bodyEl.value = tag;
+  }
+}
+
+function captureCurrentScrubberFrame() {
+  if (!currentVideoName) return alert('⚠️ 먼저 영상을 첨부해 주세요!');
+  const vid = document.getElementById('blogScrubberVideo');
+  const btn = document.getElementById('btnCaptureFrame');
+  const timeSec = vid ? Number(vid.currentTime || 0) : 0;
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ 캡처 중...'; }
+  fetch('/api/capture_frame', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ video_name: currentVideoName, time_sec: timeSec })
+  })
+  .then(async r => {
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) throw new Error(d?.msg || `HTTP ${r.status}`);
+    return d;
+  })
+  .then(d => {
+    if (!d.ok) return alert('⚠️ ' + (d.msg || '장면 캡처에 실패했습니다.'));
+    ensureThumbSlotsUpTo(selectedThumbSlot);
+    extractedThumbs[selectedThumbSlot] = {
+      url: d.url,
+      path: d.path,
+      active: true,
+      origIdx: `${d.time_sec}초`,
+      kind: 'image'
+    };
+    ensureBlogPlaceholderForSlot(selectedThumbSlot, 'image');
+    renderThumbGallery();
+  })
+  .catch(err => {
+    const msg = `⚠️ 장면 캡처 중 오류가 발생했습니다: ${err?.message || err}`;
+    appendUiLog(msg);
+    alert(msg);
+  })
+  .finally(() => {
+    if (btn) { btn.disabled = false; btn.innerText = '📸 현재 장면 슬롯 넣기'; }
+  });
+}
+
+function createGifIntoSelectedSlot() {
+  if (!currentVideoName) return alert('⚠️ 먼저 영상을 첨부해 주세요!');
+  const btn = document.getElementById('btnCreateGif');
+  const spd = Math.max(0.5, Math.min(2.0, Number(gifSpeed) || 1.0));
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ 생성 중...'; }
+  fetch('/api/create_gif', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      video_name: currentVideoName,
+      start_sec: gifStartSec,
+      end_sec: gifEndSec,
+      speed: spd
+    })
+  })
+  .then(async r => {
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) throw new Error(d?.msg || `HTTP ${r.status}`);
+    return d;
+  })
+  .then(d => {
+    if (!d.ok) return alert('⚠️ ' + (d.msg || 'GIF 생성에 실패했습니다.'));
+    ensureThumbSlotsUpTo(selectedThumbSlot);
+    const spdTag = (d.speed && Math.abs(Number(d.speed) - 1) > 0.01) ? `·${Number(Number(d.speed).toFixed(2))}x` : '';
+    extractedThumbs[selectedThumbSlot] = {
+      url: d.url,
+      path: d.path,
+      active: true,
+      origIdx: `${d.start_sec}~${d.end_sec}s${spdTag}`,
+      kind: 'gif'
+    };
+    ensureBlogPlaceholderForSlot(selectedThumbSlot, 'gif');
+    renderThumbGallery();
+  })
+  .catch(err => {
+    const msg = `⚠️ GIF 생성 중 오류가 발생했습니다: ${err?.message || err}`;
+    appendUiLog(msg);
+    alert(msg);
+  })
+  .finally(() => {
+    if (btn) { btn.disabled = false; btn.innerText = '✨ GIF 생성'; }
+  });
+}
+
+function renderThumbGallery() {
+  const grid = document.getElementById('blogThumbGrid');
+  const badge = document.getElementById('activeThumbCount');
+  if (!grid || !badge) return;
+  if (!extractedThumbs.length) {
+    grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #64748b; font-size: 11.5px; padding: 14px 0;">영상을 먼저 첨부한 뒤 [✨ 미리보기 생성] 또는 위 드래그 캡처/GIF 생성을 이용해 보세요.</div>`;
+    badge.innerText = "선택됨: 0장";
+    return;
+  }
+  grid.innerHTML = extractedThumbs.map((item, idx) => {
+    const slotNum = idx + 1;
+    const isGif = item.kind === 'gif' || (item.path || '').toLowerCase().endsWith('.gif');
+    const isTarget = idx === selectedThumbSlot;
+    const label = item.active ? (isGif ? `[${slotNum}·GIF]` : `[${slotNum}]`) : `[${slotNum}·제외]`;
+    const slotTitle = item.active
+      ? `[미디어 자료${slotNum}]${isGif ? ' (GIF)' : ' (사진)'}`
+      : `[미디어 자료${slotNum}] (제외됨 · 번호 유지)`;
+    const icon = item.active ? '✕' : '↺';
+    const mediaHtml = item.url
+      ? `<img src="${item.url}" alt="캡처 ${item.origIdx}">`
+      : `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:10px;">빈 슬롯</div>`;
+    const subLabel = typeof item.origIdx === 'number' ? `#${item.origIdx}` : `${item.origIdx}`;
+    return `
+      <div class="thumb-item ${item.active ? '' : 'disabled'} ${isTarget ? 'target-slot' : ''}"
+           title="${slotTitle}"
+           draggable="true"
+           onclick="selectThumbTargetSlot(${idx})"
+           ondragstart="onThumbDragStart(event, ${idx})"
+           ondragover="onThumbDragOver(event)"
+           ondragenter="onThumbDragEnter(event)"
+           ondragleave="onThumbDragLeave(event)"
+           ondrop="onThumbDrop(event, ${idx})">
+        ${mediaHtml}
+        <span class="thumb-order ${isGif && item.active ? 'is-gif' : ''}">${label}</span>
+        <button type="button" class="thumb-btn-x" onclick="toggleThumb(event, ${idx})" title="${item.active ? '이 자리 빼기 (번호 당겨지지 않음)' : '다시 넣기'}">${icon}</button>
+        <div class="thumb-move-bar">
+          <button type="button" class="thumb-btn-move" onclick="moveThumb(event, ${idx}, -1)" title="앞으로 이동">◀</button>
+          <span class="thumb-orig-num" title="${subLabel}">${subLabel}</span>
+          <button type="button" class="thumb-btn-move" onclick="moveThumb(event, ${idx}, 1)" title="뒤로 이동">▶</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  const activeItems = extractedThumbs.filter(t => t.active && t.path);
+  const gifCnt = activeItems.filter(t => t.kind === 'gif' || (t.path || '').toLowerCase().endsWith('.gif')).length;
+  const imgCnt = activeItems.length - gifCnt;
+  badge.innerText = gifCnt > 0
+    ? `선택: 사진 ${imgCnt} · GIF ${gifCnt}`
+    : `선택: ${imgCnt}장 (제외 시 빈자리 유지)`;
+}
+
+function toggleThumb(e, idx) {
+  e.stopPropagation();
+  if (extractedThumbs[idx]) {
+    extractedThumbs[idx].active = !extractedThumbs[idx].active;
+    if (extractedThumbs[idx].active) {
+      ensureBlogPlaceholderForSlot(idx, extractedThumbs[idx].kind || 'image');
+    }
+    renderThumbGallery();
+  }
+}
+
+function moveThumb(e, idx, dir) {
+  e.stopPropagation();
+  const targetIdx = idx + dir;
+  if (targetIdx < 0 || targetIdx >= extractedThumbs.length) return;
+  const temp = extractedThumbs[idx];
+  extractedThumbs[idx] = extractedThumbs[targetIdx];
+  extractedThumbs[targetIdx] = temp;
+  if (selectedThumbSlot === idx) {
+    selectedThumbSlot = targetIdx;
+    const sel = document.getElementById('scrubberTargetSlot');
+    if (sel) sel.value = String(selectedThumbSlot);
+  }
+  renderThumbGallery();
+}
+
+function onThumbDragStart(e, idx) {
+  draggedThumbIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onThumbDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+function onThumbDragEnter(e) {
+  e.currentTarget.classList.add('drag-over');
+}
+function onThumbDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+function onThumbDrop(e, targetIdx) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  if (draggedThumbIdx === null || draggedThumbIdx === targetIdx) return;
+  const movedItem = extractedThumbs.splice(draggedThumbIdx, 1)[0];
+  extractedThumbs.splice(targetIdx, 0, movedItem);
+  selectedThumbSlot = targetIdx;
+  const sel = document.getElementById('scrubberTargetSlot');
+  if (sel) sel.value = String(selectedThumbSlot);
+  draggedThumbIdx = null;
+  renderThumbGallery();
+}
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, false);
+});
+dropZone.addEventListener('drop', e => { if(e.dataTransfer.files?.length) handleFileChunkUpload(e.dataTransfer.files[0]); }, false);
+videoFileInput.addEventListener('change', e => { if(e.target.files.length) handleFileChunkUpload(e.target.files[0]); });
+
+async function handleFileChunkUpload(file) {
+  currentVideoName = file.name;
+  extractedThumbs = [];
+  selectedThumbSlot = 0;
+  gifSpeed = 1.0;
+  const slotSel = document.getElementById('scrubberTargetSlot');
+  if (slotSel) slotSel.value = '0';
+  const spdSel = document.getElementById('gifSpeedSelect');
+  if (spdSel) spdSel.value = '1';
+  renderThumbGallery();
+
+  if (currentVideoObjectUrl) {
+    try { URL.revokeObjectURL(currentVideoObjectUrl); } catch (e) {}
+  }
+  currentVideoObjectUrl = URL.createObjectURL(file);
+  loadVideoIntoScrubber(currentVideoObjectUrl);
+  let totalChunks = Math.max(1, Math.ceil(file.size / CHUNK_SIZE));
+  document.getElementById('mainUploadProgressBg').style.display = 'block';
+  const disp = document.getElementById('fileNameDisplay');
+  disp.textContent = "📎 " + file.name + " (전송 중...)"; disp.style.color = '#2563eb';
+
+  let lastResp = null;
+  for (let i = 0; i < totalChunks; i++) {
+    let formData = new FormData();
+    formData.append('video_chunk', file.slice(i * CHUNK_SIZE, Math.min((i + 1) * CHUNK_SIZE, file.size)));
+    formData.append('filename', currentVideoName);
+    formData.append('chunk_index', i);
+    formData.append('total_chunks', totalChunks);
+    try {
+      lastResp = await (await fetch('/api/upload_chunk', { method: 'POST', body: formData })).json();
+      let pct = Math.round(((i + 1) / totalChunks) * 100) + '%';
+      document.getElementById('mainUploadProgress').style.width = pct;
+      document.getElementById('mainUploadText').innerText = pct;
+    } catch(err) {
+      disp.textContent = "⚠️ 통신 오류 발생"; disp.style.color = '#dc2626'; return;
+    }
+  }
+  disp.textContent = "✅ 첨부 완료: " + file.name; disp.style.color = '#059669';
+  if (lastResp && lastResp.video_meta) {
+    renderVideoMeta(lastResp.video_meta);
+  }
+}
+
+function transformData(btn) {
+  const targetBtn = btn || null;
+  if (targetBtn) {
+    targetBtn.innerText = "⏳ 변환 및 영상 10컷 추출 중...";
+    targetBtn.disabled = true;
+  }
+  const sourceEl = document.getElementById('sourceText');
+  const sourceVal = sourceEl ? sourceEl.value : '';
+
+  fetch('/api/transform', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ data_text: sourceVal, video_name: currentVideoName })
+  })
+  .then(async r => {
+    const rawText = await r.text();
+    let parsed = null;
+    try { parsed = rawText ? JSON.parse(rawText) : null; } catch (e) {}
+    if (!r.ok || !parsed) {
+      throw new Error(parsed?.msg || `서버 응답 오류 (HTTP ${r.status})`);
+    }
+    return parsed;
+  })
+  .then(d => {
+    if (!d.ok || !d.data) {
+      const errMsg = d?.msg || '미리보기 변환 결과가 비어 있습니다.';
+      appendUiLog('⚠️ ' + errMsg);
+      alert('⚠️ ' + errMsg);
+      return;
+    }
+    fillFormFields(d.data);
+    if (d.video_meta && d.video_meta.ok) {
+      renderVideoMeta(d.video_meta);
+    }
+    if (currentVideoName) {
+      const vid = document.getElementById('blogScrubberVideo');
+      const studio = document.getElementById('blogScrubberStudio');
+      if (vid && (!vid.getAttribute('src') || vid.error)) {
+        loadVideoIntoScrubber(`/video/${encodeURIComponent(currentVideoName)}?t=${Date.now()}`);
+      } else {
+        if (studio) studio.style.display = 'block';
+        if (vid && vid.videoWidth > 0 && vid.videoHeight > 0) {
+          applyVideoAspectLayout(vid.videoWidth, vid.videoHeight);
+        }
+        updateScrubberUI();
+        updateGifRangeUI();
+      }
+    }
+    if (Array.isArray(d.thumbnails) && d.thumbnails.length) {
+      const bodySlots = getBlogMediaSlotNumbers(document.getElementById('naverBody')?.value || d.data.naver_body || '');
+      extractedThumbs = d.thumbnails.map((t, i) => ({
+        url: t.url,
+        path: t.path,
+        active: bodySlots.size > 0 ? bodySlots.has(i + 1) : (i < 6),
+        origIdx: i + 1,
+        kind: 'image'
+      }));
+      renderThumbGallery();
+    } else if (!extractedThumbs.length) {
+      renderThumbGallery();
+    }
+    const previewSec = document.getElementById('previewSection');
+    if (previewSec) previewSec.style.display = 'block';
+  })
+  .catch(err => {
+    console.error('transformData error:', err);
+    const errMsg = `⚠️ 미리보기 생성 중 오류가 발생했습니다: ${err?.message || err}`;
+    appendUiLog(errMsg);
+    alert(errMsg);
+  })
+  .finally(() => {
+    if (targetBtn) {
+      targetBtn.innerText = "✨ 미리보기 생성 (플랫폼별 맞춤 변환 + 영상 10컷 추출)";
+      targetBtn.disabled = false;
+    }
+  });
+}
+
+function startAuthCheck() {
+  let payload = {
+    use_naver: document.getElementById('chkNaver').checked, use_clip: document.getElementById('chkClip').checked,
+    use_tt: document.getElementById('chkTt').checked, use_ig: document.getElementById('chkIg').checked, use_pin: document.getElementById('chkPin').checked, use_threads: document.getElementById('chkThreads').checked, use_daangn: document.getElementById('chkDaangn').checked, use_x: document.getElementById('chkX').checked
+  };
+  fetch('/api/auth_check', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+  .then(r => r.json()).then(d => { if(!d.ok) alert(d.msg); });
+}
+
+function startUpload(overrideTargets = null) {
+  if (!isProfileConfigured) {
+    if (confirm('⚠️ 아직 매장 기본 정보가 설정되지 않았습니다.\n초기 설정 마법사에서 매장명과 기본 정보를 먼저 입력하시겠습니까?')) {
+      openSetupGuide(1);
+    }
+    return;
+  }
+  if(!currentVideoName) return alert("⚠️ 영상 파일이 아직 첨부되지 않았습니다!");
+  const isEnabled = (key, chkId) => {
+    if (overrideTargets === null || overrideTargets === undefined) {
+      return !!document.getElementById(chkId)?.checked;
+    }
+    if (Array.isArray(overrideTargets)) {
+      return overrideTargets.includes(key);
+    }
+    return Boolean(overrideTargets[key]);
+  };
+  TAG_INPUT_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = cleanTagsString(el.value);
+  });
+  const getVal = id => document.getElementById(id)?.value || '';
+  const getBranchVal = id => normalizeBranchName(getVal(id));
+  let payload = {
+    video_name: currentVideoName, source_text: getVal('sourceText'),
+    use_yt: isEnabled('yt', 'chkYt'), yt_title: getBranchVal('ytTitle'), yt_body: getBranchVal('ytBody'), yt_tags: cleanTagsString(getVal('ytTags')),
+    use_naver: isEnabled('naver', 'chkNaver'), naver_title: getBranchVal('naverTitle'), naver_body: getBranchVal('naverBody'), naver_tags: cleanTagsString(getVal('naverTags')), naver_category: getVal('naverCategory'), naver_place: getBranchVal('naverPlace'),
+    naver_selected_images: extractedThumbs.map(t => (t && t.active && t.path) ? t.path : ""),
+    use_clip: isEnabled('clip', 'chkClip'), clip_title: getBranchVal('clipTitle'), clip_body: getBranchVal('clipBody'), clip_tags: cleanTagsString(getVal('clipTags')), clip_place: getBranchVal('clipPlace'),
+    use_tt: isEnabled('tt', 'chkTt'), tt_title: getBranchVal('ttTitle'), tt_body: getBranchVal('ttBody'), tt_tags: cleanTagsString(getVal('ttTags')), tt_location: getBranchVal('ttLocation'),
+    use_ig: isEnabled('ig', 'chkIg'), ig_body: getBranchVal('igBody'), ig_tags: cleanTagsString(getVal('igTags')), ig_location: getBranchVal('igLocation'),
+    use_pin: isEnabled('pin', 'chkPin'), pin_title: getBranchVal('pinTitle'), pin_body: getBranchVal('pinBody'), pin_tags: cleanTagsString(getVal('pinTags')), pin_dest_url: getVal('pinDestUrl'), pin_board: getVal('pinBoard'),
+    use_threads: isEnabled('threads', 'chkThreads'), threads_body: getBranchVal('threadsBody'), threads_tags: cleanTagsString(getVal('threadsTags')),
+    use_daangn: isEnabled('daangn', 'chkDaangn'), daangn_title: getBranchVal('daangnTitle'), daangn_body: getBranchVal('daangnBody'),
+    use_x: isEnabled('x', 'chkX'), x_body: getBranchVal('xBody'), x_tags: cleanTagsString(getVal('xTags'))
+  };
+  fetch('/api/publish', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
+  .then(r => r.json()).then(d => {
+    if (!d.ok) {
+      alert(d.msg);
+      if (d.need_onboarding) openSetupGuide(1);
+    }
+  });
+}
+
+function uploadSingle(target) {
+  if(!currentVideoName) return alert("⚠️ 영상 파일이 아직 첨부되지 않았습니다!");
+  startUpload([target]);
+}
+
+function toggleHistoryPanel() {
+  let m = document.getElementById('historyModal');
+  let show = m.style.display === 'none' || m.style.display === '';
+  m.style.display = show ? 'flex' : 'none';
+  if(show) {
+    fetch('/api/history').then(r => r.json()).then(d => {
+      let c = document.getElementById('historyListContainer'), list = d.history || [];
+      if(!list.length) { c.innerHTML = '<p style="text-align:center; color:#64748b; margin-top:20px;">기록이 없습니다.</p>'; return; }
+      c.innerHTML = list.map(item => `<div class="history-item"><div><b>[${item.naver_category || 'Women'}] ${item.naver_title || item.yt_title || '제목 없음'}</b><br><small style="color:#64748b;">${item.date || ''}</small></div><button onclick="restoreHistory('${item.id}')" class="btn-single" style="background:#2563eb;">복원</button></div>`).join('');
+    });
+  }
+}
+
+function restoreHistory(id) {
+  fetch('/api/history/restore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) })
+  .then(r => r.json()).then(d => {
+    if(!d.success) return;
+    document.getElementById('sourceText').value = d.record.source_text || "";
+    fillFormFields(d.record);
+    currentVideoName = d.record.video_name || "";
+    if(currentVideoName) {
+      document.getElementById('fileNameDisplay').textContent = "✅ 복원된 파일: " + currentVideoName;
+      document.getElementById('fileNameDisplay').style.color = '#059669';
+      loadVideoIntoScrubber(`/video/${encodeURIComponent(currentVideoName)}?t=${Date.now()}`);
+    }
+    if (d.video_meta) {
+      renderVideoMeta(d.video_meta);
+    }
+    toggleHistoryPanel();
+  });
+}
+
+function runCleanAll() {
+  const msg =
+    "불필요한 임시·백업 파일을 한 번에 정리할까요?\n\n" +
+    "[정리 대상]\n" +
+    "• 불필요한 스냅샷(.png) 및 루트 임시 산출물(total_code.txt, export_error.log 등)\n" +
+    "• debug_records / temp_thumbs 임시 파일 및 _old_backup 구버전 찌꺼기\n\n" +
+    "[안전 보호 — 절대 삭제되지 않음]\n" +
+    "• 핵심 코드(.py, .html, .bat, 설정 파일), 개발 도구(export_code.py 등)\n" +
+    "• auth_data(로그인 쿠키·프로필·토큰), blackbox_login·blackbox_upload(녹화본), upload / done 영상";
+  if (!confirm(msg)) return;
+
+  const btn = document.getElementById('btnCleanAll');
+  if (btn) { btn.disabled = true; btn.innerText = '🧹 정리 중...'; }
+  fetch('/api/cleanup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'clean_all' }) })
+  .then(r => r.json()).then(d => {
+    alert(d.msg || '파일 정리가 완료되었습니다.');
+  })
+  .catch(() => {
+    alert('⚠️ 파일 정리 요청 중 통신 오류가 발생했습니다.');
+  })
+  .finally(() => {
+    if (btn) { btn.disabled = false; btn.innerText = '🧹 파일 정리'; }
+  });
+}
+
+setInterval(() => {
+  fetch('/api/status').then(r => r.json()).then(d => {
+    if(d.logs) {
+      let b = document.getElementById('logBox');
+      let atBottom = (b.scrollHeight - b.scrollTop - b.clientHeight) < 40;
+      b.textContent = d.logs.join('\n');
+      if(atBottom) b.scrollTop = b.scrollHeight;
+    }
+    const badge = document.getElementById('statusBadge');
+    if (badge) {
+      badge.innerText = d.busy ? '작업 진행 중...' : '대기 중';
+      badge.className = d.busy ? 'log-badge busy' : 'log-badge';
+    }
+    if (d.last_results !== undefined) {
+      renderPublishResults(d.last_results, !!d.busy);
+    }
+    if (wasBusy && !d.busy) {
+      refreshSetupAndQuota();
+    }
+    wasBusy = !!d.busy;
+  }).catch(()=>{});
+}, 1500);
+
+let latestReleaseInfo = { version: '1.0.0', author: '', notion_url: '#', youtube_url: '#', chat_url: '#', instagram_url: '#' };
+let latestUpdateCheck = null;
+let appToastTimer = null;
+
+function showAppToast(msg) {
+  const el = document.getElementById('appToast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  if (appToastTimer) clearTimeout(appToastTimer);
+  appToastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function handleOfficialLinkClick(ev, url, label) {
+  const cleanUrl = String(url || '').trim();
+  if (!cleanUrl || cleanUrl === '#') {
+    if (ev) ev.preventDefault();
+    showAppToast(`⏳ ${label} 링크는 현재 준비 중입니다. 곧 공식 채널이 연결됩니다!`);
+    return false;
+  }
+  return true;
+}
+
+function renderOfficialSlimBar(targetId, info) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  const ver = (info && info.version ? String(info.version) : '1.0.0').replace(/^v/i, '');
+  const author = (info && info.author ? String(info.author) : '').trim();
+  const ytUrl = (info && info.youtube_url ? String(info.youtube_url).trim() : '#') || '#';
+  const notionUrl = (info && info.notion_url ? String(info.notion_url).trim() : '#') || '#';
+  const chatUrl = (info && info.chat_url ? String(info.chat_url).trim() : '#') || '#';
+  const igUrl = (info && info.instagram_url ? String(info.instagram_url).trim() : '#') || '#';
+
+  const makeLink = (url, label) => {
+    const safeUrl = escapeHtml(url);
+    const safeLabel = escapeHtml(label);
+    const targetAttr = (url && url !== '#') ? ' target="_blank" rel="noopener noreferrer"' : '';
+    return `<a href="${safeUrl}"${targetAttr} onclick="return handleOfficialLinkClick(event, '${safeUrl}', '${safeLabel}')">[${safeLabel}]</a>`;
+  };
+
+  const authorPart = author ? ` | 제작: ${escapeHtml(author)}` : '';
+  const igPart = (igUrl && igUrl !== '#') ? ` · ${makeLink(igUrl, '📸 인스타그램')}` : '';
+  el.innerHTML = `<span class="official-ver-tag">v${escapeHtml(ver)}</span>${authorPart} · ${makeLink(ytUrl, '📺 사용법 영상')} · ${makeLink(notionUrl, '🔔 최신 버전·안내')} · ${makeLink(chatUrl, '💬 질문·소통방')}${igPart}`;
+}
+
+function loadReleaseInfo() {
+  return fetch('/api/release_info').then(r => r.json()).then(d => {
+    if (d && d.ok && d.info) {
+      latestReleaseInfo = d.info;
+    }
+    renderOfficialSlimBar('dashboardOfficialBar', latestReleaseInfo);
+    renderOfficialSlimBar('wizardOfficialBar', latestReleaseInfo);
+  }).catch(() => {
+    renderOfficialSlimBar('dashboardOfficialBar', latestReleaseInfo);
+    renderOfficialSlimBar('wizardOfficialBar', latestReleaseInfo);
+  });
+}
+
+function checkForUpdates(isManual = false) {
+  const btn = document.getElementById('btnCheckUpdate');
+  if (isManual && btn) {
+    btn.disabled = true;
+    btn.innerText = '🔄 확인 중...';
+  }
+  return fetch('/api/check_update').then(r => r.json()).then(d => {
+    latestUpdateCheck = d || null;
+    const banner = document.getElementById('updateAvailableBanner');
+    const titleEl = document.getElementById('updateBannerTitle');
+    const subEl = document.getElementById('updateBannerSub');
+    const applyBtn = document.getElementById('btnApplyUpdate');
+
+    if (d && d.local_info) {
+      latestReleaseInfo = d.local_info;
+      renderOfficialSlimBar('dashboardOfficialBar', latestReleaseInfo);
+      renderOfficialSlimBar('wizardOfficialBar', latestReleaseInfo);
+    }
+
+    if (d && d.ok && d.has_update) {
+      const rv = d.remote_version || '';
+      const lv = d.local_version || '1.0.0';
+      if (titleEl) titleEl.innerText = `🎉 새 버전 v${rv} 이 출시되었습니다! (현재 v${lv})`;
+      if (subEl) {
+        subEl.innerText = d.changelog
+          ? `변경 사항: ${d.changelog} · 개인 데이터(auth_data·로그인·프로필)는 100% 보호됩니다.`
+          : '개인 설정(auth_data·로그인·크롬 프로필)은 100% 보호되며 코드 파일만 안전하게 업데이트됩니다.';
+      }
+      if (applyBtn) applyBtn.innerText = `🚀 v${rv} 원클릭 업데이트`;
+      if (banner) banner.style.display = 'flex';
+      if (isManual) showAppToast(`🎉 새 버전 v${rv}이 확인되었습니다! 상단 원클릭 업데이트 버튼을 눌러주세요.`);
+    } else {
+      if (banner) banner.style.display = 'none';
+      if (isManual) {
+        if (d && d.ok) {
+          showAppToast(`✅ 현재 최신 버전(v${d.local_version || latestReleaseInfo.version || '1.0.0'})을 사용 중입니다.`);
+        } else {
+          showAppToast('ℹ️ 업데이트 서버에 연결할 수 없습니다 (오프라인 또는 초기 배포 전).');
+        }
+      }
+    }
+  }).catch(() => {
+    if (isManual) showAppToast('ℹ️ 업데이트 확인 중 네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+  }).finally(() => {
+    if (isManual && btn) {
+      btn.disabled = false;
+      btn.innerText = '🔄 업데이트 확인';
+    }
+  });
+}
+
+function runOneClickUpdate() {
+  const rv = latestUpdateCheck && latestUpdateCheck.remote_version ? `v${latestUpdateCheck.remote_version}` : '최신 버전';
+  const ok = confirm(
+    `${rv} 원클릭 자동 업데이트를 진행할까요?\n\n` +
+    `• GitHub main 브랜치에서 최신 순수 코드만 내려받아 문법 검사 후 반영합니다.\n` +
+    `• auth_data(로그인·크롬 프로필·user_profile.json·유튜브 토큰)와 로컬 미디어 파일은 100% 안전하게 보호됩니다.`
+  );
+  if (!ok) return;
+
+  const btn = document.getElementById('btnApplyUpdate');
+  const prevText = btn ? btn.innerText : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = '⏳ 업데이트 다운로드·검증 중...';
+  }
+  fetch('/api/apply_update', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}) })
+  .then(r => r.json())
+  .then(d => {
+    if (d && d.ok) {
+      const banner = document.getElementById('updateAvailableBanner');
+      if (banner) banner.style.display = 'none';
+      loadReleaseInfo();
+      alert(`✅ ${d.msg || '업데이트 완료! 서버재시작.command를 다시 실행해 주세요.'}`);
+    } else {
+      alert(`⚠️ ${(d && d.msg) || '업데이트에 실패했습니다. 기존 버전은 안전하게 유지됩니다.'}`);
+    }
+  })
+  .catch(() => {
+    alert('⚠️ 업데이트 요청 중 통신 오류가 발생했습니다. 기존 버전은 안전하게 유지됩니다.');
+  })
+  .finally(() => {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = prevText || '🚀 원클릭 업데이트';
+    }
+  });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadReleaseInfo();
+  checkForUpdates(false);
+  loadProfileFromServer(true);
+  refreshSetupAndQuota();
+
+  TAG_INPUT_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('blur', () => { el.value = cleanTagsString(el.value); });
+    }
+  });
+
+  const scrubVid = document.getElementById('blogScrubberVideo');
+  if (scrubVid) {
+    scrubVid.addEventListener('loadedmetadata', () => {
+      scrubDuration = Number(scrubVid.duration || 0);
+      if (scrubVid.videoWidth > 0 && scrubVid.videoHeight > 0) {
+        applyVideoAspectLayout(scrubVid.videoWidth, scrubVid.videoHeight);
+      }
+      const slider = document.getElementById('frameScrubSlider');
+      if (slider && scrubDuration > 0) {
+        slider.max = scrubDuration.toFixed(2);
+        slider.value = '0';
+      }
+      gifStartSec = 0;
+      gifEndSec = Math.min(scrubDuration || 2.5, 2.5);
+      updateGifRangeUI();
+      updateScrubberUI();
+    });
+    scrubVid.addEventListener('timeupdate', () => {
+      if (isGifLoopPreview && scrubVid.currentTime >= gifEndSec) {
+        scrubVid.currentTime = gifStartSec;
+      }
+      updateScrubberUI();
+    });
+    scrubVid.addEventListener('ended', () => {
+      if (isGifLoopPreview) {
+        scrubVid.playbackRate = Math.max(0.5, Math.min(2.0, Number(gifSpeed) || 1.0));
+        scrubVid.currentTime = gifStartSec;
+        scrubVid.play().catch(() => {});
+      } else {
+        const playBtn = document.getElementById('btnScrubPlay');
+        if (playBtn) playBtn.innerText = '▶ 재생';
+      }
+    });
+  }
+});
+</script>
+</body>
+</html>
