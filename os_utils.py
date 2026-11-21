@@ -4,7 +4,10 @@ import sys
 import json
 import glob
 import time
+import datetime
 import shutil
+import threading
+import traceback
 import subprocess
 
 MOD_KEY = "Meta" if sys.platform == "darwin" else "Control"
@@ -50,6 +53,8 @@ EMPTY_PROFILE_TEMPLATE = {
     "business_hours": "",
     "prompt_mode": "standard",
     "custom_style_guide": "",
+    "onboarding_checks": {},
+    "prompt_copied": False,
     "onboarding_step": 0,
     "onboarding_completed": False,
     "is_configured": False,
@@ -130,25 +135,44 @@ def launch_persistent_chromium(
             kwargs["record_video_size"] = record_video_size
 
     try:
-        return playwright_obj.chromium.launch_persistent_context(channel="chrome", **kwargs)
+        ctx = playwright_obj.chromium.launch_persistent_context(channel="chrome", **kwargs)
     except Exception as e:
         print(f"ℹ️ [브라우저] Chrome 채널 영구 프로필 실행 불가({e}) → 기본 Chromium으로 자동 전환합니다.", flush=True)
-        return playwright_obj.chromium.launch_persistent_context(**kwargs)
+        ctx = playwright_obj.chromium.launch_persistent_context(**kwargs)
+    try:
+        attach_diagnostics_tracker(ctx)
+    except Exception:
+        pass
+    return ctx
 
 
 PERSISTENT_COOKIE_RULES = (
     ("naver_cookies.json", ("naver.com",), {"nid_aut", "nid_ses"}),
-    ("tiktok_cookies.json", ("tiktok.com",), {"sessionid", "sessionid_ss", "sid_tt", "uid_tt"}),
+    ("tiktok_cookies.json", ("tiktok.com",), {"sessionid", "sessionid_ss", "sid_tt", "uid_tt", "uid_tt_ss", "sid_guard"}),
     ("instagram_cookies.json", ("instagram.com",), {"sessionid", "ds_user_id"}),
     ("pinterest_cookies.json", ("pinterest.com",), {"_pinterest_sess", "_auth"}),
     ("threads_cookies.json", ("threads.com", "threads.net"), {"sessionid", "ds_user_id"}),
     (
         "daangn_cookies.json",
         ("daangn.com", "karrotmarket.com"),
-        {"_daangn_session", "daangn_session", "access_token", "session", "sid", "connect.sid", "auth_token", "token", "karrot_session"},
+        {
+            "_daangn_session",
+            "daangn_session",
+            "karrot_session",
+            "biz_session",
+            "biz_access_token",
+            "access_token",
+            "refresh_token",
+            "b_token",
+            "daangn_auth",
+            "karrot_auth",
+        },
     ),
     ("x_cookies.json", ("x.com", "twitter.com"), {"auth_token", "twid"}),
 )
+
+DAANGN_VISITOR_COOKIE_PREFIXES = ("ch-session", "ch-veil", "_ga", "_gcl", "_fbp", "_clck", "_clsk", "_dd_", "_interaction")
+DAANGN_VISITOR_COOKIE_EXACT = {"karrot_user_device_id", "device_id", "accounts_sid", "_kmpid"}
 
 
 def _domain_matches(cookie_domain, target_domains):
@@ -162,69 +186,255 @@ def _domain_matches(cookie_domain, target_domains):
     return False
 
 
-def _has_logged_in_session_cookie(filename, matched_cookies, session_names):
+def _is_cookie_active(cookie_obj, now_ts=None):
+    """쿠키 값이 비어있지 않고 만료되지 않았는지 판별 (세션 쿠키 expires<=0은 유효로 간주)"""
+    if not isinstance(cookie_obj, dict):
+        return False
+    val = str(cookie_obj.get("value") or "").strip()
+    if not val:
+        return False
+    exp = cookie_obj.get("expires")
+    if exp is not None:
+        try:
+            exp_f = float(exp)
+            if exp_f > 0 and exp_f < (now_ts if now_ts is not None else time.time()):
+                return False
+        except Exception:
+            pass
+    return True
+
+
+def _has_logged_in_session_cookie(filename, matched_cookies, session_names, auth_verified=False):
+    """각 플랫폼의 비로그인 방문자 쿠키를 제외하고 실제 로그인 인증 쿠키·세션 토큰 보유 여부만 정밀 판별"""
     if not matched_cookies:
         return False
-    # Pinterest는 비로그인 시에도 _auth=0을 내려주므로 _auth=1 또는 유효한 _pinterest_sess 확인
-    if filename == "pinterest_cookies.json":
-        auth_val = None
-        has_sess = False
-        for c in matched_cookies:
-            cname = (c.get("name") or "").strip().lower()
-            cval = str(c.get("value") or "").strip()
-            if cname == "_auth":
-                auth_val = cval
-            elif cname == "_pinterest_sess" and len(cval) >= 16:
-                has_sess = True
-        if auth_val == "1":
-            return True
-        if auth_val == "0":
-            return False
-        return has_sess
 
-    # 당근 비즈프로필은 세션/토큰 계열 쿠키명 변형까지 유연하게 확인
-    if filename == "daangn_cookies.json":
-        for c in matched_cookies:
-            cname = (c.get("name") or "").strip().lower()
-            cval = str(c.get("value") or "").strip()
-            if not cval:
-                continue
-            if cname in session_names:
-                return True
-            if any(k in cname for k in ("session", "token", "auth", "user", "login")) and len(cval) >= 8:
-                return True
-        return False
-
+    now_ts = time.time()
+    active_by_name = {}
     for c in matched_cookies:
+        if not _is_cookie_active(c, now_ts=now_ts):
+            continue
         cname = (c.get("name") or "").strip().lower()
         cval = str(c.get("value") or "").strip()
-        if cname in session_names and cval:
+        cdom = (c.get("domain") or "").lstrip(".").lower()
+        if cname:
+            active_by_name.setdefault(cname, []).append((cval, cdom))
+
+    if not active_by_name:
+        return False
+
+    # 1) 네이버 블로그/클립: NID_AUT + NID_SES 모두 존재해야 실제 로그인 세션
+    if filename == "naver_cookies.json":
+        has_aut = any(len(v) >= 8 for v, _ in active_by_name.get("nid_aut", []))
+        has_ses = any(len(v) >= 8 for v, _ in active_by_name.get("nid_ses", []))
+        return has_aut and has_ses
+
+    # 2) 인스타그램: sessionid(>=10) + ds_user_id(숫자) 모두 존재 (방문자 csrftoken/mid/ig_did만 있으면 False)
+    if filename == "instagram_cookies.json":
+        has_sid = any(len(v) >= 10 for v, _ in active_by_name.get("sessionid", []))
+        has_uid = any(v.isdigit() and len(v) >= 3 for v, _ in active_by_name.get("ds_user_id", []))
+        return has_sid and has_uid
+
+    # 3) 쓰레드: threads.com / threads.net 도메인에 sessionid(>=10) + ds_user_id(숫자) 모두 존재하거나 브라우저 실로그인 검증됨
+    if filename == "threads_cookies.json":
+        if auth_verified:
+            return True
+        has_sid = any(len(v) >= 10 for v, _ in active_by_name.get("sessionid", []))
+        has_uid = any(v.isdigit() and len(v) >= 3 for v, _ in active_by_name.get("ds_user_id", []))
+        return has_sid and has_uid
+
+    # 4) 틱톡: 세션 쿠키(sessionid/sessionid_ss/sid_tt) + 계정 식별 쿠키(uid_tt/uid_tt_ss/sid_guard) 모두 존재
+    if filename == "tiktok_cookies.json":
+        has_sid = any(
+            len(v) >= 10
+            for key in ("sessionid", "sessionid_ss", "sid_tt")
+            for v, _ in active_by_name.get(key, [])
+        )
+        has_uid = any(
+            len(v) >= 5
+            for key in ("uid_tt", "uid_tt_ss", "sid_guard")
+            for v, _ in active_by_name.get(key, [])
+        )
+        return has_sid and has_uid
+
+    # 5) 핀터레스트: _auth == "1" 이고 _pinterest_sess(>=16) 모두 존재 (_auth == "0"이면 비로그인)
+    if filename == "pinterest_cookies.json":
+        auth_vals = [v for v, _ in active_by_name.get("_auth", [])]
+        if "0" in auth_vals and "1" not in auth_vals:
+            return False
+        has_auth1 = "1" in auth_vals
+        has_sess = any(len(v) >= 16 for v, _ in active_by_name.get("_pinterest_sess", []))
+        return has_auth1 and has_sess
+
+    # 6) 당근 비즈: 방문자·로그인화면 임시 쿠키(ch-session-*, karrot_user_device_id, accounts_sid, _interaction* 등) 완전 배제!
+    #    실제 비즈 대시보드 인증 쿠키(>=12자, accounts.daangn.com 제외)가 있거나,
+    #    브라우저에서 실제 대시보드 진입(auth_verified=True)이 확인된 경우만 True
+    if filename == "daangn_cookies.json":
+        if auth_verified:
+            return True
+        for cname, entries in active_by_name.items():
+            if cname in DAANGN_VISITOR_COOKIE_EXACT or any(cname.startswith(px) for px in DAANGN_VISITOR_COOKIE_PREFIXES):
+                continue
+            for cval, cdom in entries:
+                if cdom == "accounts.daangn.com" or cdom.startswith("accounts."):
+                    continue
+                if cname in session_names and len(cval) >= 12:
+                    return True
+        return False
+
+    # 7) 엑스(X): auth_token(>=10) + twid(>=3) 모두 존재 (guest_id/gt/__cf_bm만 있으면 False)
+    if filename == "x_cookies.json":
+        has_tok = any(len(v) >= 10 for v, _ in active_by_name.get("auth_token", []))
+        has_twid = any(len(v) >= 3 for v, _ in active_by_name.get("twid", []))
+        return has_tok and has_twid
+
+    for cname in session_names:
+        if active_by_name.get(cname):
             return True
     return False
 
 
-def sync_cookies_from_persistent_context(context):
-    """열려 있는 persistent context에서 플랫폼별 로그인 세션 쿠키를 추출해 auth_data/<플랫폼>_cookies.json에 원자 저장"""
+def check_cookie_login_redirect(filename, path, timeout=3.5):
+    """저장된 쿠키로 보호 URL에 HTTP 요청을 보내 로그인 페이지로 리다이렉트되는지 1회 정밀 확인.
+    네트워크 불가·오류 시 None 반환(기존 쿠키 판정 유지), 로그인 페이지 리다이렉트 감지 시 False, 통과 시 True.
+    (당근 비즈는 SPA/브라우저 OAuth 세션 구조 특성상 단순 urllib 요청에서 오판·쿠키 삭제 위험이 있으므로
+    브라우저 실검증 결과(auth_verified)와 쿠키 정밀 검사를 신뢰하고 None 반환)"""
+    import urllib.request
+    import urllib.error
+
+    if filename == "daangn_cookies.json":
+        return None
+
+    check_specs = {
+        "naver_cookies.json": (
+            "https://blog.naver.com/GoBlogWrite.naver",
+            ("nid.naver.com/nidlogin", "nidlogin.login"),
+        ),
+    }
+    spec = check_specs.get(filename)
+    if not spec or not path or not os.path.exists(path):
+        return None
+    target_url, login_markers = spec
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        cookies = data.get("cookies") or []
+        now_ts = time.time()
+        pairs = []
+        for c in cookies:
+            if not _is_cookie_active(c, now_ts=now_ts):
+                continue
+            name = (c.get("name") or "").strip()
+            val = str(c.get("value") or "").strip()
+            if name and val:
+                pairs.append(f"{name}={val}")
+        if not pairs:
+            return False
+
+        class _NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+
+        opener = urllib.request.build_opener(_NoRedirect())
+        req = urllib.request.Request(
+            target_url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                "Cookie": "; ".join(pairs),
+            },
+        )
+        try:
+            with opener.open(req, timeout=timeout) as resp:
+                final_url = (resp.geturl() or "").lower()
+                if any(mk in final_url for mk in login_markers):
+                    return False
+                body_head = resp.read(4096).decode("utf-8", errors="ignore").lower()
+                if filename == "naver_cookies.json" and "nidlogin" in body_head:
+                    return False
+                return True
+        except urllib.error.HTTPError as he:
+            if he.code in (301, 302, 303, 307, 308):
+                loc = (he.headers.get("Location") or "").lower()
+                if any(mk in loc for mk in login_markers):
+                    return False
+                return True
+            if he.code in (401, 403):
+                return False
+            return None
+    except Exception:
+        return None
+
+
+def is_platform_cookie_authenticated(filename, path, auto_clean=False):
+    """저장된 플랫폼 쿠키 JSON 파일이 단순 방문자 쿠키가 아닌 실제 로그인 인증 세션을 보유하고 있는지 정밀 검사"""
+    if not path or not os.path.exists(path):
+        return False
+    try:
+        if os.path.getsize(path) <= 10:
+            raise ValueError("cookie file is empty")
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            raise ValueError("cookie root is not dict")
+        cookies = data.get("cookies")
+        if not isinstance(cookies, list) or not cookies:
+            return False
+        auth_verified = bool(data.get("auth_verified", False))
+        rule = next((r for r in PERSISTENT_COOKIE_RULES if r[0] == filename), None)
+        if not rule:
+            return len(cookies) > 0
+        _, domains, session_names = rule
+        matched = [c for c in cookies if _domain_matches(c.get("domain"), domains)]
+        return _has_logged_in_session_cookie(filename, matched, session_names, auth_verified=auth_verified)
+    except Exception:
+        if auto_clean:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+        return False
+
+
+def sync_cookies_from_persistent_context(context, verified_platforms=None, checked_filenames=None):
+    """열려 있는 persistent context에서 플랫폼별 실제 로그인 인증 쿠키만 추출해 auth_data/<플랫폼>_cookies.json에 원자 저장.
+    비로그인 방문자 쿠키만 있는 경우 가짜 쿠키를 저장하지 않으며, checked_filenames 대상 중 비로그인 상태면 기존 잔여 파일도 정리."""
     if context is None:
         return []
     try:
         all_cookies = context.cookies()
     except Exception:
         return []
-    if not isinstance(all_cookies, list) or not all_cookies:
+    if not isinstance(all_cookies, list):
         return []
 
+    verified_set = set(verified_platforms or ())
+    checked_set = set(checked_filenames or ())
     synced = []
+
     for filename, domains, session_names in PERSISTENT_COOKIE_RULES:
         matched = [c for c in all_cookies if _domain_matches(c.get("domain"), domains)]
-        if not _has_logged_in_session_cookie(filename, matched, session_names):
-            continue
+        is_verified = filename in verified_set
+        is_logged_in = _has_logged_in_session_cookie(filename, matched, session_names, auth_verified=is_verified)
         dst_path = get_auth_file(filename)
+
+        if not is_logged_in:
+            # 이번에 직접 점검한 플랫폼인데 비로그인 상태라면 가짜/만료 쿠키 파일이 남아 초록불이 뜨지 않도록 정리
+            if filename in checked_set and os.path.exists(dst_path):
+                try:
+                    os.remove(dst_path)
+                except Exception:
+                    pass
+            continue
+
         tmp_path = f"{dst_path}.tmp"
+        payload = {"cookies": matched, "origins": []}
+        if is_verified:
+            payload["auth_verified"] = True
+            payload["verified_at"] = int(time.time())
         try:
             os.makedirs(os.path.dirname(os.path.abspath(dst_path)), exist_ok=True)
             with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump({"cookies": matched, "origins": []}, f, ensure_ascii=False, indent=2)
+                json.dump(payload, f, ensure_ascii=False, indent=2)
             if is_valid_cookie_file(tmp_path, auto_clean=False):
                 os.replace(tmp_path, dst_path)
                 synced.append(filename)
@@ -357,7 +567,7 @@ def is_any_locator_visible(page, selector):
     return False
 
 
-def save_storage_state_safely(context, cookies_path, platform_label=""):
+def save_storage_state_safely(context, cookies_path, platform_label="", mark_verified=False):
     """storage_state를 임시 파일에 먼저 저장·검증한 뒤 원자적으로 교체해 쿠키 손상 및 예외 중단 방지"""
     if not context or not cookies_path:
         return False
@@ -366,6 +576,17 @@ def save_storage_state_safely(context, cookies_path, platform_label=""):
     try:
         os.makedirs(os.path.dirname(os.path.abspath(cookies_path)), exist_ok=True)
         context.storage_state(path=tmp_path)
+        if mark_verified and os.path.exists(tmp_path):
+            try:
+                with open(tmp_path, "r", encoding="utf-8") as rf:
+                    sdata = json.load(rf)
+                if isinstance(sdata, dict):
+                    sdata["auth_verified"] = True
+                    sdata["verified_at"] = int(time.time())
+                    with open(tmp_path, "w", encoding="utf-8") as wf:
+                        json.dump(sdata, wf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
         if is_valid_cookie_file(tmp_path, auto_clean=False):
             os.replace(tmp_path, cookies_path)
             return True
@@ -665,6 +886,218 @@ def wait_for_manual_login(
             raise RuntimeError(f"{platform_label} {msg}")
 
 
+_DIAG_LOCK = threading.Lock()
+_ACTIVE_DIAG_PLATFORM = ""
+_PLATFORM_DIAGNOSTICS = {}
+_TEST_BLACKBOX_LOCK = threading.Lock()
+_TEST_BLACKBOX_DIR = ""
+_TEST_BLACKBOX_SEQ = 0
+_TEST_BLACKBOX_KIND = "test"
+
+
+def set_active_diagnostics_platform(platform_name=""):
+    """현재 진행 중인 플랫폼명 지정 (실시간 URL·버튼 캐시 및 에러 진단 매핑용)"""
+    global _ACTIVE_DIAG_PLATFORM
+    with _DIAG_LOCK:
+        _ACTIVE_DIAG_PLATFORM = str(platform_name or "").strip()
+
+
+def clear_platform_diagnostics(platform_name=None):
+    with _DIAG_LOCK:
+        if platform_name is None:
+            _PLATFORM_DIAGNOSTICS.clear()
+        else:
+            _PLATFORM_DIAGNOSTICS.pop(str(platform_name), None)
+
+
+def capture_page_diagnostics(page):
+    """열려 있는 Playwright page에서 현재 URL과 실제 표시 중인 주요 버튼·클릭 요소 텍스트 목록을 빠르게 수집"""
+    info = {"url": "", "buttons": []}
+    if page is None or _is_page_closed_safely(page):
+        return info
+    try:
+        info["url"] = str(page.url or "").strip()
+    except Exception:
+        pass
+    try:
+        js = """() => {
+            const sels = 'button, a, [role="button"], [role="tab"], input[type="submit"], input[type="button"]';
+            const nodes = Array.from(document.querySelectorAll(sels));
+            const out = [];
+            const seen = new Set();
+            for (const el of nodes) {
+                const st = window.getComputedStyle(el);
+                if (!st || st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity || '1') === 0) continue;
+                const r = el.getBoundingClientRect();
+                if (!r || (r.width < 2 && r.height < 2)) continue;
+                let txt = (el.innerText || el.textContent || el.getAttribute('aria-label') || el.getAttribute('value') || el.getAttribute('title') || '').replace(/\\s+/g, ' ').trim();
+                if (!txt) continue;
+                if (txt.length > 60) txt = txt.slice(0, 60) + '…';
+                const key = txt.toLowerCase();
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    out.push(txt);
+                }
+                if (out.length >= 45) break;
+            }
+            return out;
+        }"""
+        btns = page.evaluate(js)
+        if isinstance(btns, list):
+            info["buttons"] = [str(b).strip() for b in btns if str(b or "").strip()][:45]
+    except Exception:
+        pass
+    return info
+
+
+def attach_diagnostics_tracker(context, platform_name=""):
+    """컨텍스트의 페이지 이동/로드 시점에 최신 URL과 표시 버튼 목록을 스레드 안전하게 캐시
+    (강제 건너뛰기·브라우저 급종료 시에도 직전 페이지 URL/버튼 정보를 report.md에 보존)"""
+    if context is None:
+        return
+
+    def _update_cache(pg):
+        try:
+            with _DIAG_LOCK:
+                target_p = str(platform_name or _ACTIVE_DIAG_PLATFORM or "").strip()
+            if not target_p:
+                return
+            snap = capture_page_diagnostics(pg)
+            if not snap.get("url") and not snap.get("buttons"):
+                return
+            with _DIAG_LOCK:
+                cur = _PLATFORM_DIAGNOSTICS.setdefault(target_p, {})
+                if snap.get("url"):
+                    cur["url"] = snap["url"]
+                if snap.get("buttons"):
+                    cur["buttons"] = snap["buttons"]
+                cur["captured_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
+    def _hook_page(pg):
+        if pg is None:
+            return
+        try:
+            pg.on("framenavigated", lambda frame: _update_cache(pg) if frame == pg.main_frame else None)
+            pg.on("load", lambda *_: _update_cache(pg))
+            pg.on("domcontentloaded", lambda *_: _update_cache(pg))
+        except Exception:
+            pass
+
+    try:
+        for existing_pg in list(context.pages):
+            _hook_page(existing_pg)
+        context.on("page", _hook_page)
+    except Exception:
+        pass
+
+
+def record_platform_diagnostics(platform_name, page=None, exc=None, reason=""):
+    """플랫폼 실패·건너뜀 시 URL, 파이썬 에러/Traceback, 화면 버튼 목록을 기록"""
+    pname = str(platform_name or "").strip()
+    if not pname:
+        with _DIAG_LOCK:
+            pname = _ACTIVE_DIAG_PLATFORM
+    if not pname:
+        return {}
+    live_snap = capture_page_diagnostics(page) if page is not None else {"url": "", "buttons": []}
+    tb_text = ""
+    err_msg = ""
+    if exc is not None:
+        err_msg = f"{type(exc).__name__}: {exc}"
+        tb_raw = traceback.format_exc()
+        if tb_raw and "NoneType: None" not in tb_raw:
+            tb_text = tb_raw.strip()
+        else:
+            tb_text = err_msg
+    with _DIAG_LOCK:
+        cur = dict(_PLATFORM_DIAGNOSTICS.get(pname) or {})
+        if live_snap.get("url"):
+            cur["url"] = live_snap["url"]
+        if live_snap.get("buttons"):
+            cur["buttons"] = live_snap["buttons"]
+        if err_msg:
+            cur["error"] = err_msg
+        if tb_text:
+            cur["traceback"] = tb_text
+        if reason:
+            cur["reason"] = str(reason)
+        cur["captured_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _PLATFORM_DIAGNOSTICS[pname] = cur
+        return dict(cur)
+
+
+def get_platform_diagnostics(platform_name):
+    with _DIAG_LOCK:
+        return dict(_PLATFORM_DIAGNOSTICS.get(str(platform_name or "").strip()) or {})
+
+
+def set_blackbox_session_dir(dir_path="", session_kind="upload"):
+    """업로드/테스트 실행 중 각 플랫폼 녹화 클립(.webm)을 1회 실행 임시 세션 폴더에 순차 수집하도록 지정"""
+    global _TEST_BLACKBOX_DIR, _TEST_BLACKBOX_SEQ, _TEST_BLACKBOX_KIND
+    with _TEST_BLACKBOX_LOCK:
+        _TEST_BLACKBOX_DIR = str(dir_path or "").strip()
+        _TEST_BLACKBOX_SEQ = 0
+        _TEST_BLACKBOX_KIND = "test" if str(session_kind or "").strip().lower() == "test" else "upload"
+        if _TEST_BLACKBOX_DIR:
+            os.makedirs(_TEST_BLACKBOX_DIR, exist_ok=True)
+
+
+def get_blackbox_session_dir():
+    with _TEST_BLACKBOX_LOCK:
+        return _TEST_BLACKBOX_DIR
+
+
+def get_blackbox_session_kind():
+    with _TEST_BLACKBOX_LOCK:
+        return _TEST_BLACKBOX_KIND
+
+
+def set_test_blackbox_dir(dir_path=""):
+    """기존 호환 래퍼: 테스트 모드 녹화 세션 폴더 지정"""
+    set_blackbox_session_dir(dir_path=dir_path, session_kind="test")
+
+
+def get_test_blackbox_dir():
+    return get_blackbox_session_dir()
+
+
+def _next_test_blackbox_path(platform_name):
+    global _TEST_BLACKBOX_SEQ
+    with _TEST_BLACKBOX_LOCK:
+        if not _TEST_BLACKBOX_DIR:
+            return ""
+        _TEST_BLACKBOX_SEQ += 1
+        os.makedirs(_TEST_BLACKBOX_DIR, exist_ok=True)
+        safe_name = re.sub(r"[^\w가-힣-]+", "_", str(platform_name or "clip"))
+        return os.path.join(_TEST_BLACKBOX_DIR, f"{_TEST_BLACKBOX_SEQ:02d}_{safe_name}.webm")
+
+
+def prune_blackbox_upload_dir(max_keep=3):
+    """내부 blackbox_upload/ 폴더에 녹화 파일(.mp4 합본 및 .webm)을 최신 max_keep(기본 3개)만 유지하고 오래된 파일부터 자동 삭제"""
+    upload_bb_dir = get_blackbox_upload_dir()
+    if not os.path.isdir(upload_bb_dir):
+        return []
+    vids = []
+    for fn in os.listdir(upload_bb_dir):
+        fp = os.path.join(upload_bb_dir, fn)
+        if os.path.isfile(fp) and fn.lower().endswith((".webm", ".mp4")):
+            try:
+                vids.append((os.path.getmtime(fp), fn, fp))
+            except Exception:
+                pass
+    vids.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    removed = []
+    for _, _, old_fp in vids[max_keep:]:
+        try:
+            os.remove(old_fp)
+            removed.append(os.path.basename(old_fp))
+        except Exception:
+            pass
+    return removed
+
+
 def finalize_playwright_session(
     platform_name,
     mode=None,
@@ -677,13 +1110,22 @@ def finalize_playwright_session(
     platform_label=None,
 ):
     """finally 블록 공용 정리기:
-    1) 최신 영구 프로필 쿠키를 auth_data/로 동기화 2) video 경로 선확보
+    1) 종료 직전 진단 스냅샷(URL/버튼) 확보 및 최신 영구 프로필 쿠키를 auth_data/로 동기화
+    2) video 경로 선확보
     3) page -> context -> browser(선택) 안전 종료(녹화 파일 flush)
-    4) blackbox_login/ 또는 blackbox_upload/ 로 안전 이동 및 경로 로깅"""
+    4) 테스트 모드면 임시 세션 폴더로, 일반 업로드면 blackbox_upload/(최신 3개 유지)로 안전 이동"""
     label = platform_label or platform_name
     resolved_mode = _resolve_blackbox_mode(mode=mode, login_only=login_only)
-    target_path = get_blackbox_path(platform_name, mode=resolved_mode)
+    test_target = _next_test_blackbox_path(platform_name) if resolved_mode == "upload" and get_test_blackbox_dir() else ""
+    target_path = test_target or get_blackbox_path(platform_name, mode=resolved_mode)
     rel_target = os.path.relpath(target_path, get_base_dir()).replace("\\", "/")
+
+    # 페이지가 아직 열려 있다면 닫기 직전 URL·버튼 진단 스냅샷 최신화
+    try:
+        if page is not None and not _is_page_closed_safely(page):
+            record_platform_diagnostics(platform_name, page=page)
+    except Exception:
+        pass
 
     # persistent context 닫기 직전에 최신 쿠키를 auth_data/에 반영해 대시보드 신호등 자동 갱신
     try:
@@ -773,7 +1215,13 @@ def finalize_playwright_session(
             pass
 
     if saved_path and os.path.isfile(saved_path):
-        print(f"🎥 [{label}] 블랙박스 녹화 저장 완료: {rel_target}", flush=True)
+        if test_target:
+            kind_label = "테스트 모드" if get_blackbox_session_kind() == "test" else "업로드 세션"
+            print(f"🎥 [{label}] {kind_label} 녹화 클립 확보 완료", flush=True)
+        else:
+            if resolved_mode == "upload":
+                prune_blackbox_upload_dir(max_keep=3)
+            print(f"🎥 [{label}] 블랙박스 녹화 저장 완료: {rel_target}", flush=True)
     else:
         print(f"ℹ️ [{label}] 블랙박스 녹화 파일 미생성 (예정 경로: {rel_target})", flush=True)
     return saved_path
@@ -807,6 +1255,17 @@ def is_valid_cookie_file(path, auto_clean=True):
             except Exception:
                 pass
         return False
+
+
+def normalize_region_keyword(raw):
+    """대표 지역/상권 키워드 자동 보정: 앞의 '#'과 뒤의 '미용실' 및 불필요 공백 제거"""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"^[#\s]+", "", s)
+    s = re.sub(r"\s*미용실\s*$", "", s)
+    s = re.sub(r"^[#\s]+", "", s).strip()
+    return s
 
 
 def extract_naver_blog_id(raw):
@@ -901,11 +1360,15 @@ def load_profile():
                             legacy_cats.append(lv)
                     cats = _clean_blog_categories(legacy_cats)
                 prof["blog_categories"] = cats
+                prof["region_keyword"] = normalize_region_keyword(prof.get("region_keyword", ""))
                 prof["naver_blog_id"] = extract_naver_blog_id(prof.get("naver_blog_id", ""))
                 prof["pinterest_id"] = extract_pinterest_id(prof.get("pinterest_id", ""))
                 pm = str(prof.get("prompt_mode") or "standard").strip().lower()
                 prof["prompt_mode"] = "custom" if pm == "custom" else "standard"
                 prof["custom_style_guide"] = str(prof.get("custom_style_guide") or "").strip()
+                raw_checks = data.get("onboarding_checks")
+                prof["onboarding_checks"] = {str(k): bool(v) for k, v in raw_checks.items()} if isinstance(raw_checks, dict) else {}
+                prof["prompt_copied"] = bool(data.get("prompt_copied", False))
                 try:
                     prof["onboarding_step"] = max(0, min(4, int(prof.get("onboarding_step") or 0)))
                 except Exception:
@@ -944,7 +1407,9 @@ def save_profile(data, is_draft=False):
         if k in data:
             val = data.get(k)
             cleaned = "" if val is None else str(val).strip()
-            if k == "naver_blog_id":
+            if k == "region_keyword":
+                cleaned = normalize_region_keyword(cleaned)
+            elif k == "naver_blog_id":
                 cleaned = extract_naver_blog_id(cleaned)
             elif k == "pinterest_id":
                 cleaned = extract_pinterest_id(cleaned)
@@ -953,6 +1418,12 @@ def save_profile(data, is_draft=False):
     if "prompt_mode" in data:
         pm = str(data.get("prompt_mode") or "standard").strip().lower()
         prof["prompt_mode"] = "custom" if pm == "custom" else "standard"
+
+    if "onboarding_checks" in data and isinstance(data.get("onboarding_checks"), dict):
+        prof["onboarding_checks"] = {str(k): bool(v) for k, v in data.get("onboarding_checks").items()}
+
+    if "prompt_copied" in data:
+        prof["prompt_copied"] = bool(data.get("prompt_copied"))
 
     if "salon_name" in data and not (data.get("place_search_keyword") or "").strip():
         prof["place_search_keyword"] = prof.get("salon_name", "")
@@ -1008,7 +1479,7 @@ def get_place_search_keyword(profile=None):
 
 def get_region_keyword(profile=None):
     prof = profile if isinstance(profile, dict) else load_profile()
-    return (prof.get("region_keyword") or "").strip()
+    return normalize_region_keyword(prof.get("region_keyword") or "")
 
 
 def get_region_tags(profile=None):
@@ -1153,3 +1624,286 @@ def copy_to_clipboard(text):
         return True
     except Exception:
         return False
+
+
+def wait_for_test_mode_close(context, label, stop_checker=None):
+    """테스트 모드에서 게시 직전 입력 완료 상태를 유지한 채 사용자가 브라우저 창 [X]를 닫을 때까지 대기.
+    - 사용자가 창 [X]를 닫으면 정상 완료(True) 반환 -> 기존 블랙박스 녹화본(.webm) 저장·합본으로 자연스럽게 이어짐
+    - 대기 중 강제 중지 또는 [이 플랫폼만 건너뛰기] 요청(stop_checker() == True) 시 InterruptedError 발생"""
+    def _stopped():
+        if stop_checker is None:
+            return False
+        try:
+            return bool(stop_checker())
+        except Exception:
+            return False
+
+    print(
+        f"🧪 [테스트 확인 대기 - {label}] 입력 내용을 확인한 뒤 브라우저 창 [X]를 닫으면 다음 플랫폼으로 넘어갑니다.",
+        flush=True,
+    )
+    if context is None:
+        return True
+
+    closed_flag = [False]
+    try:
+        context.on("close", lambda *_: closed_flag.__setitem__(0, True))
+    except Exception:
+        pass
+
+    while True:
+        if _stopped():
+            msg = "테스트 확인 대기 중 중지/건너뛰기 요청이 감지되었습니다."
+            print(f"🛑 [{label}] {msg}", flush=True)
+            raise InterruptedError(f"{label} {msg}")
+
+        if closed_flag[0]:
+            print(f"✅ [테스트 확인 완료 - {label}] 브라우저 창이 닫혀 다음 플랫폼으로 이동합니다.", flush=True)
+            return True
+
+        try:
+            pages = list(context.pages)
+        except Exception as e:
+            if _stopped():
+                raise InterruptedError(f"{label} 테스트 확인 대기 중 중단됨") from e
+            print(f"✅ [테스트 확인 완료 - {label}] 브라우저 창이 닫혀 다음 플랫폼으로 이동합니다.", flush=True)
+            return True
+
+        open_pages = [pg for pg in pages if not _is_page_closed_safely(pg)]
+        if not open_pages:
+            print(f"✅ [테스트 확인 완료 - {label}] 브라우저 창이 닫혀 다음 플랫폼으로 이동합니다.", flush=True)
+            return True
+
+        try:
+            open_pages[0].wait_for_timeout(500)
+        except Exception as e:
+            if _stopped():
+                raise InterruptedError(f"{label} 테스트 확인 대기 중 중단됨") from e
+            if is_target_closed_error(e) or closed_flag[0]:
+                print(f"✅ [테스트 확인 완료 - {label}] 브라우저 창이 닫혀 다음 플랫폼으로 이동합니다.", flush=True)
+                return True
+            time.sleep(0.5)
+
+
+PLATFORM_LOGOUT_CONFIG = {
+    "yt": {
+        "label": "유튜브 쇼츠",
+        "cookie_file": "youtube_token.json",
+        "domains": (),
+        "origins": (),
+        "is_youtube": True,
+    },
+    "naver": {
+        "label": "네이버 블로그·클립",
+        "cookie_file": "naver_cookies.json",
+        "domains": ("naver.com",),
+        "origins": (
+            "https://www.naver.com",
+            "https://nid.naver.com",
+            "https://blog.naver.com",
+            "https://clipcreators.naver.com",
+        ),
+    },
+    "clip": {
+        "label": "네이버 블로그·클립",
+        "cookie_file": "naver_cookies.json",
+        "domains": ("naver.com",),
+        "origins": (
+            "https://www.naver.com",
+            "https://nid.naver.com",
+            "https://blog.naver.com",
+            "https://clipcreators.naver.com",
+        ),
+    },
+    "tt": {
+        "label": "틱톡",
+        "cookie_file": "tiktok_cookies.json",
+        "domains": ("tiktok.com",),
+        "origins": ("https://www.tiktok.com", "https://tiktok.com"),
+    },
+    "ig": {
+        "label": "인스타그램",
+        "cookie_file": "instagram_cookies.json",
+        "domains": ("instagram.com",),
+        "origins": ("https://www.instagram.com", "https://instagram.com"),
+    },
+    "pin": {
+        "label": "핀터레스트",
+        "cookie_file": "pinterest_cookies.json",
+        "domains": ("pinterest.com", "pinterest.co.kr"),
+        "origins": (
+            "https://www.pinterest.com",
+            "https://kr.pinterest.com",
+            "https://www.pinterest.co.kr",
+        ),
+    },
+    "threads": {
+        "label": "쓰레드",
+        "cookie_file": "threads_cookies.json",
+        "domains": ("threads.net", "threads.com"),
+        "origins": (
+            "https://www.threads.net",
+            "https://www.threads.com",
+            "https://threads.net",
+            "https://threads.com",
+        ),
+    },
+    "daangn": {
+        "label": "당근 비즈",
+        "cookie_file": "daangn_cookies.json",
+        "domains": ("daangn.com", "karrotmarket.com"),
+        "origins": (
+            "https://business.daangn.com",
+            "https://bizprofile.daangn.com",
+            "https://accounts.daangn.com",
+            "https://www.daangn.com",
+            "https://www.karrotmarket.com",
+        ),
+    },
+    "x": {
+        "label": "엑스(X)",
+        "cookie_file": "x_cookies.json",
+        "domains": ("x.com", "twitter.com"),
+        "origins": ("https://x.com", "https://twitter.com"),
+    },
+}
+
+_LOGOUT_PROFILE_LOCK = threading.Lock()
+
+
+def logout_platform_session(platform_key):
+    """특정 플랫폼의 로그인 쿠키 파일과 영구 크롬 프로필 내 해당 도메인 쿠키·스토리지만 완전히 제거.
+    (타 플랫폼 로그인 세션과 유튜브 client_secret.json은 절대 건드리지 않음)"""
+    key = str(platform_key or "").strip().lower()
+    cfg = PLATFORM_LOGOUT_CONFIG.get(key)
+    if not cfg:
+        return {"ok": False, "msg": f"지원하지 않는 플랫폼 키입니다: {platform_key}"}
+
+    label = cfg["label"]
+    cookie_file = cfg["cookie_file"]
+    domains = cfg["domains"]
+    origins = cfg.get("origins") or ()
+
+    # 1) 유튜브: youtube_token.json만 삭제 (client_secret.json 안전 유지)
+    if cfg.get("is_youtube"):
+        tok_path = get_auth_file(cookie_file)
+        removed = False
+        if os.path.exists(tok_path):
+            try:
+                os.remove(tok_path)
+                removed = True
+            except Exception as e:
+                return {"ok": False, "msg": f"[{label}] 토큰 파일 삭제 실패: {e}"}
+        msg = (
+            f"[{label}] 로그아웃 완료! (youtube_token.json 삭제 · client_secret.json 유지)"
+            if removed
+            else f"[{label}] 이미 로그아웃 상태입니다. (client_secret.json 유지)"
+        )
+        return {
+            "ok": True,
+            "platform": key,
+            "label": label,
+            "removed_file": removed,
+            "cleared_cookies": 0,
+            "msg": msg,
+        }
+
+    # 2) Playwright 기반 플랫폼: auth_data 쿠키 JSON 파일 삭제 + 영구 크롬 프로필 내 해당 도메인 쿠키·스토리지 제거
+    with _LOGOUT_PROFILE_LOCK:
+        cpath = get_auth_file(cookie_file)
+        removed_file = False
+        if os.path.exists(cpath):
+            try:
+                os.remove(cpath)
+                removed_file = True
+            except Exception as e:
+                return {"ok": False, "msg": f"[{label}] 쿠키 파일 삭제 실패: {e}"}
+
+        cleared_cookies = 0
+        profile_dir = get_chrome_profile_dir()
+        has_profile_data = os.path.isdir(profile_dir) and any(
+            name not in (".DS_Store", "SingletonLock", "SingletonCookie", "SingletonSocket")
+            for name in os.listdir(profile_dir)
+        )
+
+        if has_profile_data and domains:
+            try:
+                from playwright.sync_api import sync_playwright
+
+                with sync_playwright() as p:
+                    ctx = launch_persistent_chromium(p, headless=True)
+                    try:
+                        all_cookies = ctx.cookies() or []
+                        matched = [c for c in all_cookies if _domain_matches(c.get("domain"), domains)]
+                        cleared_cookies = len(matched)
+
+                        if matched:
+                            target_doms = set()
+                            for d in domains:
+                                target_doms.add(d)
+                                target_doms.add("." + d)
+                            for c in matched:
+                                d = (c.get("domain") or "").strip()
+                                if d:
+                                    target_doms.add(d)
+                                    target_doms.add(d.lstrip("."))
+
+                            domain_filter_supported = True
+                            for d in target_doms:
+                                try:
+                                    ctx.clear_cookies(domain=d)
+                                except TypeError:
+                                    domain_filter_supported = False
+                                    break
+                                except Exception:
+                                    pass
+
+                            # 구버전 Playwright이거나 서브도메인 쿠키가 남은 경우 안전 필터링 폴백
+                            remaining = [
+                                c for c in (ctx.cookies() or [])
+                                if _domain_matches(c.get("domain"), domains)
+                            ]
+                            if not domain_filter_supported or remaining:
+                                keep = [
+                                    c for c in (ctx.cookies() or [])
+                                    if not _domain_matches(c.get("domain"), domains)
+                                ]
+                                ctx.clear_cookies()
+                                if keep:
+                                    ctx.add_cookies(keep)
+
+                        # 해당 플랫폼 origin의 localStorage/IndexedDB/CacheStorage도 함께 제거
+                        if origins:
+                            pg = ctx.pages[0] if ctx.pages else ctx.new_page()
+                            try:
+                                cdp = ctx.new_cdp_session(pg)
+                                for orig in origins:
+                                    try:
+                                        cdp.send(
+                                            "Storage.clearDataForOrigin",
+                                            {
+                                                "origin": orig,
+                                                "storageTypes": "cookies,local_storage,indexeddb,cache_storage,service_workers",
+                                            },
+                                        )
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
+                    finally:
+                        try:
+                            ctx.close()
+                        except Exception:
+                            pass
+                        cleanup_chrome_profile_locks()
+            except Exception as e:
+                print(f"⚠️ [{label}] 영구 크롬 프로필 쿠키 정리 중 경고 (쿠키 파일은 삭제됨): {e}", flush=True)
+
+    return {
+        "ok": True,
+        "platform": key,
+        "label": label,
+        "removed_file": removed_file,
+        "cleared_cookies": cleared_cookies,
+        "msg": f"[{label}] 완전 로그아웃이 완료되었습니다. (쿠키 파일 및 브라우저 세션 초기화)",
+    }

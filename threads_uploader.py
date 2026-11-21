@@ -11,8 +11,10 @@ from os_utils import (
     is_target_closed_error,
     save_storage_state_safely,
     wait_for_manual_login,
+    wait_for_test_mode_close,
     finalize_playwright_session,
     launch_persistent_chromium,
+    record_platform_diagnostics,
     load_profile,
     get_region_tags,
     get_effective_banned_tags,
@@ -25,12 +27,14 @@ os.makedirs(DEBUG_DIR, exist_ok=True)
 nl = chr(10)
 
 def is_threads_logged_in(page):
-    """로그아웃 버튼이나 인스타그램 로그인 화면이 없고, 실제 로그인 상태인지 엄격히 판별"""
+    """threads.com / threads.net 모두 지원: 로그인 유도 화면이 없고 실제 로그인 UI가 보이면 True"""
     url = (page.url or "").lower()
+    if not url or ("threads.com" not in url and "threads.net" not in url):
+        return False
     if "instagram.com" in url or "/login" in url:
         return False
 
-    # 화면에 로그인 유도 문구나 버튼이 보이면 무조건 미로그인 상태
+    # 화면에 로그인 유도 문구나 버튼이 보이면 미로그인 상태
     logged_out_sels = (
         ':text-is("Instagram으로 계속하기"), '
         ':text-is("Continue with Instagram"), '
@@ -48,20 +52,37 @@ def is_threads_logged_in(page):
     if is_any_locator_visible(page, logged_out_sels):
         return False
 
-    # 로그인 유도 버튼이 전혀 없으면서 글쓰기 영역이 보일 때만 로그인 완료로 인정
-    compose_sels = (
+    # 로그인 유도 버튼이 전혀 없으면서 최신 threads.com / threads.net 로그인 전용 UI가 확인되면 로그인 완료
+    logged_in_sels = (
+        'div[role="button"]:has-text("새로운 소식을 공유해보세요"), '
+        'span:has-text("새로운 소식을 공유해보세요"), '
+        ':text("새로운 소식을 공유해보세요"), '
         'div[role="button"]:has-text("새로운 소식이 있나요"), '
         'span:has-text("새로운 소식이 있나요"), '
         'div[role="button"]:has-text("스레드를 시작"), '
         'div[role="button"]:has-text("스레드 시작"), '
         'div[role="button"]:has-text("What\'s new"), '
         'div[role="button"]:has-text("Start a thread"), '
+        'div[role="button"]:text-is("게시"), '
+        'button:text-is("게시"), '
+        'div[role="button"]:has-text("유령 게시물 만들기"), '
+        'a:has-text("새로운 스레드"), '
+        'div[role="button"]:has-text("새로운 스레드"), '
+        'button:has-text("새로운 스레드"), '
         'svg[aria-label="새로운 스레드"], '
         'svg[aria-label="만들기"], '
         'svg[aria-label="Create"], '
-        'svg[aria-label="New thread"]'
+        'svg[aria-label="New thread"], '
+        'a:has-text("프로필"), '
+        'svg[aria-label="프로필"], '
+        'svg[aria-label="Profile"], '
+        'a:has-text("알림"), '
+        'svg[aria-label="알림"], '
+        'svg[aria-label="활동"], '
+        'svg[aria-label="Activity"], '
+        'a:has-text("인사이트")'
     )
-    return page.locator(compose_sels).count() > 0
+    return page.locator(logged_in_sels).count() > 0
 
 def click_ig_continue_if_present(page):
     """팝업창 맨 앞(.last)에 있는 'Instagram으로 계속하기' 또는 영문 SSO 버튼 자동 클릭"""
@@ -89,7 +110,7 @@ def click_ig_continue_if_present(page):
             raise
     return False
 
-def upload_to_threads(body="", tags=None, video_path=None, login_only=False, stop_checker=None):
+def upload_to_threads(body="", tags=None, video_path=None, login_only=False, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [쓰레드] 영상 파일을 찾을 수 없습니다.", flush=True)
         return False
@@ -165,14 +186,14 @@ def upload_to_threads(body="", tags=None, video_path=None, login_only=False, sto
                 )
                 if _is_stopped():
                     return False
-                save_storage_state_safely(context, COOKIES_PATH, "쓰레드")
+                save_storage_state_safely(context, COOKIES_PATH, "쓰레드", mark_verified=True)
 
             if _is_stopped():
                 return False
             if not is_threads_logged_in(page):
                 raise RuntimeError("쓰레드 로그인이 완료되지 않아 중단했습니다.")
 
-            save_storage_state_safely(context, COOKIES_PATH, "쓰레드")
+            save_storage_state_safely(context, COOKIES_PATH, "쓰레드", mark_verified=True)
             if login_only:
                 print("✅ [쓰레드] 로그인 점검 및 쿠키 저장 완료!", flush=True)
                 return True
@@ -180,13 +201,20 @@ def upload_to_threads(body="", tags=None, video_path=None, login_only=False, sto
             # 글쓰기 모달창 열기
             print("✍️ [쓰레드] 새 스레드 작성창 열기 시도 중...", flush=True)
             compose_open_sels = [
+                'div[role="button"]:has-text("새로운 소식을 공유해보세요")',
+                'span:has-text("새로운 소식을 공유해보세요")',
+                ':text("새로운 소식을 공유해보세요")',
                 'div[role="button"]:has-text("새로운 소식이 있나요")',
                 'span:has-text("새로운 소식이 있나요")',
+                'a:has-text("새로운 스레드")',
+                'div[role="button"]:has-text("새로운 스레드")',
+                'button:has-text("새로운 스레드")',
                 'div[role="button"]:has-text("스레드를 시작")',
                 'div[role="button"]:has-text("스레드 시작")',
                 'svg[aria-label="새로운 스레드"]',
                 'svg[aria-label="만들기"]',
-                'svg[aria-label="Create"]'
+                'svg[aria-label="Create"]',
+                'svg[aria-label="New thread"]'
             ]
             for sel in compose_open_sels:
                 try:
@@ -223,15 +251,23 @@ def upload_to_threads(body="", tags=None, video_path=None, login_only=False, sto
                     break
                 time.sleep(1.0)
 
+            if test_mode:
+                print("🧪 [테스트 모드 - 쓰레드] 최종 게시 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "쓰레드")
+                wait_for_test_mode_close(context, "쓰레드", stop_checker=stop_checker)
+                return True
+
             time.sleep(1.5)
             post_btn.click(force=True)
             time.sleep(6.0)
 
             save_storage_state_safely(context, COOKIES_PATH, "쓰레드")
             return True
-        except InterruptedError:
+        except InterruptedError as ie:
+            record_platform_diagnostics("쓰레드", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return False
         except Exception as e:
+            record_platform_diagnostics("쓰레드", page=page, exc=e)
             if not _is_stopped():
                 print(f"⚠️ [쓰레드] 중단/오류: {e}", flush=True)
             return False

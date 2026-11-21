@@ -18,6 +18,8 @@ _old_backup/
 *.webm
 *.log
 *.png
+!favicon.png
+salon_uploader_icon.png
 __pycache__/
 .DS_Store
 .installed_done
@@ -28,4 +30,8 @@ export_code.py
 total_code.txt
 total_code*.txt
 export_error.log
+errorReport.md
+report.md
 *.command
+!1_맥북_최초설치.command
+!2_맥북_프로그램_실행.command

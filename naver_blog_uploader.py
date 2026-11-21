@@ -10,8 +10,10 @@ from os_utils import (
     is_any_locator_visible,
     save_storage_state_safely,
     wait_for_manual_login,
+    wait_for_test_mode_close,
     finalize_playwright_session,
     launch_persistent_chromium,
+    record_platform_diagnostics,
     normalize_branch_name,
     load_profile,
     get_effective_banned_tags,
@@ -724,7 +726,7 @@ def is_naver_blog_logged_in(page):
         return True
     return False
 
-def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=None, place_name=None, login_only=False, selected_images=None, stop_checker=None):
+def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=None, place_name=None, login_only=False, selected_images=None, stop_checker=None, test_mode=False):
     prof = load_profile()
     banned_tags = get_effective_banned_tags(prof)
 
@@ -845,6 +847,12 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
 
             time.sleep(0.8)
 
+            if test_mode:
+                print("🧪 [테스트 모드 - 네이버 블로그] 최종 발행 직전까지 입력·설정 확인 완료 (실제 발행 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "네이버 블로그")
+                wait_for_test_mode_close(context, "네이버 블로그", stop_checker=stop_checker)
+                return "test_mode_ok"
+
             confirm_btn = find_in_both(page, editor, 'button[class*="confirm_btn"]')
             confirm_btn.first.click()
             time.sleep(4)
@@ -855,9 +863,11 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
             post_url = page.url if ("GoBlogWrite" not in page.url and "postwrite" not in page.url) else default_blog_url
             return post_url
 
-        except InterruptedError:
+        except InterruptedError as ie:
+            record_platform_diagnostics("네이버블로그", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return False
         except Exception as e:
+            record_platform_diagnostics("네이버블로그", page=page, exc=e)
             if not (stop_checker and stop_checker()):
                 print(f"⚠️ [네이버 블로그] 멈춤 또는 오류 발생: {e}", flush=True)
             return False

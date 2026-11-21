@@ -10,8 +10,10 @@ from os_utils import (
     is_any_locator_visible,
     save_storage_state_safely,
     wait_for_manual_login,
+    wait_for_test_mode_close,
     finalize_playwright_session,
     launch_persistent_chromium,
+    record_platform_diagnostics,
     normalize_branch_name,
     load_profile,
     get_salon_name,
@@ -41,7 +43,7 @@ def is_pinterest_logged_in(page):
     return "pin-creation-tool" in url or "pin-builder" in url
 
 
-def upload_to_pinterest(title="", description="", tags=None, video_path=None, link=None, board_name=None, board_id="", login_only=False, stop_checker=None):
+def upload_to_pinterest(title="", description="", tags=None, video_path=None, link=None, board_name=None, board_id="", login_only=False, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [핀터레스트] 업로드할 영상 파일을 찾을 수 없습니다:", video_path, flush=True)
         return None
@@ -168,6 +170,12 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
                     time.sleep(1.0)
             except Exception: pass
 
+            if test_mode:
+                print("🧪 [테스트 모드 - 핀터레스트] 최종 발행 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "핀터레스트")
+                wait_for_test_mode_close(context, "핀터레스트", stop_checker=stop_checker)
+                return "test_mode_ok"
+
             publish_btn = page.locator('[data-test-id="board-dropdown-save-button"], button:has-text("발행"), button:has-text("게시"), button:has-text("Publish")').last
             if publish_btn.count() > 0:
                 for _ in range(40):
@@ -183,9 +191,11 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
             pin_id = (prof.get("pinterest_id") or "").strip()
             return f"https://kr.pinterest.com/{pin_id}/" if pin_id else "https://kr.pinterest.com/"
 
-        except InterruptedError:
+        except InterruptedError as ie:
+            record_platform_diagnostics("핀터레스트", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return None
         except Exception as e:
+            record_platform_diagnostics("핀터레스트", page=page, exc=e)
             if not (stop_checker and stop_checker()):
                 print(f"⚠️ [핀터레스트] 오류: {str(e)}", flush=True)
             return None

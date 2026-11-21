@@ -14,7 +14,6 @@ import urllib.error
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 VERSION_JSON_FILE = os.path.join(BASE_DIR, "version.json")
-VERSION_TXT_FILE = os.path.join(BASE_DIR, "version.txt")
 INSTALLED_MARKER = os.path.join(BASE_DIR, ".installed_done")
 
 PUBLIC_REPO_URL = "https://github.com/pentagon-51/salon-multi-uploader.git"
@@ -32,7 +31,15 @@ DEFAULT_RELEASE_INFO = {
 }
 
 ALLOWED_EXTENSIONS = {".py", ".html", ".bat", ".ico"}
-ALLOWED_EXACT_NAMES = {"version.json", "version.txt", "LICENSE.txt", ".gitignore"}
+ALLOWED_EXACT_NAMES = {
+    "version.json",
+    "LICENSE.txt",
+    ".gitignore",
+    "salon_uploader.ico",
+    "favicon.png",
+    "1_맥북_최초설치.command",
+    "2_맥북_프로그램_실행.command",
+}
 INSTALL_ONLY_FILES = {"0_처음사용자_안내서.html", "1_최초설치_자동인스톨.bat"}
 EXCLUDED_DEV_FILES = {
     "export_code.py",
@@ -41,6 +48,8 @@ EXCLUDED_DEV_FILES = {
     "build_release.py",
     "배포판_만들기_및_업로드.command",
     "AI_RULES.md",
+    "salon_uploader_icon.png",
+    "planh_uploader.ico",
 }
 PROTECTED_EXACT_NAMES = {
     "user_profile.json",
@@ -119,14 +128,6 @@ def load_release_info():
                 for k in DEFAULT_RELEASE_INFO:
                     if k in data and data[k] is not None:
                         info[k] = str(data[k]).strip()
-        except Exception:
-            pass
-    elif os.path.exists(VERSION_TXT_FILE):
-        try:
-            with open(VERSION_TXT_FILE, "r", encoding="utf-8") as f:
-                v = f.read().strip()
-                if v:
-                    info["version"] = v
         except Exception:
             pass
     if not info.get("version"):
@@ -333,6 +334,11 @@ def apply_public_update(branch="main", report=None, target_dir=None, timeout=30)
                         continue
                 else:
                     shutil.copy2(src_path, final_dst)
+                    if final_dst.lower().endswith(".command"):
+                        try:
+                            os.chmod(final_dst, 0o755)
+                        except Exception:
+                            pass
                     updated_count += 1
             except PermissionError:
                 continue
@@ -344,7 +350,7 @@ def apply_public_update(branch="main", report=None, target_dir=None, timeout=30)
             "new_version": final_ver,
             "updated_count": updated_count,
             "total_files": len(extracted_files),
-            "msg": f"v{final_ver} 업데이트 완료! 서버재시작.command를 다시 실행해 주세요. (Windows는 2_프로그램_실행.bat 재실행)",
+            "msg": f"v{final_ver} 업데이트 완료! 프로그램을 다시 실행해 주세요. (Mac: 2_맥북_프로그램_실행.command / Windows: 2_프로그램_실행.bat)",
         }
     except Exception as e:
         return {"ok": False, "msg": f"업데이트 중 오류가 발생했습니다 (기존 버전은 안전하게 유지됨): {e}"}
@@ -357,7 +363,7 @@ def run_with_tk_popup(remote_version):
     from tkinter import ttk
 
     root = tk.Tk()
-    root.title("헤어살롱 SNS 업로더 자동 업데이트")
+    root.title("미용실 멀티업로더 자동 업데이트")
     root.resizable(False, False)
 
     win_w, win_h = 420, 150
@@ -371,7 +377,7 @@ def run_with_tk_popup(remote_version):
     frame = ttk.Frame(root, padding=18)
     frame.pack(fill="both", expand=True)
 
-    title_lbl = ttk.Label(frame, text="헤어살롱 SNS 업로더 자동 업데이트", font=("Malgun Gothic", 11, "bold"))
+    title_lbl = ttk.Label(frame, text="미용실 멀티업로더 자동 업데이트", font=("Malgun Gothic", 11, "bold"))
     title_lbl.pack(anchor="w", pady=(0, 6))
 
     status_var = tk.StringVar(value=f"새 버전 확인 완료 (v{remote_version}) — 다운로드 준비 중")

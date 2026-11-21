@@ -10,8 +10,10 @@ from os_utils import (
     is_any_locator_visible,
     save_storage_state_safely,
     wait_for_manual_login,
+    wait_for_test_mode_close,
     finalize_playwright_session,
     launch_persistent_chromium,
+    record_platform_diagnostics,
     load_profile,
     get_place_search_keyword,
     get_region_tags,
@@ -78,7 +80,7 @@ def is_tiktok_logged_in(page, context=None, login_only=False):
     return False
 
 
-def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=None, draft=False, login_only=False, stop_checker=None):
+def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=None, draft=False, login_only=False, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [틱톡] 업로드할 영상 파일이 없습니다:", video_path, flush=True)
         return False
@@ -208,6 +210,12 @@ def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=N
                     break
                 time.sleep(1.5)
 
+            if test_mode:
+                print("🧪 [테스트 모드 - 틱톡] 최종 게시 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "틱톡")
+                wait_for_test_mode_close(context, "틱톡", stop_checker=stop_checker)
+                return True
+
             time.sleep(2.0); post_btn.scroll_into_view_if_needed(); time.sleep(0.5); post_btn.click()
 
             for _ in range(20):
@@ -222,9 +230,11 @@ def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=N
             save_storage_state_safely(context, COOKIES_PATH, "틱톡")
             return True
 
-        except InterruptedError:
+        except InterruptedError as ie:
+            record_platform_diagnostics("틱톡", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return False
         except Exception as e:
+            record_platform_diagnostics("틱톡", page=page, exc=e)
             if not (stop_checker and stop_checker()):
                 print(f"⚠️ [틱톡] 오류: {e}", flush=True)
             return False

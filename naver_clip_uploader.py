@@ -10,8 +10,10 @@ from os_utils import (
     is_any_locator_visible,
     save_storage_state_safely,
     wait_for_manual_login,
+    wait_for_test_mode_close,
     finalize_playwright_session,
     launch_persistent_chromium,
+    record_platform_diagnostics,
     load_profile,
     get_place_search_keyword,
     get_region_tags,
@@ -196,7 +198,7 @@ def is_naver_clip_logged_in(page):
         return False
     return "clipcreators.naver.com" in url
 
-def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_name=None, login_only=False, stop_checker=None):
+def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_name=None, login_only=False, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [네이버 클립] 업로드할 영상 파일이 없습니다:", video_path, flush=True)
         return False
@@ -353,6 +355,11 @@ def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_na
             # 7단계: 하단 [등록] 버튼 클릭
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(1.0)
+            if test_mode:
+                print("🧪 [테스트 모드 - 네이버 클립] 최종 등록 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "네이버 클립")
+                wait_for_test_mode_close(context, "네이버 클립", stop_checker=stop_checker)
+                return True
             sub_btn = page.locator('button:text-is("등록"), button:has-text("등록"), button:has-text("발행")').last
             if sub_btn.count() > 0:
                 sub_btn.scroll_into_view_if_needed()
@@ -368,9 +375,11 @@ def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_na
 
             save_storage_state_safely(context, COOKIES_PATH, "네이버 클립")
             return True
-        except InterruptedError:
+        except InterruptedError as ie:
+            record_platform_diagnostics("네이버클립", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return False
         except Exception as e:
+            record_platform_diagnostics("네이버클립", page=page, exc=e)
             if not (stop_checker and stop_checker()):
                 print(f"⚠️ [네이버 클립] 오류: {e}", flush=True)
             return False

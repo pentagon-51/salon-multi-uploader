@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title 헤어살롱 SNS 멀티 업로더
+title 미용실 멀티업로더
 setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 set PYTHONUTF8=1

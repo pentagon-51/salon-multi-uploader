@@ -10,8 +10,10 @@ from os_utils import (
     is_any_locator_visible,
     save_storage_state_safely,
     wait_for_manual_login,
+    wait_for_test_mode_close,
     finalize_playwright_session,
     launch_persistent_chromium,
+    record_platform_diagnostics,
     load_profile,
     get_place_search_keyword,
     get_region_tags,
@@ -65,7 +67,7 @@ def is_instagram_logged_in(page):
     return page.locator(logged_in_sels).count() > 0
 
 
-def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, login_only=False, place_name=None, stop_checker=None):
+def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, login_only=False, place_name=None, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [인스타그램] 업로드할 영상 파일이 없습니다:", video_path, flush=True)
         return None
@@ -214,6 +216,12 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
             except Exception:
                 pass
 
+            if test_mode:
+                print("🧪 [테스트 모드 - 인스타그램] 최종 공유 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "인스타그램")
+                wait_for_test_mode_close(context, "인스타그램", stop_checker=stop_checker)
+                return "test_mode_ok"
+
             for sh in ["공유하기", "Share"]:
                 try:
                     s_btn = page.locator(f'div[role="button"]:has-text("{sh}"), button:has-text("{sh}")').first
@@ -230,9 +238,11 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
             save_storage_state_safely(context, COOKIES_PATH, "인스타그램")
             return "https://www.instagram.com/"
 
-        except InterruptedError:
+        except InterruptedError as ie:
+            record_platform_diagnostics("인스타그램", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return None
         except Exception as e:
+            record_platform_diagnostics("인스타그램", page=page, exc=e)
             if not (stop_checker and stop_checker()):
                 print(f"⚠️ [인스타그램] 오류: {e}", flush=True)
             return None

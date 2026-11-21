@@ -1,5 +1,5 @@
-import os, re, sys, json, time, glob, stat, random, shutil, threading, subprocess, datetime, mimetypes
-from urllib.parse import unquote
+import os, re, sys, json, time, glob, stat, random, shutil, struct, hashlib, threading, traceback, subprocess, datetime, mimetypes
+from urllib.parse import unquote, quote, parse_qs, urlsplit
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -30,6 +30,8 @@ from os_utils import (
     save_profile,
     get_effective_banned_tags,
     is_valid_cookie_file,
+    is_platform_cookie_authenticated,
+    check_cookie_login_redirect,
     get_salon_name,
     get_salon_address,
     get_place_search_keyword,
@@ -38,6 +40,16 @@ from os_utils import (
     get_blog_categories,
     is_profile_ready,
     recommend_blog_category,
+    set_active_diagnostics_platform,
+    clear_platform_diagnostics,
+    record_platform_diagnostics,
+    get_platform_diagnostics,
+    set_blackbox_session_dir,
+    get_blackbox_session_dir,
+    set_test_blackbox_dir,
+    get_test_blackbox_dir,
+    prune_blackbox_upload_dir,
+    logout_platform_session,
 )
 
 BASE_DIR = get_base_dir()
@@ -50,10 +62,13 @@ DONE_DIR = os.path.join(BASE_DIR, 'done')
 BACKUP_DIR = os.path.join(BASE_DIR, '_old_backup')
 THUMB_DIR = os.path.join(BASE_DIR, 'temp_thumbs')
 DEBUG_DIR = os.path.join(BASE_DIR, 'debug_records')
+REPORT_PATH = os.path.join(BASE_DIR, 'report.md')
 UI_FILE = os.path.join(BASE_DIR, 'app_ui.html')
 migrate_legacy_auth_files()
 DAILY_USAGE_PATH = get_auth_file('daily_usage.json')
 USAGE_LOCK = threading.Lock()
+HISTORY_LOCK = threading.Lock()
+TEST_MERGE_LOCK = threading.Lock()
 
 SAFE_DAILY_LIMITS = {
     'naver': 5,
@@ -81,8 +96,20 @@ STATE = {
     'busy': False,
     'stop_requested': False,
     'active_run_id': 0,
+    'auth_check_seq': 0,
     'logs': ['준비 완료! 영상을 업로드하세요.'],
     'last_results': {},
+    'active_history_id': '',
+    'active_uploaded_platforms': [],
+    'current_platform_key': '',
+    'current_platform_label': '',
+    'skip_platform_key': '',
+    'skip_seq': 0,
+    'is_test_mode': False,
+    'test_session_dir': '',
+    'test_start_dt': None,
+    'test_merged_done': False,
+    'force_stop_merging': False,
 }
 
 class UILogStream:
@@ -116,8 +143,8 @@ def log(msg):
 
 ESSENTIAL_ITEMS = {
     'app_server.py', 'app_ui.html', 'os_utils.py', 'auto_updater.py', 'AI_RULES.md', 'check_personal_leak.py',
-    'build_release.py', '배포판_만들기_및_업로드.command',
-    'version.json', 'version.txt', 'LICENSE.txt', 'updater_config.json', '.gitignore', 'planh_uploader.ico',
+    'build_release.py', '1_맥북_최초설치.command', '2_맥북_프로그램_실행.command',
+    'version.json', 'LICENSE.txt', '.gitignore', 'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
     '0_처음사용자_안내서.html', '1_최초설치_자동인스톨.bat', '2_프로그램_실행.bat', '.installed_done', '_설치완료_보관함',
     'naver_blog_uploader.py', 'naver_clip_uploader.py', 'tiktok_uploader.py', 'instagram_uploader.py', 'pinterest_uploader.py', 'threads_uploader.py', 'daangn_uploader.py', 'x_uploader.py',
     'app.log',
@@ -144,6 +171,7 @@ STYLE_EXPANSION_MAP = {
     '시스루': ['시스루뱅', '시스루댄디컷', '시스루애즈펌', '앞머리컷'],
     '크롭': ['크롭컷', '남자크롭컷', '스왓컷', '다운펌', '남자짧은머리'],
     '드롭': ['드롭컷', '남자드롭컷', '드롭펌', '다운펌', '남자짧은머리'],
+    '크리드': ['크리드컷', '남자크리드컷', '다운펌', '남자짧은머리'],
     '아이비리그': ['아이비리그컷', '남자아이비리그컷', '남자짧은머리', '다운펌', '맨즈헤어'],
     '가일': ['가일컷', '가일펌', '남자가일펌', '포마드펌', '남자머리'],
     '리젠트': ['리젠트컷', '리젠트펌', '남자리젠트펌', '다운펌', '남자짧은머리'],
@@ -155,9 +183,23 @@ STYLE_EXPANSION_MAP = {
     '탈색': ['애쉬그레이', '발레아쥬', '솜브레', '탈색염색'],
 }
 
+# 해시태그 3단계 등급제(티어)
+# 1티어: 검색량·트렌드 최상위 메인 시술명 (쓰레드 1개·엑스 2개 등 소수 태그 플랫폼 최우선 배치)
+TIER1_TREND_STYLE_TAGS = {
+    # 남자
+    '드롭컷', '크롭컷', '크리드컷', '애즈펌', '가르마펌', '다운펌',
+    '아이비리그컷', '가일펌', '쉐도우펌', '시스루댄디컷', '댄디컷', '리젠트펌',
+    # 여자
+    '레이어드컷', '레이어드펌', '태슬컷', '허쉬컷', '빌드펌',
+    '엘리자벳펌', '히피펌', '단발펌', '보니펌', '볼륨매직',
+}
+TIER1_TREND_STYLE_TAGS_LOWER = {t.lower() for t in TIER1_TREND_STYLE_TAGS}
+
+# 2티어 포함 전체 검증 시술 사전 (1티어 + 연관·보조 시술명)
 KNOWN_NATURAL_STYLE_TAGS = {
     t for vals in STYLE_EXPANSION_MAP.values() for t in vals
-}
+} | TIER1_TREND_STYLE_TAGS | {'남자커트', '여자커트'}
+KNOWN_NATURAL_STYLE_TAGS_LOWER = {t.lower() for t in KNOWN_NATURAL_STYLE_TAGS}
 
 AWKWARD_TAG_SUFFIXES = (
     '해결', '고민해결', '완성', '비법', '꿀팁', '꿀팁공유', '고민', '추천해요',
@@ -169,12 +211,24 @@ AWKWARD_TAG_SUBSTRINGS = (
 )
 
 COOKIE_STALE_DAYS = 20
+PREVIEW_TRANSCODE_LOCK = threading.Lock()
 
-def _check_cookie_status_and_age(cookie_filename):
-    """auth_data/ 기준 쿠키 유효성 및 최종 수정일 20일 경과 여부 반환: (state, age_days)"""
+def _check_cookie_status_and_age(cookie_filename, deep=False):
+    """auth_data/ 기준 플랫폼별 실제 로그인 인증 쿠키/세션 정밀 판별 및 경과 일수 반환: (state, age_days).
+    단순 방문자 쿠키·비로그인 프로필은 반드시 'red'로 판별.
+    deep=True일 때만 보호 URL 리다이렉트 정밀 검사(네이버·당근)를 1회 수행."""
     cpath = get_auth_file(cookie_filename)
-    if not is_valid_cookie_file(cpath, auto_clean=True):
+    if not is_platform_cookie_authenticated(cookie_filename, cpath, auto_clean=False):
         return 'red', None
+    if deep:
+        redirect_ok = check_cookie_login_redirect(cookie_filename, cpath, timeout=3.5)
+        if redirect_ok is False:
+            try:
+                if os.path.exists(cpath):
+                    os.remove(cpath)
+            except Exception:
+                pass
+            return 'red', None
     try:
         elapsed = max(0.0, time.time() - os.path.getmtime(cpath))
         age_days = int(elapsed // 86400)
@@ -184,8 +238,9 @@ def _check_cookie_status_and_age(cookie_filename):
     except Exception:
         return 'green', 0
 
-def get_setup_status():
-    """9개 플랫폼 로그인/API 상태 신호등(green/yellow/red) 및 쿠키 경과 일수 반환"""
+def get_setup_status(deep=False):
+    """9개 플랫폼 로그인/API 상태 신호등(green/yellow/red) 및 쿠키 경과 일수 반환.
+    deep=True는 로그인 창 닫힘 직후 및 [상태 새로고침] 수동 클릭 시에만 1회 실행."""
     migrate_legacy_auth_files()
     secret_path = get_auth_file('client_secret.json')
     token_path = get_auth_file('youtube_token.json')
@@ -198,13 +253,13 @@ def get_setup_status():
     else:
         yt_state = 'red'
 
-    naver_state, naver_age = _check_cookie_status_and_age('naver_cookies.json')
-    tt_state, tt_age = _check_cookie_status_and_age('tiktok_cookies.json')
-    ig_state, ig_age = _check_cookie_status_and_age('instagram_cookies.json')
-    pin_state, pin_age = _check_cookie_status_and_age('pinterest_cookies.json')
-    th_state, th_age = _check_cookie_status_and_age('threads_cookies.json')
-    dg_state, dg_age = _check_cookie_status_and_age('daangn_cookies.json')
-    x_state, x_age = _check_cookie_status_and_age('x_cookies.json')
+    naver_state, naver_age = _check_cookie_status_and_age('naver_cookies.json', deep=deep)
+    tt_state, tt_age = _check_cookie_status_and_age('tiktok_cookies.json', deep=deep)
+    ig_state, ig_age = _check_cookie_status_and_age('instagram_cookies.json', deep=deep)
+    pin_state, pin_age = _check_cookie_status_and_age('pinterest_cookies.json', deep=deep)
+    th_state, th_age = _check_cookie_status_and_age('threads_cookies.json', deep=deep)
+    dg_state, dg_age = _check_cookie_status_and_age('daangn_cookies.json', deep=deep)
+    x_state, x_age = _check_cookie_status_and_age('x_cookies.json', deep=deep)
 
     return {
         'yt': yt_state,
@@ -228,6 +283,149 @@ def get_setup_status():
         },
         'has_client_secret': has_secret,
         'has_youtube_token': has_token,
+    }
+
+
+def probe_video_codec_info(video_path):
+    """ffprobe로 영상 0번 비디오 스트림의 코덱·픽셀포맷·HDR 색공간 정보를 조회"""
+    info = {
+        'codec_name': '',
+        'pix_fmt': '',
+        'color_transfer': '',
+        'color_primaries': '',
+    }
+    if not video_path or not os.path.isfile(video_path):
+        return info
+    try:
+        proc = subprocess.run(
+            [
+                'ffprobe', '-v', 'error', '-select_streams', 'v:0',
+                '-show_entries', 'stream=codec_name,pix_fmt,color_transfer,color_primaries',
+                '-of', 'json', video_path,
+            ],
+            capture_output=True, text=True, timeout=10,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            parsed = json.loads(proc.stdout)
+            streams = parsed.get('streams') or []
+            if streams and isinstance(streams[0], dict):
+                st = streams[0]
+                info['codec_name'] = str(st.get('codec_name') or '').strip().lower()
+                info['pix_fmt'] = str(st.get('pix_fmt') or '').strip().lower()
+                info['color_transfer'] = str(st.get('color_transfer') or '').strip().lower()
+                info['color_primaries'] = str(st.get('color_primaries') or '').strip().lower()
+    except Exception:
+        pass
+    return info
+
+
+def is_browser_standard_h264(video_path, codec_info=None):
+    """브라우저 <video>에서 변환 없이 바로 재생 가능한 표준 H.264(8-bit yuv420p SDR .mp4) 여부 판별"""
+    if not video_path or not os.path.isfile(video_path):
+        return False
+    ext = os.path.splitext(video_path)[1].lower()
+    ci = codec_info if isinstance(codec_info, dict) else probe_video_codec_info(video_path)
+    codec = ci.get('codec_name') or ''
+    pix_fmt = ci.get('pix_fmt') or ''
+    ctrc = ci.get('color_transfer') or ''
+    is_hdr = ctrc in ('arib-std-b67', 'smpte2084') or '10' in pix_fmt or '12' in pix_fmt
+    return ext == '.mp4' and codec == 'h264' and pix_fmt == 'yuv420p' and not is_hdr
+
+
+def ensure_browser_preview_video(video_path):
+    """미리보기 플레이어(<video>)용 호환 영상 URL을 반환.
+    - 이미 표준 H.264(yuv420p, SDR, .mp4)면 변환 없이 원본 /video/<fname> 바로 재생
+    - HEVC(H.265), 10-bit HDR, VP9, .mov 등 비호환 코덱이면 temp_thumbs/에 저용량 H.264(yuv420p) 임시 미리보기 생성
+    - 원본 영상(upload/)은 절대 수정하지 않으며, 실제 SNS 업로드에는 항상 원본을 사용."""
+    if not video_path or not os.path.isfile(video_path):
+        return {'ok': False, 'preview_url': '', 'transcoded': False, 'codec': '', 'pix_fmt': ''}
+
+    basename = os.path.basename(video_path)
+    direct_url = f"/video/{quote(basename)}"
+    ci = probe_video_codec_info(video_path)
+    codec = ci.get('codec_name') or 'unknown'
+    pix_fmt = ci.get('pix_fmt') or 'unknown'
+    ctrc = ci.get('color_transfer') or ''
+
+    if is_browser_standard_h264(video_path, ci):
+        return {
+            'ok': True,
+            'preview_url': direct_url,
+            'transcoded': False,
+            'codec': codec,
+            'pix_fmt': pix_fmt,
+            'color_transfer': ctrc,
+        }
+
+    os.makedirs(THUMB_DIR, exist_ok=True)
+    try:
+        st = os.stat(video_path)
+        sig = f"{basename}|{st.st_size}|{int(st.st_mtime)}"
+    except Exception:
+        sig = basename
+    cache_key = hashlib.sha1(sig.encode('utf-8')).hexdigest()[:12]
+    preview_fname = f"preview_{cache_key}.mp4"
+    preview_path = os.path.join(THUMB_DIR, preview_fname)
+    preview_url = f"/preview_video/{quote(preview_fname)}"
+
+    with PREVIEW_TRANSCODE_LOCK:
+        if os.path.isfile(preview_path) and os.path.getsize(preview_path) > 1024:
+            return {
+                'ok': True,
+                'preview_url': preview_url,
+                'transcoded': True,
+                'cached': True,
+                'codec': codec,
+                'pix_fmt': pix_fmt,
+                'color_transfer': ctrc,
+            }
+
+        tmp_out = os.path.join(THUMB_DIR, f"preview_{cache_key}_{os.getpid()}.tmp.mp4")
+        hdr_note = f"/{ctrc}" if ctrc in ('arib-std-b67', 'smpte2084') else ""
+        log(f"🎬 [미리보기 호환 변환] {codec}/{pix_fmt}{hdr_note} 감지 → H.264(yuv420p) 미리보기 생성 중... (업로드는 원본 사용)")
+        try:
+            proc = subprocess.run(
+                [
+                    'ffmpeg', '-y', '-i', video_path,
+                    '-map', '0:v:0', '-an',
+                    '-vf', "scale='trunc(min(720,iw)/2)*2':-2:flags=fast_bilinear,format=yuv420p",
+                    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26',
+                    '-pix_fmt', 'yuv420p',
+                    '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709',
+                    '-movflags', '+faststart',
+                    tmp_out,
+                ],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=90,
+            )
+            if proc.returncode == 0 and os.path.isfile(tmp_out) and os.path.getsize(tmp_out) > 1024:
+                os.replace(tmp_out, preview_path)
+                mb = round(os.path.getsize(preview_path) / (1024.0 * 1024.0), 2)
+                log(f"✅ [미리보기 호환 변환 완료] {preview_fname} ({mb}MB · temp_thumbs 저장, 원본 유지)")
+                return {
+                    'ok': True,
+                    'preview_url': preview_url,
+                    'transcoded': True,
+                    'cached': False,
+                    'codec': codec,
+                    'pix_fmt': pix_fmt,
+                    'color_transfer': ctrc,
+                }
+        except Exception as e:
+            log(f"⚠️ [미리보기 호환 변환 실패] 원본 직접 재생으로 폴백합니다: {e}")
+        finally:
+            if os.path.exists(tmp_out):
+                try:
+                    os.remove(tmp_out)
+                except Exception:
+                    pass
+
+    return {
+        'ok': True,
+        'preview_url': direct_url,
+        'transcoded': False,
+        'codec': codec,
+        'pix_fmt': pix_fmt,
+        'color_transfer': ctrc,
     }
 
 def probe_video_metadata(video_path):
@@ -506,17 +704,9 @@ def reset_personal_data(confirm_text):
         'msg': f'개인 정보·쿠키·임시 파일이 모두 초기화되었습니다! (삭제 항목 {len(deleted_files)}건 + 임시 폴더 비움)',
     }
 
-def force_stop_active_task():
-    """진행 중인 자동화 브라우저(Playwright 전용 크롬 창)를 즉시 종료하고 백그라운드 스레드/상태를 깔끔하게 정리"""
-    global ACTIVE_WORKER_THREAD
-    with STATE_LOCK:
-        STATE['stop_requested'] = True
-        STATE['active_run_id'] += 1
-        worker_t = ACTIVE_WORKER_THREAD
-
-    log('🛑 [강제 중지 요청] 실행 중인 자동화 브라우저를 닫고 작업을 중단합니다...')
+def _kill_automation_chrome():
+    """Playwright가 띄운 자동화 크롬 창만 타겟팅하여 즉시 종료 (개인 크롬 창은 유지)"""
     try:
-        # Playwright가 띄운 자동화 크롬 창만 타겟팅하여 즉시 종료 (개인 크롬 창은 유지)
         if sys.platform == 'win32':
             ps_cmd = (
                 "Get-CimInstance Win32_Process | "
@@ -534,9 +724,409 @@ def force_stop_active_task():
     except Exception:
         pass
 
+
+def _rescue_debug_webms_into_dir(target_dir):
+    """강제 중지 등으로 debug_records/_rec_* 폴더에 남은 비어 있지 않은 .webm 녹화본을 target_dir로 안전 회수"""
+    if not target_dir or not os.path.isdir(DEBUG_DIR):
+        return 0
+    os.makedirs(target_dir, exist_ok=True)
+    rescued = 0
+    existing = [f for f in os.listdir(target_dir) if f.lower().endswith('.webm')]
+    next_idx = len(existing) + 1
+    entries = []
+    for entry in os.listdir(DEBUG_DIR):
+        sub_p = os.path.join(DEBUG_DIR, entry)
+        if os.path.isdir(sub_p) and entry.startswith('_rec_') and '_login_' not in entry and not entry.endswith('_login'):
+            try:
+                entries.append((os.path.getmtime(sub_p), entry, sub_p))
+            except Exception:
+                entries.append((0, entry, sub_p))
+    entries.sort(key=lambda x: x[0])
+    for _, entry, sub_p in entries:
+        webms = [
+            os.path.join(sub_p, f)
+            for f in os.listdir(sub_p)
+            if f.lower().endswith('.webm') and os.path.isfile(os.path.join(sub_p, f))
+        ]
+        non_empty = []
+        for w in webms:
+            try:
+                if os.path.getsize(w) > 0:
+                    non_empty.append(w)
+            except Exception:
+                pass
+        if non_empty:
+            newest_w = max(non_empty, key=lambda x: os.path.getmtime(x))
+            safe_tag = re.sub(r'[^\w가-힣-]+', '_', entry.replace('_rec_', ''))[:32]
+            dst = os.path.join(target_dir, f"{next_idx:02d}_rescued_{safe_tag}.webm")
+            try:
+                shutil.move(newest_w, dst)
+                next_idx += 1
+                rescued += 1
+            except Exception:
+                try:
+                    shutil.copy2(newest_w, dst)
+                    next_idx += 1
+                    rescued += 1
+                except Exception:
+                    pass
+        _force_rmtree(sub_p)
+    return rescued
+
+
+def merge_blackbox_session_to_mp4(session_dir, out_dir, start_dt=None, is_test_mode=False):
+    """1회 실행(테스트 모드 또는 일반 업로드) 중 수집된 각 플랫폼 .webm 블랙박스 클립을 FFmpeg로 단일 MP4로 합본해
+    지정된 out_dir에 (HH-MM_YYMMDD).mp4 형식으로 저장하고 최종 로그를 출력."""
+    if not session_dir:
+        return ''
+    with TEST_MERGE_LOCK:
+        _rescue_debug_webms_into_dir(session_dir)
+        if not os.path.isdir(session_dir):
+            return ''
+        raw_clips = []
+        for fn in sorted(os.listdir(session_dir)):
+            fp = os.path.join(session_dir, fn)
+            if os.path.isfile(fp) and fn.lower().endswith(('.webm', '.mp4')):
+                try:
+                    if os.path.getsize(fp) > 512:
+                        raw_clips.append(fp)
+                except Exception:
+                    pass
+        if not raw_clips:
+            _force_rmtree(session_dir)
+            return ''
+
+        dt = start_dt if isinstance(start_dt, datetime.datetime) else datetime.datetime.now()
+        out_name = f"({dt.strftime('%H-%M_%y%m%d')}).mp4"
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, out_name)
+
+        norm_dir = os.path.join(session_dir, '_norm')
+        os.makedirs(norm_dir, exist_ok=True)
+        norm_clips = []
+        for idx_c, src_clip in enumerate(raw_clips, start=1):
+            norm_mp4 = os.path.join(norm_dir, f"part_{idx_c:02d}.mp4")
+            try:
+                proc = subprocess.run(
+                    [
+                        'ffmpeg', '-y', '-err_detect', 'ignore_err', '-i', src_clip,
+                        '-map', '0:v:0', '-an',
+                        '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=15,format=yuv420p',
+                        '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '26',
+                        '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+                        norm_mp4,
+                    ],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120,
+                )
+                if proc.returncode == 0 and os.path.isfile(norm_mp4) and os.path.getsize(norm_mp4) > 512:
+                    norm_clips.append(norm_mp4)
+            except Exception:
+                pass
+
+        saved_ok = False
+        if len(norm_clips) == 1:
+            try:
+                shutil.copy2(norm_clips[0], out_path)
+                saved_ok = os.path.isfile(out_path) and os.path.getsize(out_path) > 512
+            except Exception:
+                saved_ok = False
+        elif len(norm_clips) >= 2:
+            list_txt = os.path.join(norm_dir, 'concat_list.txt')
+            try:
+                with open(list_txt, 'w', encoding='utf-8') as lf:
+                    for nc in norm_clips:
+                        escaped = nc.replace("'", "'\\''")
+                        lf.write(f"file '{escaped}'\n")
+                proc = subprocess.run(
+                    [
+                        'ffmpeg', '-y', '-f', 'concat', '-safe', '0', '-i', list_txt,
+                        '-c', 'copy', '-movflags', '+faststart', out_path,
+                    ],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120,
+                )
+                saved_ok = proc.returncode == 0 and os.path.isfile(out_path) and os.path.getsize(out_path) > 512
+            except Exception:
+                saved_ok = False
+
+        _force_rmtree(session_dir)
+        if saved_ok:
+            if is_test_mode:
+                log(f"🎬 테스트 블랙박스 영상이 바탕화면에 저장되었습니다: {out_name} (오류 문의 시 첨부해 주세요)")
+            else:
+                prune_blackbox_upload_dir(max_keep=3)
+                log(f"🎬 업로드 블랙박스 합본 영상이 저장되었습니다: blackbox_upload/{out_name} (최신 3개 자동 유지)")
+            return out_path
+        if is_test_mode:
+            log("⚠️ [테스트 모드] 합본할 수 있는 유효한 블랙박스 녹화본이 없어 바탕화면 저장을 건너뛰었습니다.")
+        else:
+            log("⚠️ [업로드 블랙박스] 합본할 수 있는 유효한 녹화본이 없어 MP4 저장을 건너뛰었습니다.")
+        return ''
+
+
+def merge_test_blackbox_to_desktop(session_dir, start_dt=None):
+    """기존 호환 래퍼: 테스트 모드 블랙박스 세션을 바탕화면(~/Desktop) 단일 MP4로 합본 저장"""
+    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
+    return merge_blackbox_session_to_mp4(session_dir, desktop_dir, start_dt=start_dt, is_test_mode=True)
+
+
+def _finalize_blackbox_session_merge_once():
+    """실행(테스트 모드 또는 일반 업로드) 세션당 정확히 1회만 FFmpeg 단일 MP4 합본 저장을 실행"""
+    with STATE_LOCK:
+        if STATE.get('test_merged_done'):
+            return ''
+        sdir = STATE.get('test_session_dir') or ''
+        sdt = STATE.get('test_start_dt')
+        is_test = bool(STATE.get('is_test_mode'))
+        STATE['test_merged_done'] = True
+        STATE['is_test_mode'] = False
+        STATE['test_session_dir'] = ''
+        STATE['test_start_dt'] = None
+    set_blackbox_session_dir('')
+    if not sdir:
+        return ''
+    out_dir = os.path.join(os.path.expanduser('~'), 'Desktop') if is_test else BLACKBOX_UPLOAD_DIR
+    return merge_blackbox_session_to_mp4(sdir, out_dir, start_dt=sdt, is_test_mode=is_test)
+
+
+def _finalize_test_mode_merge_once():
+    """기존 호환 래퍼"""
+    return _finalize_blackbox_session_merge_once()
+
+
+def _format_duration_ko(elapsed_sec):
+    sec = max(0.0, float(elapsed_sec or 0.0))
+    if sec < 60.0:
+        return f"{sec:.1f}초"
+    mins = int(sec // 60)
+    rem = sec - (mins * 60)
+    if mins < 60:
+        return f"{mins}분 {rem:.1f}초 ({sec:.1f}초)"
+    hrs = mins // 60
+    rem_m = mins % 60
+    return f"{hrs}시간 {rem_m}분 {int(rem)}초 ({sec:.1f}초)"
+
+
+def _diagnose_run_issue(item):
+    """실패·건너뜀·중단 항목의 에러 메시지/Traceback/URL을 분석해 1줄 원인 유형을 자동 분류"""
+    status = str(item.get('status') or '').strip()
+    err_msg = str(item.get('error') or item.get('msg') or '').strip()
+    tb_text = str(item.get('traceback') or '').strip()
+    url = str(item.get('url') or '').strip()
+    combined = f"{err_msg}\n{tb_text}\n{url}".lower()
+
+    if status == '건너뜀' or '건너뛰기' in err_msg or 'skipped by user' in combined:
+        return '사용자 건너뜀 ([이 플랫폼만 건너뛰기] 요청)'
+    if status == '중단' or '강제 중지' in err_msg or 'interruptederror' in combined:
+        return '사용자 강제 중지 ([강제 중지] 요청으로 중단)'
+    if any(k in combined for k in (
+        'targetclosederror',
+        'target page, context or browser has been closed',
+        'browser has been closed',
+        'context has been closed',
+        'page has been closed',
+        'target closed',
+        'frame was detached',
+        '창이 닫혀',
+    )):
+        return '브라우저 닫힘 (TargetClosedError / 창 종료)'
+    if any(k in combined for k in (
+        '로그인', 'login', 'nidlogin', 'accounts.google', 'unauthorized', 'invalid_grant',
+        '2단계 인증', '보안 확인', 'checkpoint', 'challenge', 'cookie', '쿠키', '세션 만료',
+    )):
+        return '로그인 필요·세션 만료 또는 보안 인증'
+    if any(k in combined for k in (
+        'timeouterror', 'timeout', 'timed out', '시간 초과',
+        'waiting for locator', 'waiting for selector', 'strict mode violation',
+        '찾을 수 없', '미발견', 'not found', '요소',
+    )):
+        return '요소 미발견·타임아웃 (화면 UI 변경 또는 로딩 지연)'
+    if any(k in combined for k in (
+        'quotaexceeded', 'quota', 'rate limit', '429', 'too many requests', '한도',
+    )):
+        return '플랫폼 업로드 한도·요청 제한 초과'
+    if any(k in combined for k in (
+        'filenotfounderror', 'no such file', '파일이 없', '영상', '사진 첨부 실패',
+    )):
+        return '미디어 파일 누락 또는 첨부 실패'
+    if any(k in combined for k in (
+        'net::err_', 'err_connection', 'err_name_not_resolved', 'connectionerror',
+        'ssl', 'dns', '네트워크',
+    )):
+        return '네트워크 연결·페이지 로딩 오류'
+    short_err = (err_msg.splitlines()[0] if err_msg else '상세 오류 없음')[:60]
+    return f'기타 실행 오류 ({short_err})'
+
+
+def _md_cell(text):
+    return str(text or '').replace('\r', ' ').replace('\n', ' ').replace('|', '\\|').strip()
+
+
+def write_run_report(platform_results, mode_label='실업로드', video_name='', start_dt=None, end_dt=None, stopped_by_user=False):
+    """성공·실패·건너뜀·강제 중지·테스트 모드 여부와 관계없이 매 실행 종료 시 프로젝트 루트 report.md에 최신 실행 리포트를 저장"""
+    end_t = end_dt if isinstance(end_dt, datetime.datetime) else datetime.datetime.now()
+    start_t = start_dt if isinstance(start_dt, datetime.datetime) else end_t
+    elapsed_sec = max(0.0, (end_t - start_t).total_seconds())
+    now_str = end_t.strftime('%Y-%m-%d %H:%M:%S')
+
+    items = list(platform_results or [])
+    ok_cnt = sum(1 for x in items if x.get('status') == '성공')
+    fail_cnt = sum(1 for x in items if x.get('status') == '실패')
+    skip_cnt = sum(1 for x in items if x.get('status') == '건너뜀')
+    stop_cnt = sum(1 for x in items if x.get('status') == '중단')
+    problem_items = [x for x in items if x.get('status') in ('실패', '건너뜀', '중단')]
+
+    if stopped_by_user:
+        finish_label = '강제 중지'
+    elif fail_cnt > 0 or skip_cnt > 0:
+        finish_label = '일부 실패·건너뜀'
+    else:
+        finish_label = '정상 완료'
+
+    result_summary = f'성공 {ok_cnt}건 / 실패 {fail_cnt}건 / 건너뜀 {skip_cnt}건'
+    if stop_cnt > 0:
+        result_summary += f' / 중단 {stop_cnt}건'
+
+    lines = [
+        '# 실행 결과 리포트 (`report.md`)',
+        '',
+        '## 1. 실행 요약',
+        f'- **기록 시각**: {now_str}',
+        f'- **실행 모드**: {mode_label}',
+        f'- **종료 상태**: {finish_label}',
+        f'- **대상 영상**: `{os.path.basename(video_name) if video_name else "(없음)"}`',
+        f'- **총 소요 시간**: {_format_duration_ko(elapsed_sec)}',
+        f'- **전체 결과**: 총 {len(items)}건 ({result_summary})',
+        '',
+        '## 2. 파이썬 1차 자동 진단',
+    ]
+
+    if not problem_items:
+        lines.append('- ✅ 모든 선택 플랫폼이 오류 없이 정상 완료되었습니다.')
+    else:
+        for pitem in problem_items:
+            p_label = pitem.get('label') or pitem.get('key') or '알 수 없음'
+            p_status = pitem.get('status') or '실패'
+            diag_cause = _diagnose_run_issue(pitem)
+            p_err = (pitem.get('error') or pitem.get('msg') or '').strip()
+            p_err_line = p_err.splitlines()[0][:100] if p_err else ''
+            if p_err_line:
+                lines.append(f'- **[{p_label}]** ({p_status}): `{diag_cause}` — `{p_err_line}`')
+            else:
+                lines.append(f'- **[{p_label}]** ({p_status}): `{diag_cause}`')
+
+    lines.extend([
+        '',
+        '## 3. 플랫폼별 실행 결과',
+        '| 플랫폼 | 상태 | 최종 메시지 | 도달 URL |',
+        '| --- | --- | --- | --- |',
+    ])
+
+    status_badge_map = {
+        '성공': '✅ 성공',
+        '실패': '❌ 실패',
+        '건너뜀': '⏭️ 건너뜀',
+        '중단': '🛑 중단',
+    }
+    if items:
+        for item in items:
+            p_label = _md_cell(item.get('label') or item.get('key') or '알 수 없음')
+            p_status = status_badge_map.get(item.get('status'), _md_cell(item.get('status') or '-'))
+            p_msg = _md_cell(item.get('msg') or item.get('error') or '-')
+            raw_url = (item.get('url') or '').strip()
+            p_url = f'`{_md_cell(raw_url)}`' if raw_url else '-'
+            lines.append(f'| {p_label} | {p_status} | {p_msg} | {p_url} |')
+    else:
+        lines.append('| (선택된 플랫폼 없음) | - | - | - |')
+
+    if problem_items:
+        lines.extend([
+            '',
+            '---',
+            '',
+            '## 4. 상세 진단 (실패·건너뜀 항목)',
+            '',
+        ])
+        for idx_e, item in enumerate(problem_items, start=1):
+            label = item.get('label') or item.get('key') or '알 수 없음'
+            status = item.get('status') or '실패'
+            url = (item.get('url') or '').strip() or '(페이지 URL 미확인)'
+            err_msg = (item.get('error') or item.get('msg') or '').strip() or '(상세 에러 메시지 없음)'
+            tb_text = (item.get('traceback') or '').strip() or err_msg
+            buttons = item.get('buttons') or []
+            at_str = item.get('captured_at') or now_str
+            diag_cause = _diagnose_run_issue(item)
+
+            lines.append(f'### 4-{idx_e}. [{label}] — {status} ({at_str})')
+            lines.append('')
+            lines.append(f'- **1차 자동 진단**: `{diag_cause}`')
+            lines.append(f'- **실패/건너뜀 직전 페이지 URL**: `{url}`')
+            lines.append(f'- **오류 요약**: `{err_msg}`')
+            lines.append('')
+            lines.append('#### 파이썬 상세 에러 메시지 및 Traceback')
+            lines.append('```text')
+            lines.append(tb_text)
+            lines.append('```')
+            lines.append('')
+            lines.append('#### 해당 시점 화면의 주요 버튼·클릭 요소 텍스트 목록')
+            if buttons:
+                for btxt in buttons:
+                    lines.append(f'- {btxt}')
+            else:
+                lines.append('- (화면 클릭 요소 정보 없음 — 브라우저 닫힘 또는 페이지 로드 전 발생)')
+            lines.append('')
+            lines.append('---')
+            lines.append('')
+
+    try:
+        with open(REPORT_PATH, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines).rstrip() + '\n')
+        return REPORT_PATH
+    except Exception:
+        return ''
+
+
+def skip_current_platform():
+    """전체 업로드를 멈추지 않고 현재 진행 중인 플랫폼의 브라우저/작업만 즉시 종료해 다음 플랫폼으로 넘김 (타임아웃 없음)"""
+    with STATE_LOCK:
+        is_busy = bool(STATE.get('busy'))
+        cur_key = str(STATE.get('current_platform_key') or '').strip()
+        cur_label = str(STATE.get('current_platform_label') or cur_key).strip()
+        cur_run_id = int(STATE.get('active_run_id', 0))
+        if not is_busy or not cur_key:
+            return {'ok': False, 'msg': '현재 건너뛸 수 있는 진행 중 플랫폼 작업이 없습니다.'}
+        STATE['skip_platform_key'] = cur_key
+        STATE['skip_seq'] = int(STATE.get('skip_seq', 0)) + 1
+
+    log(f'⏭️ [건너뛰기 요청] [{cur_label}] 작업을 종료하고 다음 플랫폼으로 이동합니다...')
+    # stop_checker 기반 graceful 종료에 잠시 기회를 준 뒤 아직 같은 플랫폼에 걸려 있으면 자동화 브라우저만 즉시 종료
+    for _ in range(4):
+        time.sleep(0.1)
+        with STATE_LOCK:
+            if STATE.get('active_run_id') != cur_run_id or STATE.get('current_platform_key') != cur_key:
+                return {'ok': True, 'skipped': cur_key, 'msg': f'[{cur_label}] 건너뛰기 완료'}
+    if cur_key != 'yt':
+        _kill_automation_chrome()
+    return {'ok': True, 'skipped': cur_key, 'msg': f'[{cur_label}] 건너뛰기 요청을 적용했습니다.'}
+
+
+def force_stop_active_task():
+    """진행 중인 자동화 브라우저(Playwright 전용 크롬 창)를 즉시 종료하고 백그라운드 스레드/상태를 깔끔하게 정리.
+    테스트 모드·일반 업로드 실행 중 강제 중지 시에도 그 시점까지 녹화된 블랙박스 영상을 FFmpeg 단일 MP4로 합본 저장."""
+    global ACTIVE_WORKER_THREAD
+    with STATE_LOCK:
+        STATE['stop_requested'] = True
+        STATE['active_run_id'] += 1
+        worker_t = ACTIVE_WORKER_THREAD
+        has_bb_session = bool(STATE.get('test_session_dir')) and not bool(STATE.get('test_merged_done'))
+        if has_bb_session:
+            STATE['force_stop_merging'] = True
+
+    log('🛑 [강제 중지 요청] 실행 중인 자동화 브라우저를 닫고 작업을 중단합니다...')
+    _kill_automation_chrome()
+
     if worker_t is not None and worker_t.is_alive() and worker_t is not threading.current_thread():
         try:
-            worker_t.join(timeout=4.0)
+            worker_t.join(timeout=6.0)
         except Exception:
             pass
     else:
@@ -546,14 +1136,23 @@ def force_stop_active_task():
     cleanup_chrome_profile_locks()
     with STATE_LOCK:
         STATE['busy'] = False
+        STATE['current_platform_key'] = ''
+        STATE['current_platform_label'] = ''
+        STATE['skip_platform_key'] = ''
         # 작업 스레드가 아직 완전히 종료되지 않았으면 stop_requested=True를 유지해 잔여 대기 로그 차단
         if not worker_still_alive:
             STATE['stop_requested'] = False
         if ACTIVE_WORKER_THREAD is worker_t:
             ACTIVE_WORKER_THREAD = None
 
-    clean_and_unify_blackbox_files(clear_thumbs=False)
+    if not has_bb_session:
+        clean_and_unify_blackbox_files(clear_thumbs=False)
     log('✅ [강제 중지 완료] 자동화 브라우저 종료 및 작업 상태 정리가 완료되었습니다.')
+    if has_bb_session:
+        _finalize_blackbox_session_merge_once()
+        with STATE_LOCK:
+            STATE['force_stop_merging'] = False
+        clean_and_unify_blackbox_files(clear_thumbs=False)
     return {'ok': True, 'msg': '진행 중인 업로드 작업을 강제 중지했습니다.'}
 
 def clean_and_unify_blackbox_files(clear_thumbs=False):
@@ -567,7 +1166,7 @@ def clean_and_unify_blackbox_files(clear_thumbs=False):
         os.makedirs(BLACKBOX_UPLOAD_DIR, exist_ok=True)
 
         for fn in os.listdir(BASE_DIR):
-            if fn.lower().endswith('.png'):
+            if fn.lower().endswith('.png') and not _is_protected_root_file(fn):
                 try: os.remove(os.path.join(BASE_DIR, fn))
                 except Exception: pass
 
@@ -697,6 +1296,10 @@ def clean_and_unify_blackbox_files(clear_thumbs=False):
                 if os.path.isfile(fp):
                     try: os.remove(fp)
                     except Exception: pass
+
+        # 내부 blackbox_upload/ 폴더는 최신 3개만 자동 유지 (4개 이상 시 가장 오래된 파일부터 삭제)
+        if not is_busy:
+            prune_blackbox_upload_dir(max_keep=3)
     except Exception:
         pass
 
@@ -705,8 +1308,10 @@ def has_backup_files():
 
 PROTECTED_CODE_EXTS = ('.py', '.html', '.bat', '.command')
 PROTECTED_ROOT_FILES = {
-    'version.json', 'version.txt', 'LICENSE.txt', 'updater_config.json', '.gitignore', '.installed_done',
-    'AI_RULES.md', 'export_code.py', 'check_personal_leak.py', 'build_release.py', '배포판_만들기_및_업로드.command',
+    'version.json', 'LICENSE.txt', '.gitignore', '.installed_done',
+    'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
+    '1_맥북_최초설치.command', '2_맥북_프로그램_실행.command',
+    'AI_RULES.md', 'export_code.py', 'check_personal_leak.py', 'build_release.py',
     'app.log',
     'youtube_token.json', 'client_secret.json', 'user_profile.json', 'daily_usage.json', 'login_credentials.json',
 }
@@ -746,10 +1351,12 @@ def handle_cleanup(action='clean_all'):
     removed_thumbs = 0
     removed_backup = 0
 
-    # 루트 .png 스냅샷 및 임시 산출물 정리 (보호 파일은 절대 제외)
+    # 루트 .png 스냅샷 및 임시 산출물 정리 (favicon.png 등 보호 파일은 절대 제외)
     for fn in list(os.listdir(BASE_DIR)):
         src = os.path.join(BASE_DIR, fn)
         if not os.path.isfile(src):
+            continue
+        if _is_protected_root_file(fn):
             continue
         if fn.lower().endswith('.png'):
             try:
@@ -757,8 +1364,6 @@ def handle_cleanup(action='clean_all'):
                 removed_png += 1
             except Exception:
                 pass
-            continue
-        if _is_protected_root_file(fn):
             continue
         if fn in TEMP_ROOT_FILES or fn.lower().endswith(('.tmp', '.bak', '.old')) or not _is_protected_root_file(fn):
             try:
@@ -821,12 +1426,13 @@ def handle_cleanup(action='clean_all'):
     log(msg)
     return {'ok': True, 'msg': msg, 'has_backup': has_backup_files()}
 
-def extract_10_thumbnails(video_path, count=10):
+def extract_10_thumbnails(video_path, count=10, prefix='thumb_'):
     if not video_path or not os.path.exists(video_path):
         return []
     os.makedirs(THUMB_DIR, exist_ok=True)
+    safe_prefix = re.sub(r'[^A-Za-z0-9_-]+', '', str(prefix or 'thumb_')) or 'thumb_'
     for old_f in os.listdir(THUMB_DIR):
-        if old_f.startswith('thumb_') and old_f.endswith('.jpg'):
+        if old_f.startswith(safe_prefix) and old_f.endswith('.jpg'):
             try: os.remove(os.path.join(THUMB_DIR, old_f))
             except Exception: pass
 
@@ -846,13 +1452,13 @@ def extract_10_thumbnails(video_path, count=10):
                 cap.set(cv2.CAP_PROP_POS_FRAMES, f_no)
                 ret, frame = cap.read()
                 if ret:
-                    fname = f"thumb_{idx:02d}.jpg"
+                    fname = f"{safe_prefix}{idx:02d}.jpg"
                     fpath = os.path.join(THUMB_DIR, fname)
                     cv2.imwrite(fpath, frame, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
                     thumbnails.append({'url': f'/thumbs/{fname}?t={ts}', 'path': fpath})
         cap.release()
         if thumbnails:
-            log(f"📸 영상에서 블로그용 캡처 {len(thumbnails)}장을 추출했습니다.")
+            log(f"📸 영상에서 캡처 사진 {len(thumbnails)}장을 추출했습니다.")
             return thumbnails
     except Exception:
         pass
@@ -869,7 +1475,7 @@ def extract_10_thumbnails(video_path, count=10):
             step_t = (end_t - start_t) / max(1, (count - 1))
             for i in range(count):
                 sec = start_t + i * step_t
-                fname = f"thumb_{i+1:02d}.jpg"
+                fname = f"{safe_prefix}{i+1:02d}.jpg"
                 fpath = os.path.join(THUMB_DIR, fname)
                 subprocess.run(
                     ['ffmpeg', '-y', '-ss', f"{sec:.2f}", '-i', video_path, '-frames:v', '1', '-q:v', '2', fpath],
@@ -878,11 +1484,46 @@ def extract_10_thumbnails(video_path, count=10):
                 if os.path.exists(fpath):
                     thumbnails.append({'url': f'/thumbs/{fname}?t={ts}', 'path': fpath})
         if thumbnails:
-            log(f"📸 (FFmpeg) 영상에서 블로그용 캡처 {len(thumbnails)}장을 추출했습니다.")
+            log(f"📸 (FFmpeg) 영상에서 캡처 사진 {len(thumbnails)}장을 추출했습니다.")
     except Exception as e:
         log(f"⚠️ 영상 캡처 추출 실패: {e}")
 
     return thumbnails
+
+
+def resolve_daangn_images(payload, video_path=''):
+    """당근 비즈프로필 소식 첨부 사진 결정 (0장 방지 3단계 안전장치):
+    1) payload['daangn_selected_images'] 중 실존하는 비-GIF 이미지 (최대 10장)
+    2) 비어 있으면 payload['naver_selected_images'] 중 실존하는 비-GIF 이미지 (최대 4장)
+    3) 그래도 0장이고 video_path가 존재하면 영상 균등 4구간 핵심 사진 자동 추출"""
+    def _filter_imgs(raw_list, limit):
+        out = []
+        seen = set()
+        for p in (raw_list or []):
+            if not p or not isinstance(p, str):
+                continue
+            if p.lower().endswith('.gif') or not os.path.exists(p):
+                continue
+            if p not in seen:
+                seen.add(p)
+                out.append(p)
+            if len(out) >= limit:
+                break
+        return out
+
+    imgs = _filter_imgs((payload or {}).get('daangn_selected_images'), 10)
+    if imgs:
+        return imgs
+
+    imgs = _filter_imgs((payload or {}).get('naver_selected_images'), 4)
+    if imgs:
+        return imgs
+
+    if video_path and os.path.exists(video_path):
+        log('📸 [당근 비즈프로필] 선택된 사진이 없어 첨부 영상에서 핵심 사진 4장을 자동 추출합니다...')
+        extracted = extract_10_thumbnails(video_path, count=4, prefix='daangn_thumb_')
+        imgs = _filter_imgs([t.get('path') for t in (extracted or []) if isinstance(t, dict)], 4)
+    return imgs
 
 
 def capture_frame_at_time(video_path, time_sec):
@@ -1103,12 +1744,51 @@ def format_clean_tags(tags_iter):
     return ', '.join(cleaned)
 
 
+def smart_trim_text(text, max_len):
+    """글자 수(max_len) 초과 시 단어 중간을 강제로 자르지 않고,
+    완성된 문장(마침표·물음표·느낌표·줄바꿈) 또는 어절(띄어쓰기) 단위로 자연스럽게 축약"""
+    s = (text or '').strip()
+    if not s or max_len <= 0:
+        return ''
+    if len(s) <= max_len:
+        return s
+
+    candidate = s[:max_len]
+    next_char = s[max_len] if len(s) > max_len else ''
+
+    # 딱 경계 직후가 공백·구두점·줄바꿈이면 어절이 끊기지 않은 상태
+    if next_char in ('', ' ', '\n', '\t', ',', '.', '!', '?', '·', '|'):
+        trimmed = candidate.rstrip(' ,·|-:/')
+        if trimmed:
+            return trimmed
+
+    # 1순위: 완성 문장 끝(. ! ? 또는 줄바꿈) 우선 채택 (최소 45% 이상 유지 시)
+    min_sent_keep = max(8, int(max_len * 0.45))
+    best_sent_end = -1
+    for m in re.finditer(r'(?:[.!?](?=\s|$)|\n)', candidate):
+        if m.end() >= min_sent_keep:
+            best_sent_end = m.end()
+    if best_sent_end != -1:
+        trimmed = candidate[:best_sent_end].strip().rstrip(' ,·|-:/')
+        if trimmed:
+            return trimmed
+
+    # 2순위: 어절(띄어쓰기·구분자) 경계에서 깔끔하게 마무리
+    cut_pos = max(candidate.rfind(' '), candidate.rfind('\n'), candidate.rfind(' | '), candidate.rfind(' · '))
+    if cut_pos >= max(4, int(max_len * 0.3)):
+        trimmed = candidate[:cut_pos].rstrip(' ,·|-:/')
+        if trimmed:
+            return trimmed
+
+    return candidate.rstrip(' ,·|-:/')
+
+
 def build_smart_tags(raw_tags, full_text, cat, profile=None):
     prof = profile if isinstance(profile, dict) else load_profile()
     banned_tags = get_effective_banned_tags(prof)
     region_tags = get_region_tags(prof)
     region_set = set(region_tags)
-    style_tags = []
+    collected_tags = []
     seen_low = set()
 
     def _add_tag(candidate):
@@ -1117,17 +1797,24 @@ def build_smart_tags(raw_tags, full_text, cat, profile=None):
             return
         if not _is_natural_search_tag(tok, banned_tags, region_tags=region_set):
             return
-        if tok.lower() not in seen_low:
-            seen_low.add(tok.lower())
-            style_tags.append(tok)
+        low = tok.lower()
+        if low in seen_low:
+            return
+        seen_low.add(low)
+        collected_tags.append(tok)
 
-    # 1) 원문 본문/해시태그 텍스트에서 실제 시술 스타일 키워드 우선 매칭
+    # 1) 원문 태그(raw_tags) 수집 (원문 등장 순서 보존)
+    raw_sanitized_for_match = []
     for t in (raw_tags or []):
+        tok = _sanitize_tag_token(t)
+        if tok:
+            raw_sanitized_for_match.append(tok)
         _add_tag(t)
 
-    men_only_keys = {'다운펌', '옆머리', '뜨는', '가르마', '애즈', '댄디', '크롭', '드롭', '아이비리그', '가일', '리젠트', '쉐도우', '상고', '페이드'}
+    # 2) 원문 본문·태그에서 STYLE_EXPANSION_MAP으로 대표/연관 시술명 매칭
+    men_only_keys = {'다운펌', '옆머리', '뜨는', '가르마', '애즈', '댄디', '크롭', '드롭', '크리드', '아이비리그', '가일', '리젠트', '쉐도우', '상고', '페이드'}
     women_only_keys = {'태슬', '단발', '허쉬', '빌드', '엘리자벳', '구름', '히피', '보브'}
-    match_src = ' '.join(style_tags) + ' ' + (full_text or '')
+    match_src = ' '.join(raw_sanitized_for_match) + ' ' + (full_text or '')
     for key, exp_list in STYLE_EXPANSION_MAP.items():
         if cat == 'Men' and key in women_only_keys:
             continue
@@ -1137,14 +1824,27 @@ def build_smart_tags(raw_tags, full_text, cat, profile=None):
             for item in exp_list:
                 _add_tag(item)
 
-    # 2) 부족분은 실제 검색량이 높은 대표 시술명으로 자연스럽게 보충
+    # 3) 부족분은 실제 검색량이 검증된 대표 시술명으로 자연스럽게 보충
     promo_pool = (
-        ['드롭컷', '크롭컷', '다운펌', '애즈펌', '가르마펌', '댄디컷', '상고컷', '남자커트']
+        ['드롭컷', '크롭컷', '크리드컷', '다운펌', '애즈펌', '가르마펌', '댄디컷', '상고컷', '남자커트']
         if cat == 'Men'
         else ['레이어드컷', '태슬컷', '단발펌', '빌드펌', '허쉬컷', '볼륨매직', 'C컬펌', '여자커트']
     )
     for p in promo_pool:
         _add_tag(p)
+
+    # 최종 3단계 등급제(티어) 안정 정렬:
+    # 1티어(메인 트렌드 시술명) → 2티어(사전 등록 연관·보조 시술명) → 3티어(사전 미등록 일반 원문 태그)
+    # 파이썬 sort는 안정 정렬이므로 각 티어 내에서는 원문/본문에서 먼저 매칭된 순서를 그대로 유지
+    def _tag_tier(tok):
+        low = tok.lower()
+        if low in TIER1_TREND_STYLE_TAGS_LOWER:
+            return 1
+        if low in KNOWN_NATURAL_STYLE_TAGS_LOWER:
+            return 2
+        return 3
+
+    style_tags = sorted(collected_tags, key=_tag_tier)
 
     max_5_style = max(1, 5 - len(region_tags))
     max_10_style = max(1, 10 - len(region_tags))
@@ -1417,6 +2117,9 @@ def parse_multi_block_sections(data_text):
 
     for raw_line in (data_text or '').splitlines():
         cleaned = _clean_invisible_line(raw_line)
+        # 단일 코드박스(```text ... ```) 채로 복사해 붙여넣은 경우 바깥 펜스 줄을 안전하게 무시
+        if re.match(r'^`{3,}[a-zA-Z0-9_-]*$', cleaned):
+            continue
         sec_key, inline_rest = _match_section_header(cleaned)
         if sec_key is not None:
             current_key = sec_key
@@ -1527,6 +2230,156 @@ def _has_custom_ig_footer(text, salon_name='', designer_name=''):
     return False
 
 
+INCOMPLETE_LINE_NOUN_EXCEPTIONS_RE = re.compile(
+    r'(?:헤어|레이어|케어|드라이어|스퀘어|코어|투어|퓨어|아이디어|파노라마|드라마|테마|아로마|매니아)$'
+)
+COMPLETE_SENTENCE_END_RE = re.compile(
+    r'(?:[.!?…~]["\'\)\]]*$|(?:습니다|읍니다|입니다|랍니다|답니다|됩니다|합니다|세요|해요|돼요|네요|예요|에요|어요|아요|워요|져요|려요|줘요|나요|가요|까요|군요|거든요|잖아요|죠|요|다|까)["\'\)\]]*$)'
+)
+INCOMPLETE_CONNECTIVE_END_RE = re.compile(
+    r'(?:,|،|'
+    r'하면서|되면서|있으면서|없으면서|으로써|으로서|에서는|에서도|으로는|으로도|'
+    r'하는데|되는데|있는데|없는데|겠지만|하지만|이지만|면서도|더라도|이라면|하려면|'
+    r'되도록|하도록|만들어|올려주어|잡아주어|덜어내어|살려주어|채워주어|눌러주어|정리하여|보완하여|맞추어|연결하여|'
+    r'하여|해서|돼서|되어|라서|이라서|여서|니까|으니까|므로|으므로|는데|은데|ㄴ데|'
+    r'면서|으며|지며|하며|되며|지만|으나|거나|든지|도록|려고|으려고|고자|고서|'
+    r'하고|되고|있고|없고|잡고|넣고|살리고|줄이고|덜고|누르고|채우고|올리고|내리고|자르고|다듬고|맞추고|정리하고|보완하고|연결하고|말리고|'
+    r'이라|에서|으로|까지|부터|처럼|없이|위해|통해|'
+    r'고|며|서|어|아|해|워|져|려)$'
+)
+SHORTFORM_BULLET_OR_FOOTER_START_RE = re.compile(
+    r'^(?:[•✔✓💡📍📌✂️💈📩💌📞☎️👉👇✨🔹🔸\-]\s*|\d+[\.\)]\s*|@)'
+)
+
+
+def _is_incomplete_korean_line(line):
+    """줄 끝이 쉼표 또는 연결어미로 끝나고 문장이 종결되지 않은 미완결 줄인지 판별"""
+    s = _clean_invisible_line(line)
+    if not s:
+        return False
+    if COMPLETE_SENTENCE_END_RE.search(s):
+        return False
+    if s.endswith((',', '،')):
+        return True
+    if INCOMPLETE_LINE_NOUN_EXCEPTIONS_RE.search(s):
+        return False
+    return bool(INCOMPLETE_CONNECTIVE_END_RE.search(s))
+
+
+def merge_incomplete_lines(lines):
+    """줄바꿈으로 쪼개진 미완결 문장(쉼표·연결어미 끝)을 다음 줄과 공백 1칸으로 자동 병합해 완결 문장 리스트 반환"""
+    cleaned = [_clean_invisible_line(l) for l in (lines or []) if _clean_invisible_line(l)]
+    if not cleaned:
+        return []
+    merged = []
+    idx = 0
+    while idx < len(cleaned):
+        cur = cleaned[idx]
+        while (
+            idx + 1 < len(cleaned)
+            and _is_incomplete_korean_line(cur)
+            and not SHORTFORM_BULLET_OR_FOOTER_START_RE.match(cleaned[idx + 1])
+        ):
+            nxt = cleaned[idx + 1]
+            cur = f"{cur} {nxt}".strip()
+            idx += 1
+        merged.append(cur)
+        idx += 1
+    return merged
+
+
+def format_shortform_readable(text):
+    """숏폼·소통 플랫폼 전용 포맷터:
+    글자 수(24~28자) 기준의 기계적 강제 줄바꿈을 하지 않고,
+    완결된 문장 단위 줄바꿈과 문단 사이 빈 줄 1칸(\n\n)만 깔끔하게 정리"""
+    nl = chr(10)
+    raw = (text or '').replace('\r\n', '\n').replace('\r', '\n').strip()
+    if not raw:
+        return ''
+    out = []
+    blank_streak = 0
+    for raw_line in raw.splitlines():
+        s = _clean_invisible_line(raw_line)
+        if not s:
+            if out and blank_streak == 0:
+                out.append('')
+                blank_streak += 1
+            continue
+        out.append(s)
+        blank_streak = 0
+    while out and not out[0]:
+        out.pop(0)
+    while out and not out[-1]:
+        out.pop()
+    return nl.join(out).strip()
+
+
+def _is_ig_footer_line(line, salon_name='', designer_name=''):
+    s = _clean_invisible_line(line)
+    if not s:
+        return False
+    if s.startswith(('📍', '✂️', '📌', '💈', '📩', '💌', '☎️', '📞', '@')):
+        return True
+    if IG_HANDLE_RE.search(s) or IG_DM_FOOTER_RE.search(s):
+        return True
+    if salon_name and salon_name != '우리 매장' and re.sub(r'\s+', '', salon_name) in re.sub(r'\s+', '', s):
+        return True
+    if designer_name and designer_name in s and ('|' in s or '/' in s or IG_SIGN_EMOJI_RE.search(s)):
+        return True
+    return False
+
+
+def _add_instagram_breathing_room(text, salon_name='', designer_name=''):
+    """인스타그램 원문 말투·이모지·영문·커스텀 서명을 100% 보존하되,
+    원문에 빈 줄이 하나도 없이 4줄 이상 빽빽하게 붙어 있는 경우에만
+    도입부 / 본문 / 손질 팁 / 하단 푸터 사이에 빈 줄 1칸(\n\n)을 자동 삽입"""
+    nl = chr(10)
+    base = format_shortform_readable(text)
+    if not base or f"{nl}{nl}" in base:
+        return base
+    lines = [l for l in base.splitlines() if l.strip()]
+    if len(lines) < 4:
+        return base
+
+    # 하단 연속 푸터 영역 분리
+    footer_start = len(lines)
+    while footer_start > 1 and _is_ig_footer_line(lines[footer_start - 1], salon_name=salon_name, designer_name=designer_name):
+        footer_start -= 1
+    body_lines = lines[:footer_start]
+    footer_lines = lines[footer_start:]
+
+    # 본문 줄들을 쉼표/연결어미 연속 줄이 갈라지지 않게 최소 문장 블록으로 묶음
+    blocks = []
+    i = 0
+    while i < len(body_lines):
+        grp = [body_lines[i]]
+        while i + 1 < len(body_lines) and _is_incomplete_korean_line(body_lines[i]) and not SHORTFORM_BULLET_OR_FOOTER_START_RE.match(body_lines[i + 1]):
+            i += 1
+            grp.append(body_lines[i])
+        blocks.append(nl.join(grp))
+        i += 1
+
+    paragraphs = []
+    if len(blocks) >= 3:
+        paragraphs.append(blocks[0])
+        if len(blocks) == 3:
+            paragraphs.append(blocks[1])
+            paragraphs.append(blocks[2])
+        else:
+            paragraphs.append(nl.join(blocks[1:-1]))
+            paragraphs.append(blocks[-1])
+    elif len(blocks) == 2:
+        paragraphs.append(blocks[0])
+        paragraphs.append(blocks[1])
+    elif blocks:
+        paragraphs.append(blocks[0])
+
+    if footer_lines:
+        paragraphs.append(nl.join(footer_lines))
+
+    return f"{nl}{nl}".join([p for p in paragraphs if p.strip()]).strip()
+
+
 def _prepare_instagram_preserved_body(raw_text):
     """[숏폼 전용 본문]의 말투·이모지·줄바꿈·영문 문구·커스텀 서명을 원형 그대로 보존 (순수 해시태그 줄·섹션 헤더만 안전 제거)"""
     nl = chr(10)
@@ -1625,7 +2478,8 @@ def convert_master_content(data_text, video_name='', profile_override=None):
             if not _is_pure_english_line(stripped_line):
                 kr_content_lines.append(stripped_line)
 
-    content_lines = kr_content_lines or all_non_sig_lines or ['차분하고 깔끔하게 정돈된 맞춤 헤어 스타일입니다.']
+    raw_content_lines = kr_content_lines or all_non_sig_lines or ['차분하고 깔끔하게 정돈된 맞춤 헤어 스타일입니다.']
+    content_lines = merge_incomplete_lines(raw_content_lines) or ['차분하고 깔끔하게 정돈된 맞춤 헤어 스타일입니다.']
 
     seo_hint = re.sub(r'[_\-\.]+', ' ', _clean_invisible_line(seo_filename))
     full_line_text = ' '.join(content_lines)
@@ -1666,9 +2520,12 @@ def convert_master_content(data_text, video_name='', profile_override=None):
     parsed_titles = [t for t in parsed_titles if t]
     if parsed_titles:
         hook_line = parsed_titles[0] or hook_line
-    naver_title = normalize_branch_name(
-        parsed_titles[2] if len(parsed_titles) >= 3 else f"{region_title_prefix}{main_kw}, {desc_phrase}".strip()
-    )[:50]
+    naver_title = smart_trim_text(
+        normalize_branch_name(
+            parsed_titles[2] if len(parsed_titles) >= 3 else f"{region_title_prefix}{main_kw}, {desc_phrase}".strip()
+        ),
+        50,
+    )
 
     gender_target = "남성 고객님" if gender_cat == "Men" else "고객님"
     style_core = kr_style_kws[0] if kr_style_kws else main_kw
@@ -2059,67 +2916,69 @@ def convert_master_content(data_text, video_name='', profile_override=None):
             preserve_media_markers=True,
         )
 
-    # 플랫폼별 인기 글쓰기 틀 적용 (제목 & 본문 · 모바일 호흡 줄바꿈)
-    yt_title_cand = f"{hook_line} | {style_core}" if style_core not in hook_line else hook_line
-    yt_title = normalize_branch_name(yt_title_cand if len(yt_title_cand) <= 55 else hook_line[:55])
-    yt_points = [f"• {l}" for l in content_lines[1:3]] if len(content_lines) > 1 else [f"• {main_kw} 맞춤 디자인"]
-    yt_body = format_mobile_readable(
+    # 플랫폼별 인기 글쓰기 틀 적용 (숏폼·소통 플랫폼은 문장·문단 호흡 중심 포맷터 적용 · 문장/어절 단위 안전 축약)
+    yt_title_cand = normalize_branch_name(f"{hook_line} | {style_core}" if style_core not in hook_line else hook_line)
+    yt_title = yt_title_cand if len(yt_title_cand) <= 55 else smart_trim_text(normalize_branch_name(hook_line), 55)
+    yt_points = [f"• {l}" for l in mid_lines[:2]] if mid_lines else [f"• {main_kw} 맞춤 디자인"]
+    yt_body = format_shortform_readable(
         normalize_branch_name(
             f"{hook_line}{nl}{nl}"
             f"{nl.join(yt_points)}{nl}"
             f"• 손질 팁: {care_comment}{nl}{nl}"
             f"📍 {salon_name}{designer_pipe}"
-        ),
-        max_line_len=28,
-        preserve_media_markers=False,
+        )
     )
 
-    clip_title_cand = hook_line if style_core in hook_line else f"{style_core} | {hook_line}"
-    clip_title = normalize_branch_name(clip_title_cand[:38].rstrip(' |,'))
+    clip_title_cand = normalize_branch_name(hook_line if style_core in hook_line else f"{style_core} | {hook_line}")
+    clip_title = smart_trim_text(clip_title_cand, 38)
     clip_mid = nl.join([f"✔ {l}" for l in mid_lines[:2]]) if mid_lines else f"✔ {main_kw} 맞춤 시술"
-    clip_body = format_mobile_readable(
+    clip_body = format_shortform_readable(
         normalize_branch_name(
             f"{hook_line}{nl}{nl}"
-            f"{clip_mid}{nl}"
+            f"{clip_mid}{nl}{nl}"
             f"💡 {care_comment}{nl}{nl}"
             f"📍 {salon_name}{designer_pipe}{nl}"
             f"아래 장소 태그에서 바로 예약 가능해요."
-        ),
-        max_line_len=26,
-        preserve_media_markers=False,
+        )
     )
 
-    tt_title = normalize_branch_name(hook_line[:45])
-    if len(content_lines) >= 3:
-        tt_raw = f"{mid_lines[0]}{nl}💡 {care_comment}"
-    elif len(content_lines) == 2:
-        tt_raw = f"{content_lines[1]}"
+    tt_title = smart_trim_text(normalize_branch_name(hook_line), 45)
+    tt_main = mid_lines[0] if mid_lines else (content_lines[1] if len(content_lines) >= 2 else '')
+    if tt_main and tt_main != care_comment:
+        tt_raw = (
+            f"{tt_main}{nl}{nl}"
+            f"💡 {care_comment}{nl}{nl}"
+            f"📍 {salon_name}{designer_pipe}"
+        )
     else:
-        tt_raw = f"💡 {care_comment}"
-    tt_body = format_mobile_readable(
-        normalize_branch_name(tt_raw),
-        max_line_len=26,
-        preserve_media_markers=False,
-    )
+        tt_raw = (
+            f"{hook_line}{nl}{nl}"
+            f"💡 {care_comment}{nl}{nl}"
+            f"📍 {salon_name}{designer_pipe}"
+        )
+    tt_body = format_shortform_readable(normalize_branch_name(tt_raw))
 
     ig_preserved = _prepare_instagram_preserved_body(short_section_raw if short_section_raw else short_raw)
     ig_has_custom_footer = _has_custom_ig_footer(ig_preserved, salon_name=salon_name, designer_name=designer_name)
     ig_has_english = _has_english_copy(ig_preserved)
 
     if ig_preserved and (bool(short_section_raw) or ig_has_custom_footer or ig_has_english):
+        ig_spaced = _add_instagram_breathing_room(ig_preserved, salon_name=salon_name, designer_name=designer_name)
         if ig_has_custom_footer:
-            ig_body = normalize_branch_name(ig_preserved)
+            ig_body = normalize_branch_name(ig_spaced)
         else:
-            ig_body = normalize_branch_name(
-                f"{ig_preserved}{nl}{nl}"
-                f"📌 저장해두고 상담 때 보여주세요{nl}"
-                f"📍 {salon_name}{designer_pipe}"
+            ig_body = format_shortform_readable(
+                normalize_branch_name(
+                    f"{ig_spaced}{nl}{nl}"
+                    f"📌 저장해두고 상담 때 보여주세요{nl}"
+                    f"📍 {salon_name}{designer_pipe}"
+                )
             )
     else:
         ig_mid = nl.join([f"✔ {l}" for l in mid_lines[:2]]) if mid_lines else f"✔ {main_kw} 맞춤 정리"
         ig_base = (
             f"{hook_line}{nl}{nl}"
-            f"{ig_mid}{nl}"
+            f"{ig_mid}{nl}{nl}"
             f"💡 {care_comment}"
         )
         if not _has_custom_ig_footer(ig_base, salon_name=salon_name, designer_name=designer_name):
@@ -2128,22 +2987,32 @@ def convert_master_content(data_text, video_name='', profile_override=None):
                 f"📌 저장해두고 상담 때 보여주세요{nl}"
                 f"📍 {salon_name}{designer_pipe}"
             )
-        ig_body = format_mobile_readable(
-            normalize_branch_name(ig_base),
-            max_line_len=24,
-            preserve_media_markers=False,
-        )
+        ig_body = format_shortform_readable(normalize_branch_name(ig_base))
 
-    pin_title = normalize_branch_name(f"{main_kw}, {desc_phrase} | {salon_name}"[:52])
-    pin_summary = f"{hook_line}. {care_comment}".strip()
-    pin_body = normalize_branch_name(
-        f"[{salon_name}{designer_label}] {pin_summary} "
-        f"예약·상담은 아래 링크에서 확인해 주세요."
-    )[:220]
+    pin_suffix = f" | {salon_name}" if salon_name else ""
+    pin_head_full = normalize_branch_name(f"{main_kw}, {desc_phrase}")
+    if len(pin_head_full) + len(pin_suffix) <= 52:
+        pin_title = f"{pin_head_full}{pin_suffix}"
+    elif pin_suffix and len(pin_suffix) < 36:
+        pin_title = f"{smart_trim_text(pin_head_full, 52 - len(pin_suffix))}{pin_suffix}"
+    else:
+        pin_title = smart_trim_text(normalize_branch_name(f"{pin_head_full}{pin_suffix}"), 52)
+
+    pin_sep = " " if hook_line.endswith((".", "!", "?")) else ". "
+    pin_summary = normalize_branch_name(f"{hook_line}{pin_sep}{care_comment}".strip())
+    pin_prefix = normalize_branch_name(f"[{salon_name}{designer_label}] ")
+    pin_cta = "예약·상담은 아래 링크에서 확인해 주세요."
+    pin_full = f"{pin_prefix}{pin_summary} {pin_cta}"
+    if len(pin_full) <= 220:
+        pin_body = pin_full
+    else:
+        pin_mid_budget = max(30, 220 - len(pin_prefix) - len(pin_cta) - 1)
+        pin_mid_trimmed = smart_trim_text(pin_summary, pin_mid_budget)
+        pin_body = smart_trim_text(f"{pin_prefix}{pin_mid_trimmed} {pin_cta}", 220)
 
     fallback_region_tag = region_tags[0] if region_tags else "헤어스타일"
     threads_top_tag = _sanitize_tag_token(kr_style_kws[0] if kr_style_kws else fallback_region_tag)
-    threads_second = mid_lines[0] if mid_lines else care_comment
+    threads_second = mid_lines[0] if mid_lines else ""
     threads_q_pool = [
         f"아침에 머리 손질할 때 제일 신경 쓰이는 부분 있으신가요?",
         f"비슷한 모질 고민 있으시면 댓글로 편하게 물어보세요!",
@@ -2151,24 +3020,37 @@ def convert_master_content(data_text, video_name='', profile_override=None):
         f"평소 드라이하는 데 보통 몇 분 정도 걸리시나요?",
     ]
     threads_q = random.choice(threads_q_pool)
-    threads_body = format_mobile_readable(
+    if threads_second and threads_second != care_comment:
+        threads_mid_block = f"{threads_second}{nl}{nl}{care_comment}"
+    else:
+        threads_mid_block = care_comment
+    threads_body = format_shortform_readable(
         normalize_branch_name(
             f"{hook_line}{nl}{nl}"
-            f"{threads_second}{nl}"
-            f"{care_comment}{nl}{nl}"
+            f"{threads_mid_block}{nl}{nl}"
             f"{threads_q}{nl}{nl}"
             f"📍 {salon_name}{designer_pipe}"
-        ),
-        max_line_len=24,
-        preserve_media_markers=False,
+        )
     )
     threads_tags_str = format_clean_tags([threads_top_tag])
 
-    daangn_title_raw = f"{daangn_prefix}{hook_line}" if style_core in hook_line else f"{daangn_prefix.rstrip('] ')} {style_core}] {hook_line}"
-    daangn_title = normalize_branch_name(daangn_title_raw[:48])
+    daangn_full_prefix = daangn_prefix if style_core in hook_line else f"{daangn_prefix.rstrip('] ')} {style_core}] "
+    daangn_title_full = normalize_branch_name(f"{daangn_full_prefix}{hook_line}")
+    if len(daangn_title_full) <= 30:
+        daangn_title = daangn_title_full
+    else:
+        # 30자 초과 시 말머리를 [지역]으로 간결화하고 중복 지역 접두어를 정리해 제목 본문이 잘리지 않게 확보
+        hook_for_daangn = normalize_branch_name(hook_line)
+        if region_kw:
+            hook_for_daangn = re.sub(rf'^{re.escape(region_kw)}\s*(?:미용실|헤어샵|헤어살롱)?\s*', '', hook_for_daangn).strip() or hook_for_daangn
+        if len(daangn_prefix) <= 12:
+            daangn_title_raw = f"{daangn_prefix}{hook_for_daangn}"
+        else:
+            daangn_title_raw = hook_for_daangn
+        daangn_title = smart_trim_text(normalize_branch_name(daangn_title_raw), 30)
     daangn_bullets = nl.join([f"✔ {l}" for l in design_lines[:2]])
     daangn_addr_line = f"📍 {salon_addr} ({salon_name})" if salon_addr else f"📍 {salon_name}"
-    daangn_body = format_mobile_readable(
+    daangn_body = format_shortform_readable(
         normalize_branch_name(
             f"안녕하세요, {salon_name}{designer_label}입니다.{nl}{nl}"
             f"{region_neighbor_label} 오늘의 {style_core} 시술 소식 전해드려요.{nl}{nl}"
@@ -2176,17 +3058,27 @@ def convert_master_content(data_text, video_name='', profile_override=None):
             f"💡 집에서 손질 팁{nl}{care_comment}{nl}{nl}"
             f"궁금한 점이나 예약 문의는 당근 채팅으로 편하게 남겨주세요.{nl}"
             f"{daangn_addr_line}"
-        ),
-        max_line_len=28,
-        preserve_media_markers=False,
+        )
     )
 
-    x_point = mid_lines[0] if mid_lines else care_comment
-    x_head = hook_line[:46].rstrip()
-    x_tail = f"📍 {salon_name}"
-    x_mid_budget = max(16, 102 - len(x_head) - len(x_tail) - 2)
-    x_mid = x_point[:x_mid_budget].rstrip(' ,.')
-    x_body = normalize_branch_name(f"{x_head}{nl}{x_mid}{nl}{x_tail}")[:105].rstrip()
+    x_tail = normalize_branch_name(f"📍 {salon_name}")
+    x_head_src = normalize_branch_name(parsed_titles[0] if parsed_titles else hook_line)
+    x_point_src = normalize_branch_name(mid_lines[0] if mid_lines else '')
+    x_care_src = normalize_branch_name(care_comment)
+    x_total_limit = 110
+    cand_with_point = f"{x_head_src}{nl}{x_point_src}{nl}{x_tail}" if (x_point_src and x_point_src != x_head_src) else ""
+    cand_with_care = f"{x_head_src}{nl}{x_care_src}{nl}{x_tail}" if (x_care_src and x_care_src != x_head_src) else ""
+    cand_head_only = f"{x_head_src}{nl}{x_tail}"
+
+    if cand_with_point and len(cand_with_point) <= x_total_limit:
+        x_body = cand_with_point
+    elif cand_with_care and len(cand_with_care) <= x_total_limit:
+        x_body = cand_with_care
+    elif len(cand_head_only) <= x_total_limit:
+        x_body = cand_head_only
+    else:
+        x_head_trimmed = smart_trim_text(x_head_src, max(16, x_total_limit - len(x_tail) - 1))
+        x_body = f"{x_head_trimmed}{nl}{x_tail}"
     x_tail_tag = region_tags[-1:] if region_tags else []
     x_tags_str = format_clean_tags((style_kws[: (2 - len(x_tail_tag))] + x_tail_tag)[:2])
 
@@ -2242,7 +3134,7 @@ def upload_to_youtube(title, body='', tags=None, video_path=None, privacy='publi
 
     prof = load_profile()
     banned_tags = get_effective_banned_tags(prof)
-    salon_name = get_salon_name(prof, fallback='헤어살롱')
+    salon_name = get_salon_name(prof, fallback='미용실')
     salon_addr = get_salon_address(prof)
     region_tags = get_region_tags(prof)
     region_set = set(region_tags)
@@ -2286,16 +3178,108 @@ def worker_auth_check(payload):
         ACTIVE_WORKER_THREAD = threading.current_thread()
 
     login_targets = [
-        (payload.get('use_naver'), '네이버 블로그', 'https://blog.naver.com/GoBlogWrite.naver'),
-        (payload.get('use_clip'), '네이버 클립', 'https://clipcreators.naver.com/web'),
-        (payload.get('use_tt'), '틱톡', 'https://www.tiktok.com/tiktokstudio'),
-        (payload.get('use_ig'), '인스타그램', 'https://www.instagram.com/'),
-        (payload.get('use_pin'), '핀터레스트', 'https://kr.pinterest.com/pin-creation-tool/'),
-        (payload.get('use_threads'), '쓰레드', 'https://www.threads.com/'),
-        (payload.get('use_daangn'), '당근 비즈', 'https://business.daangn.com/'),
-        (payload.get('use_x'), '엑스(X)', 'https://x.com/compose/post'),
+        (payload.get('use_naver'), 'naver', 'naver_cookies.json', '네이버 블로그', 'https://blog.naver.com/GoBlogWrite.naver'),
+        (payload.get('use_clip'), 'clip', 'naver_cookies.json', '네이버 클립', 'https://clipcreators.naver.com/web'),
+        (payload.get('use_tt'), 'tt', 'tiktok_cookies.json', '틱톡', 'https://www.tiktok.com/tiktokstudio'),
+        (payload.get('use_ig'), 'ig', 'instagram_cookies.json', '인스타그램', 'https://www.instagram.com/'),
+        (payload.get('use_pin'), 'pin', 'pinterest_cookies.json', '핀터레스트', 'https://kr.pinterest.com/pin-creation-tool/'),
+        (payload.get('use_threads'), 'threads', 'threads_cookies.json', '쓰레드', 'https://www.threads.com/'),
+        (payload.get('use_daangn'), 'daangn', 'daangn_cookies.json', '당근 비즈', 'https://business.daangn.com/'),
+        (payload.get('use_x'), 'x', 'x_cookies.json', '엑스(X)', 'https://x.com/compose/post'),
     ]
-    selected = [(label, url) for enabled, label, url in login_targets if enabled]
+    selected = [(key, cfile, label, url) for enabled, key, cfile, label, url in login_targets if enabled]
+    checked_cookie_files = {cfile for _, cfile, _, _ in selected}
+    verified_platforms = set()
+    active_login_page_cfiles = set()
+
+    LOGIN_PAGE_REDIRECT_RULES = (
+        ('naver_cookies.json', ('nid.naver.com/nidlogin', 'nidlogin.login'), ('naver.com',)),
+        ('tiktok_cookies.json', ('tiktok.com/login',), ('tiktok.com',)),
+        ('instagram_cookies.json', ('instagram.com/accounts/login',), ('instagram.com',)),
+        ('pinterest_cookies.json', ('pinterest.com/login', '/login/'), ('pinterest.com',)),
+        ('threads_cookies.json', ('threads.com/login', 'threads.net/login'), ('threads.com', 'threads.net')),
+        ('daangn_cookies.json', ('accounts.daangn.com', '/login', '/signin', '/auth'), ('daangn.com', 'karrotmarket.com')),
+        ('x_cookies.json', ('x.com/i/flow/login', 'x.com/login', 'twitter.com/i/flow/login'), ('x.com', 'twitter.com')),
+    )
+
+    def _inspect_live_tabs(ctx):
+        """열려 있는 브라우저 탭을 정밀 점검:
+        1) 당근 비즈 실제 대시보드 진입 여부 확인(단순 열었다 닫기 시 절대 초록불 불가)
+        2) 각 플랫폼 탭이 로그인 페이지로 리다이렉트된 채 머물러 있는지 감지해 잔여 쿠키 가짜 초록불 차단"""
+        if ctx is None:
+            return
+        try:
+            from daangn_uploader import is_daangn_logged_in
+            from threads_uploader import is_threads_logged_in
+            pages = list(ctx.pages)
+        except Exception:
+            return
+        seen_login_page = set()
+        seen_non_login_page = set()
+        daangn_logged_in_any = False
+        daangn_seen_any = False
+        threads_logged_in_any = False
+        threads_seen_any = False
+        for pg in pages:
+            try:
+                if pg.is_closed():
+                    continue
+                cur_u = (pg.url or '').lower()
+                if not cur_u or cur_u == 'about:blank':
+                    continue
+                if 'daangn.com' in cur_u or 'karrotmarket.com' in cur_u:
+                    daangn_seen_any = True
+                    if is_daangn_logged_in(pg):
+                        daangn_logged_in_any = True
+                    continue
+                if 'threads.com' in cur_u or 'threads.net' in cur_u:
+                    threads_seen_any = True
+                    if is_threads_logged_in(pg):
+                        threads_logged_in_any = True
+                    continue
+                for cfile, login_markers, dom_markers in LOGIN_PAGE_REDIRECT_RULES:
+                    if any(dm in cur_u for dm in dom_markers):
+                        if any(mk in cur_u for mk in login_markers):
+                            seen_login_page.add(cfile)
+                        else:
+                            seen_non_login_page.add(cfile)
+            except Exception:
+                pass
+        if daangn_seen_any:
+            if daangn_logged_in_any:
+                verified_platforms.add('daangn_cookies.json')
+                seen_non_login_page.add('daangn_cookies.json')
+            else:
+                verified_platforms.discard('daangn_cookies.json')
+                seen_login_page.add('daangn_cookies.json')
+        if threads_seen_any:
+            if threads_logged_in_any:
+                verified_platforms.add('threads_cookies.json')
+                seen_non_login_page.add('threads_cookies.json')
+            else:
+                verified_platforms.discard('threads_cookies.json')
+                seen_login_page.add('threads_cookies.json')
+        active_login_page_cfiles.clear()
+        for cf in seen_login_page:
+            if cf not in seen_non_login_page:
+                active_login_page_cfiles.add(cf)
+
+    def _sync_and_enforce_checked(ctx):
+        _inspect_live_tabs(ctx)
+        sync_cookies_from_persistent_context(
+            ctx,
+            verified_platforms=verified_platforms,
+            checked_filenames=checked_cookie_files,
+        )
+        # 현재 열린 탭이 로그인 화면으로 리다이렉트된 플랫폼은 잔여 쿠키 파일이 남지 않도록 즉시 제거
+        for cf in list(active_login_page_cfiles):
+            if cf in checked_cookie_files and cf not in verified_platforms:
+                fp = get_auth_file(cf)
+                if os.path.exists(fp):
+                    try:
+                        os.remove(fp)
+                    except Exception:
+                        pass
 
     if not selected:
         log('ℹ️ [Step 1] 로그인 점검할 플랫폼이 선택되지 않았습니다.')
@@ -2311,8 +3295,8 @@ def worker_auth_check(payload):
     try:
         from playwright.sync_api import sync_playwright
 
-        names_str = ', '.join(label for label, _ in selected)
-        log(f'⏳ [통합 로그인] 전용 크롬 1창에 {len(selected)}개 플랫폼 탭을 여는 중... ({names_str})')
+        names_str = ', '.join(label for _, _, label, _ in selected)
+        log(f'⏳ [통합 로그인] 브라우저 창에 {len(selected)}개 플랫폼 탭을 여는 중... ({names_str})')
 
         with sync_playwright() as p:
             # 로그인 점검 시 비밀번호 노출 방지를 위해 record_video_dir 없이 영구 크롬 프로필로 실행
@@ -2324,7 +3308,7 @@ def worker_auth_check(payload):
                 pass
 
             first_page = None
-            for idx, (label, url) in enumerate(selected):
+            for idx, (key, cfile, label, url) in enumerate(selected):
                 if _is_stop_requested(my_run_id) or context_closed[0]:
                     break
                 try:
@@ -2346,7 +3330,7 @@ def worker_auth_check(payload):
                     pass
 
             if not _is_stop_requested(my_run_id) and not context_closed[0]:
-                log('🔑 [통합 로그인] 열린 크롬 창에서 각 탭에 로그인(2차 인증·로그인 유지 체크)을 완료한 뒤, 크롬 창 우측 상단 [X] 버튼으로 닫아주세요. 닫는 즉시 영구 저장됩니다!')
+                log('🔑 [통합 로그인] 열린 브라우저 창에서 로그인을 완료한 뒤 창 우측 상단 [X]로 닫아주세요. 닫는 즉시 로그인 상태를 정밀 확인합니다!')
 
             last_sync_ts = 0.0
             while not context_closed[0]:
@@ -2362,9 +3346,9 @@ def worker_auth_check(payload):
                     break
 
                 now_ts = time.time()
-                if now_ts - last_sync_ts >= 3.0:
+                if now_ts - last_sync_ts >= 2.0:
                     try:
-                        sync_cookies_from_persistent_context(context)
+                        _sync_and_enforce_checked(context)
                     except Exception:
                         pass
                     last_sync_ts = now_ts
@@ -2376,7 +3360,7 @@ def worker_auth_check(payload):
                     time.sleep(1.0)
 
             try:
-                sync_cookies_from_persistent_context(context)
+                _sync_and_enforce_checked(context)
             except Exception:
                 pass
             try:
@@ -2386,14 +3370,19 @@ def worker_auth_check(payload):
             context = None
 
         if not _is_stop_requested(my_run_id):
-            log('✅ [통합 로그인 완료] 전용 크롬 프로필에 세션이 영구 저장되었습니다!')
+            st_after = get_setup_status(deep=True)
+            summary = ', '.join(
+                f"{label} {'🟢' if st_after.get(key) in ('green', 'yellow') else '🔴'}"
+                for key, _, label, _ in selected
+            )
+            log(f'✅ [로그인 상태 정밀 확인 완료] {summary}')
     except Exception as e:
         if not _is_stop_requested(my_run_id):
             log(f'⚠️ 통합 로그인 중 오류: {e}')
     finally:
         if context is not None:
             try:
-                sync_cookies_from_persistent_context(context)
+                _sync_and_enforce_checked(context)
             except Exception:
                 pass
             try:
@@ -2402,6 +3391,7 @@ def worker_auth_check(payload):
                 pass
         cleanup_chrome_profile_locks()
         with STATE_LOCK:
+            STATE['auth_check_seq'] = int(STATE.get('auth_check_seq', 0)) + 1
             if STATE['active_run_id'] == my_run_id:
                 STATE['busy'] = False
                 STATE['stop_requested'] = False
@@ -2429,51 +3419,234 @@ def _is_stop_requested(run_id=None):
             return True
         return False
 
-def _set_last_result(key, ok, msg, run_id=None):
+
+def _was_platform_skipped(run_id, platform_key):
+    with STATE_LOCK:
+        if run_id is not None and STATE.get('active_run_id') != run_id:
+            return False
+        return str(STATE.get('skip_platform_key') or '') == str(platform_key or '')
+
+
+def _is_stop_or_skip_requested(run_id, platform_key):
+    return _is_stop_requested(run_id) or _was_platform_skipped(run_id, platform_key)
+
+
+def _set_last_result(key, ok, msg, run_id=None, history_id='', history_rec=None, test_mode=False):
     with STATE_LOCK:
         if run_id is not None and STATE.get('active_run_id') != run_id:
             return
         STATE['last_results'][key] = {'ok': bool(ok), 'msg': msg}
+    if ok and not test_mode:
+        updated = record_history_uploaded_platform(history_id, key, fallback_rec=history_rec)
+        with STATE_LOCK:
+            if run_id is None or STATE.get('active_run_id') == run_id:
+                if updated is not None:
+                    STATE['active_uploaded_platforms'] = list(updated)
+                else:
+                    cur = list(STATE.get('active_uploaded_platforms') or [])
+                    norm_k = _normalize_platform_key(key)
+                    if norm_k and norm_k not in cur:
+                        cur.append(norm_k)
+                    STATE['active_uploaded_platforms'] = cur
 
 def worker_publish(payload):
     global ACTIVE_WORKER_THREAD
+    test_mode = bool(payload.get('test_mode', False))
+    history_id = '' if test_mode else str(payload.get('_history_id') or payload.get('history_id') or '').strip()
+    history_rec = None if test_mode else (payload.get('_history_rec') if isinstance(payload.get('_history_rec'), dict) else None)
+    existing_uploaded = [] if test_mode else get_history_uploaded_platforms(history_id, fallback_rec=history_rec)
+    run_start_dt = datetime.datetime.now()
+    bb_session_dir = ''
+
     with STATE_LOCK:
         STATE['busy'] = True
         STATE['stop_requested'] = False
+        STATE['skip_platform_key'] = ''
+        STATE['current_platform_key'] = ''
+        STATE['current_platform_label'] = ''
         STATE['last_results'] = {}
+        STATE['active_history_id'] = history_id
+        STATE['active_uploaded_platforms'] = list(existing_uploaded)
         STATE['active_run_id'] += 1
         my_run_id = STATE['active_run_id']
+        STATE['is_test_mode'] = test_mode
+        STATE['test_merged_done'] = False
+        STATE['force_stop_merging'] = False
+        if test_mode:
+            bb_session_dir = os.path.join(DEBUG_DIR, f'_test_session_{my_run_id}_{int(time.time())}')
+        else:
+            bb_session_dir = os.path.join(DEBUG_DIR, f'_upload_session_{my_run_id}_{int(time.time())}')
+        STATE['test_session_dir'] = bb_session_dir
+        STATE['test_start_dt'] = run_start_dt
         ACTIVE_WORKER_THREAD = threading.current_thread()
         state_vn = STATE['video_name']
         state_vp = STATE['video_path']
+
+    if test_mode:
+        set_blackbox_session_dir(bb_session_dir, session_kind='test')
+        log('🧪 [테스트 모드 시작] 각 플랫폼 게시 직전까지 시뮬레이션하며 블랙박스 영상을 수집합니다.')
+    else:
+        set_blackbox_session_dir(bb_session_dir, session_kind='upload')
+
+    clear_platform_diagnostics(None)
     naver_completed = False
     prof = load_profile()
     vn = payload.get('video_name') or state_vn
     video_path = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
-    stop_checker = lambda: _is_stop_requested(my_run_id)
+    default_place = get_place_search_keyword(prof)
+    mode_label = '테스트 모드' if test_mode else '실업로드'
+
+    platform_order = [
+        ('yt', '유튜브 쇼츠', '유튜브', 'use_yt'),
+        ('naver', '네이버 블로그', '네이버블로그', 'use_naver'),
+        ('clip', '네이버 클립', '네이버클립', 'use_clip'),
+        ('tt', '틱톡', '틱톡', 'use_tt'),
+        ('ig', '인스타그램', '인스타그램', 'use_ig'),
+        ('pin', '핀터레스트', '핀터레스트', 'use_pin'),
+        ('threads', '쓰레드', '쓰레드', 'use_threads'),
+        ('daangn', '당근 비즈', '당근', 'use_daangn'),
+        ('x', '엑스(X)', '엑스', 'use_x'),
+    ]
+    selected_platforms = [(k, lbl, bbn) for k, lbl, bbn, flag in platform_order if payload.get(flag)]
+    platform_records = {}
+    platform_last_msgs = {}
+    top_level_exc = None
+    top_level_tb = ''
+
+    def mark_res(k, ok, msg):
+        platform_last_msgs[k] = msg
+        _set_last_result(
+            k, ok, msg, my_run_id, history_id=history_id, history_rec=history_rec, test_mode=test_mode
+        )
+
+    def _begin_platform(pkey, label, bb_name):
+        with STATE_LOCK:
+            if STATE['active_run_id'] == my_run_id:
+                STATE['current_platform_key'] = pkey
+                STATE['current_platform_label'] = label
+                STATE['skip_platform_key'] = ''
+        clear_platform_diagnostics(bb_name)
+        set_active_diagnostics_platform(bb_name)
+        act_word = '테스트' if test_mode else '업로드'
+        log(f'현재 {label} {act_word}를 시작합니다...')
+
+    def _finish_platform(pkey, label, bb_name, ok, exc_obj=None, err_tb=''):
+        skipped = _was_platform_skipped(my_run_id, pkey)
+        stopped_all = _is_stop_requested(my_run_id)
+        with STATE_LOCK:
+            if STATE['active_run_id'] == my_run_id:
+                STATE['current_platform_key'] = ''
+                STATE['current_platform_label'] = ''
+                if skipped:
+                    STATE['skip_platform_key'] = ''
+        set_active_diagnostics_platform('')
+
+        diag = get_platform_diagnostics(bb_name)
+        now_cap = diag.get('captured_at') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        reached_url = diag.get('url', '') or ('(YouTube Data API)' if pkey == 'yt' else '')
+        final_msg = str(platform_last_msgs.get(pkey) or '').strip()
+
+        if skipped:
+            mark_res(pkey, False, '건너뜀')
+            log(f'⏭️ [{label}] 사용자 요청으로 건너뛰고 다음 플랫폼으로 이동합니다.')
+            platform_records[pkey] = {
+                'key': pkey,
+                'label': label,
+                'status': '건너뜀',
+                'msg': '건너뜀',
+                'url': reached_url,
+                'error': diag.get('error') or '사용자가 [이 플랫폼만 건너뛰기]를 클릭해 건너뜀',
+                'traceback': diag.get('traceback') or err_tb or 'Skipped by user request',
+                'buttons': diag.get('buttons') or [],
+                'captured_at': now_cap,
+            }
+            cleanup_chrome_profile_locks()
+            return
+
+        if ok:
+            platform_records[pkey] = {
+                'key': pkey,
+                'label': label,
+                'status': '성공',
+                'msg': final_msg or ('테스트 통과' if test_mode else '완료'),
+                'url': reached_url,
+                'error': '',
+                'traceback': '',
+                'buttons': [],
+                'captured_at': now_cap,
+            }
+            return
+
+        if stopped_all:
+            err_summary = diag.get('error') or (f'{type(exc_obj).__name__}: {exc_obj}' if exc_obj else '사용자 강제 중지 요청으로 중단됨')
+            tb_final = diag.get('traceback') or err_tb or err_summary
+            platform_records[pkey] = {
+                'key': pkey,
+                'label': label,
+                'status': '중단',
+                'msg': '강제 중지',
+                'url': reached_url,
+                'error': err_summary,
+                'traceback': tb_final,
+                'buttons': diag.get('buttons') or [],
+                'captured_at': now_cap,
+            }
+            return
+
+        err_summary = diag.get('error') or (f'{type(exc_obj).__name__}: {exc_obj}' if exc_obj else f'{label} 업로드/게시 실패')
+        tb_final = diag.get('traceback') or err_tb or err_summary
+        platform_records[pkey] = {
+            'key': pkey,
+            'label': label,
+            'status': '실패',
+            'msg': final_msg or err_summary[:80],
+            'url': reached_url,
+            'error': err_summary,
+            'traceback': tb_final,
+            'buttons': diag.get('buttons') or [],
+            'captured_at': now_cap,
+        }
+
     try:
         for _ in (0,):
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_yt'):
+                _begin_platform('yt', '유튜브 쇼츠', '유튜브')
+                yt_ok = False
+                yt_exc = None
+                yt_tb = ''
                 try:
-                    log('🔴 [유튜브 쇼츠] 업로드 시작...')
-                    yt_url = upload_to_youtube(normalize_branch_name(payload.get('yt_title', '')), normalize_branch_name(payload.get('yt_body', '')), split_tags(payload.get('yt_tags')), video_path, 'public')
-                    if yt_url:
-                        record_daily_usage('yt')
-                        _set_last_result('yt', True, '완료', my_run_id)
+                    if test_mode:
+                        log('🧪 [테스트 모드 - 유튜브 쇼츠] 공식 API 실업로드를 건너뛰고 정상 통과합니다.')
+                        yt_ok = True
+                        mark_res('yt', True, '테스트 통과')
                     else:
-                        _set_last_result('yt', False, '업로드 실패', my_run_id)
-                    log('✅ [유튜브 쇼츠] 완료!')
+                        log('🔴 [유튜브 쇼츠] 업로드 시작...')
+                        yt_url = upload_to_youtube(normalize_branch_name(payload.get('yt_title', '')), normalize_branch_name(payload.get('yt_body', '')), split_tags(payload.get('yt_tags')), video_path, 'public')
+                        if yt_url:
+                            yt_ok = True
+                            record_daily_usage('yt')
+                            mark_res('yt', True, '완료')
+                            log('✅ [유튜브 쇼츠] 완료!')
+                        else:
+                            mark_res('yt', False, '업로드 실패')
                 except Exception as e:
-                    _set_last_result('yt', False, str(e)[:80], my_run_id)
-                    log(f'⚠️ [유튜브 쇼츠] 오류: {e}')
-
-            default_place = get_place_search_keyword(prof)
+                    yt_exc = e
+                    yt_tb = traceback.format_exc()
+                    mark_res('yt', False, str(e)[:80])
+                    if not _is_stop_or_skip_requested(my_run_id, 'yt'):
+                        log(f'⚠️ [유튜브 쇼츠] 오류: {e}')
+                _finish_platform('yt', '유튜브 쇼츠', '유튜브', yt_ok, exc_obj=yt_exc, err_tb=yt_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_naver'):
+                _begin_platform('naver', '네이버 블로그', '네이버블로그')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'naver')
+                b_ok = False
+                b_exc = None
+                b_tb = ''
                 try:
                     cat = (payload.get('naver_category') or '').strip()
                     cat_log = cat or '기본 게시판'
@@ -2484,7 +3657,7 @@ def worker_publish(payload):
                     media_desc = f"사진 {img_cnt}장 · GIF {gif_cnt}개" if gif_cnt else f"사진 {img_cnt}장"
                     log(f'🟢 [네이버 블로그 - {cat_log}] 발행 시작 (선택 미디어 {media_desc})...')
                     log(f"🏷️ [네이버 블로그] 등록할 태그({min(len(n_tags), 10)}개): " + ", ".join([f"#{t.replace('#', '')}" for t in n_tags[:10]]))
-                    b_ok = upload_to_naver_blog(
+                    b_ok = bool(upload_to_naver_blog(
                         normalize_branch_name(payload.get('naver_title', '')),
                         normalize_branch_name(payload.get('naver_body', '')),
                         n_tags,
@@ -2492,188 +3665,633 @@ def worker_publish(payload):
                         cat,
                         normalize_branch_name(payload.get('naver_place') or default_place),
                         selected_images=payload.get('naver_selected_images') or [],
-                        stop_checker=stop_checker,
-                    )
+                        stop_checker=p_stop,
+                        test_mode=test_mode,
+                    ))
                     if b_ok:
-                        naver_completed = True
-                        record_daily_usage('naver')
-                        _set_last_result('naver', True, '발행 완료', my_run_id)
-                    else:
-                        _set_last_result('naver', False, '발행 중단/실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log(f'✅ [네이버 블로그 - {cat_log}] 발행 완료!' if b_ok else f'⚠️ [네이버 블로그 - {cat_log}] 발행 중단/실패')
+                        if not test_mode:
+                            naver_completed = True
+                            record_daily_usage('naver')
+                        mark_res('naver', True, '테스트 통과' if test_mode else '발행 완료')
+                    elif not _was_platform_skipped(my_run_id, 'naver'):
+                        mark_res('naver', False, '발행 중단/실패')
+                    if not p_stop():
+                        log(f'✅ [네이버 블로그 - {cat_log}] {"테스트 완료!" if test_mode else "발행 완료!"}' if b_ok else f'⚠️ [네이버 블로그 - {cat_log}] 발행 중단/실패')
                 except Exception as e:
-                    _set_last_result('naver', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    b_exc = e
+                    b_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'naver'):
+                        mark_res('naver', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [네이버 블로그] 오류: {e}')
+                _finish_platform('naver', '네이버 블로그', '네이버블로그', b_ok, exc_obj=b_exc, err_tb=b_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_clip'):
+                _begin_platform('clip', '네이버 클립', '네이버클립')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'clip')
+                c_ok = False
+                c_exc = None
+                c_tb = ''
                 try:
                     from naver_clip_uploader import upload_to_naver_clip
                     log('🟢 [네이버 클립] 게시 시작...')
-                    c_ok = upload_to_naver_clip(normalize_branch_name(payload.get('clip_title', '')), normalize_branch_name(payload.get('clip_body', '')), split_tags(payload.get('clip_tags')), video_path, normalize_branch_name(payload.get('clip_place') or default_place), stop_checker=stop_checker)
+                    c_ok = bool(upload_to_naver_clip(normalize_branch_name(payload.get('clip_title', '')), normalize_branch_name(payload.get('clip_body', '')), split_tags(payload.get('clip_tags')), video_path, normalize_branch_name(payload.get('clip_place') or default_place), stop_checker=p_stop, test_mode=test_mode))
                     if c_ok:
-                        record_daily_usage('clip')
-                        _set_last_result('clip', True, '게시 완료', my_run_id)
-                    else:
-                        _set_last_result('clip', False, '게시 실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [네이버 클립] 게시 완료!' if c_ok else '⚠️ [네이버 클립] 게시 실패')
+                        if not test_mode:
+                            record_daily_usage('clip')
+                        mark_res('clip', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'clip'):
+                        mark_res('clip', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [네이버 클립] ' + ('테스트 완료!' if test_mode else '게시 완료!') if c_ok else '⚠️ [네이버 클립] 게시 실패')
                 except Exception as e:
-                    _set_last_result('clip', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    c_exc = e
+                    c_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'clip'):
+                        mark_res('clip', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [네이버 클립] 오류: {e}')
+                _finish_platform('clip', '네이버 클립', '네이버클립', c_ok, exc_obj=c_exc, err_tb=c_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_tt'):
+                _begin_platform('tt', '틱톡', '틱톡')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'tt')
+                t_ok = False
+                t_exc = None
+                t_tb = ''
                 try:
                     log('⚫ [틱톡] 게시 시작...')
                     tt_place = normalize_branch_name(payload.get('tt_location') or default_place)
-                    t_ok = upload_to_tiktok(normalize_branch_name(payload.get('tt_title', '')), normalize_branch_name(payload.get('tt_body', '')), split_tags(payload.get('tt_tags')), video_path, place_name=tt_place, draft=False, stop_checker=stop_checker)
+                    t_ok = bool(upload_to_tiktok(normalize_branch_name(payload.get('tt_title', '')), normalize_branch_name(payload.get('tt_body', '')), split_tags(payload.get('tt_tags')), video_path, place_name=tt_place, draft=False, stop_checker=p_stop, test_mode=test_mode))
                     if t_ok:
-                        record_daily_usage('tt')
-                        _set_last_result('tt', True, '게시 완료', my_run_id)
-                    else:
-                        _set_last_result('tt', False, '취소/실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [틱톡] 게시 완료!' if t_ok else '⚠️ [틱톡] 취소됨')
+                        if not test_mode:
+                            record_daily_usage('tt')
+                        mark_res('tt', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'tt'):
+                        mark_res('tt', False, '취소/실패')
+                    if not p_stop():
+                        log('✅ [틱톡] ' + ('테스트 완료!' if test_mode else '게시 완료!') if t_ok else '⚠️ [틱톡] 취소됨')
                 except Exception as e:
-                    _set_last_result('tt', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    t_exc = e
+                    t_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'tt'):
+                        mark_res('tt', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [틱톡] 오류: {e}')
+                _finish_platform('tt', '틱톡', '틱톡', t_ok, exc_obj=t_exc, err_tb=t_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_ig'):
+                _begin_platform('ig', '인스타그램', '인스타그램')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'ig')
+                ig_ok = False
+                ig_exc = None
+                ig_tb = ''
                 try:
                     log('🟣 [인스타그램 릴스] 게시 시작...')
                     ig_place = normalize_branch_name(payload.get('ig_location') or default_place)
-                    ig_ok = upload_to_instagram(normalize_branch_name(payload.get('ig_body', '')), split_tags(payload.get('ig_tags')), video_path, is_draft=False, place_name=ig_place, stop_checker=stop_checker)
+                    ig_ok = bool(upload_to_instagram(normalize_branch_name(payload.get('ig_body', '')), split_tags(payload.get('ig_tags')), video_path, is_draft=False, place_name=ig_place, stop_checker=p_stop, test_mode=test_mode))
                     if ig_ok:
-                        record_daily_usage('ig')
-                        _set_last_result('ig', True, '게시 완료', my_run_id)
-                    else:
-                        _set_last_result('ig', False, '게시 실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [인스타그램 릴스] 게시 완료!' if ig_ok else '⚠️ [인스타그램 릴스] 게시 실패')
+                        if not test_mode:
+                            record_daily_usage('ig')
+                        mark_res('ig', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'ig'):
+                        mark_res('ig', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [인스타그램 릴스] ' + ('테스트 완료!' if test_mode else '게시 완료!') if ig_ok else '⚠️ [인스타그램 릴스] 게시 실패')
                 except Exception as e:
-                    _set_last_result('ig', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    ig_exc = e
+                    ig_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'ig'):
+                        mark_res('ig', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [인스타그램] 오류: {e}')
+                _finish_platform('ig', '인스타그램', '인스타그램', ig_ok, exc_obj=ig_exc, err_tb=ig_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_pin'):
+                _begin_platform('pin', '핀터레스트', '핀터레스트')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'pin')
+                pin_ok = False
+                pin_exc = None
+                pin_tb = ''
                 try:
                     from pinterest_uploader import upload_to_pinterest
                     log('🔴 [핀터레스트] 게시 시작...')
                     pin_link = payload.get('pin_dest_url') if payload.get('pin_dest_url') is not None else prof.get('booking_url', '')
                     pin_board = payload.get('pin_board') if payload.get('pin_board') is not None else prof.get('pinterest_board', '')
-                    pin_url = upload_to_pinterest(title=normalize_branch_name(payload.get('pin_title', '')), description=normalize_branch_name(payload.get('pin_body', '')), tags=split_tags(payload.get('pin_tags')), video_path=video_path, link=pin_link, board_name=pin_board, stop_checker=stop_checker)
-                    if pin_url:
-                        record_daily_usage('pin')
-                        _set_last_result('pin', True, '게시 완료', my_run_id)
-                    else:
-                        _set_last_result('pin', False, '중단/실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [핀터레스트] 게시 완료!' if pin_url else '⚠️ [핀터레스트] 중단됨')
+                    pin_ok = bool(upload_to_pinterest(title=normalize_branch_name(payload.get('pin_title', '')), description=normalize_branch_name(payload.get('pin_body', '')), tags=split_tags(payload.get('pin_tags')), video_path=video_path, link=pin_link, board_name=pin_board, stop_checker=p_stop, test_mode=test_mode))
+                    if pin_ok:
+                        if not test_mode:
+                            record_daily_usage('pin')
+                        mark_res('pin', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'pin'):
+                        mark_res('pin', False, '중단/실패')
+                    if not p_stop():
+                        log('✅ [핀터레스트] ' + ('테스트 완료!' if test_mode else '게시 완료!') if pin_ok else '⚠️ [핀터레스트] 중단됨')
                 except Exception as e:
-                    _set_last_result('pin', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    pin_exc = e
+                    pin_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'pin'):
+                        mark_res('pin', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [핀터레스트] 오류: {e}')
+                _finish_platform('pin', '핀터레스트', '핀터레스트', pin_ok, exc_obj=pin_exc, err_tb=pin_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_threads'):
+                _begin_platform('threads', '쓰레드', '쓰레드')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'threads')
+                th_ok = False
+                th_exc = None
+                th_tb = ''
                 try:
                     from threads_uploader import upload_to_threads
                     log('🧵 [쓰레드] 게시 시작...')
-                    th_ok = upload_to_threads(body=normalize_branch_name(payload.get('threads_body', '')), tags=split_tags(payload.get('threads_tags')), video_path=video_path, stop_checker=stop_checker)
+                    th_ok = bool(upload_to_threads(body=normalize_branch_name(payload.get('threads_body', '')), tags=split_tags(payload.get('threads_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
                     if th_ok:
-                        record_daily_usage('threads')
-                        _set_last_result('threads', True, '게시 완료', my_run_id)
-                    else:
-                        _set_last_result('threads', False, '게시 실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [쓰레드] 게시 완료!' if th_ok else '⚠️ [쓰레드] 게시 실패')
+                        if not test_mode:
+                            record_daily_usage('threads')
+                        mark_res('threads', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'threads'):
+                        mark_res('threads', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [쓰레드] ' + ('테스트 완료!' if test_mode else '게시 완료!') if th_ok else '⚠️ [쓰레드] 게시 실패')
                 except Exception as e:
-                    _set_last_result('threads', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    th_exc = e
+                    th_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'threads'):
+                        mark_res('threads', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [쓰레드] 오류: {e}')
+                _finish_platform('threads', '쓰레드', '쓰레드', th_ok, exc_obj=th_exc, err_tb=th_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_daangn'):
+                _begin_platform('daangn', '당근 비즈', '당근')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'daangn')
+                d_ok = False
+                d_exc = None
+                d_tb = ''
                 try:
                     from daangn_uploader import upload_to_daangn
-                    daangn_imgs = [
-                        p for p in (payload.get('naver_selected_images') or [])
-                        if p and os.path.exists(p) and not p.lower().endswith('.gif')
-                    ][:4]
+                    daangn_imgs = resolve_daangn_images(payload, video_path=video_path)
                     log(f'🥕 [당근 비즈프로필] 소식 발행 시작 (첨부 사진 {len(daangn_imgs)}장)...')
-                    d_ok = upload_to_daangn(title=normalize_branch_name(payload.get('daangn_title', '')), body=normalize_branch_name(payload.get('daangn_body', '')), video_path=video_path, selected_images=daangn_imgs, stop_checker=stop_checker)
+                    d_ok = bool(upload_to_daangn(title=normalize_branch_name(payload.get('daangn_title', '')), body=normalize_branch_name(payload.get('daangn_body', '')), video_path=video_path, selected_images=daangn_imgs, stop_checker=p_stop, test_mode=test_mode))
                     if d_ok:
-                        record_daily_usage('daangn')
-                        _set_last_result('daangn', True, '발행 완료', my_run_id)
-                    else:
-                        _set_last_result('daangn', False, '발행 실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [당근 비즈프로필] 발행 완료!' if d_ok else '⚠️ [당근 비즈프로필] 발행 실패')
+                        if not test_mode:
+                            record_daily_usage('daangn')
+                        mark_res('daangn', True, '테스트 통과' if test_mode else '발행 완료')
+                    elif not _was_platform_skipped(my_run_id, 'daangn'):
+                        mark_res('daangn', False, '발행 실패')
+                    if not p_stop():
+                        log('✅ [당근 비즈프로필] ' + ('테스트 완료!' if test_mode else '발행 완료!') if d_ok else '⚠️ [당근 비즈프로필] 발행 실패')
                 except Exception as e:
-                    _set_last_result('daangn', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    d_exc = e
+                    d_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'daangn'):
+                        mark_res('daangn', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [당근 비즈프로필] 오류: {e}')
+                _finish_platform('daangn', '당근 비즈', '당근', d_ok, exc_obj=d_exc, err_tb=d_tb)
 
             if _is_stop_requested(my_run_id):
                 break
             if payload.get('use_x'):
+                _begin_platform('x', '엑스(X)', '엑스')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'x')
+                x_ok = False
+                x_exc = None
+                x_tb = ''
                 try:
                     from x_uploader import upload_to_x
                     log('𝕏 [엑스(X)] 게시 시작...')
-                    x_ok = upload_to_x(body=normalize_branch_name(payload.get('x_body', '')), tags=split_tags(payload.get('x_tags')), video_path=video_path, stop_checker=stop_checker)
+                    x_ok = bool(upload_to_x(body=normalize_branch_name(payload.get('x_body', '')), tags=split_tags(payload.get('x_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
                     if x_ok:
-                        record_daily_usage('x')
-                        _set_last_result('x', True, '게시 완료', my_run_id)
-                    else:
-                        _set_last_result('x', False, '게시 실패', my_run_id)
-                    if not _is_stop_requested(my_run_id):
-                        log('✅ [엑스(X)] 게시 완료!' if x_ok else '⚠️ [엑스(X)] 게시 실패')
+                        if not test_mode:
+                            record_daily_usage('x')
+                        mark_res('x', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'x'):
+                        mark_res('x', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [엑스(X)] ' + ('테스트 완료!' if test_mode else '게시 완료!') if x_ok else '⚠️ [엑스(X)] 게시 실패')
                 except Exception as e:
-                    _set_last_result('x', False, str(e)[:80], my_run_id)
-                    if not _is_stop_requested(my_run_id):
+                    x_exc = e
+                    x_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'x'):
+                        mark_res('x', False, str(e)[:80])
+                    if not p_stop():
                         log(f'⚠️ [엑스(X)] 오류: {e}')
+                _finish_platform('x', '엑스(X)', '엑스', x_ok, exc_obj=x_exc, err_tb=x_tb)
 
         if _is_stop_requested(my_run_id):
             log('🛑 [작업 중지 완료] 사용자 요청으로 남은 업로드를 모두 취소했습니다.')
         else:
-            if video_path and os.path.exists(video_path):
+            if not test_mode and video_path and os.path.exists(video_path):
                 shutil.copy2(video_path, os.path.join(DONE_DIR, os.path.basename(video_path)))
                 log('📁 완료된 영상 done 폴더 백업 완료!')
             with STATE_LOCK:
                 run_results = dict(STATE.get('last_results', {})) if STATE['active_run_id'] == my_run_id else {}
             had_failed = any(not bool(v.get('ok')) for v in run_results.values())
             if had_failed:
-                log('⚠️ 일부 플랫폼 업로드에서 오류가 발생했습니다.')
+                log('⚠️ 일부 플랫폼 작업에서 오류 또는 건너뜀이 발생했습니다.')
                 log('💡 플랫폼 화면이 바뀌었나요? 상단 [🔄 업데이트 확인] 또는 하단 [💬 질문·소통방]을 확인하세요.')
             else:
-                log('🎉 선택한 플랫폼 작업이 모두 완료되었습니다!')
+                log('🎉 선택한 플랫폼 테스트가 모두 완료되었습니다!' if test_mode else '🎉 선택한 플랫폼 작업이 모두 완료되었습니다!')
     except Exception as e:
+        top_level_exc = e
+        top_level_tb = traceback.format_exc()
         if not _is_stop_requested(my_run_id):
             log(f'⚠️ 업로드 중 오류 발생: {e}')
             log('💡 플랫폼 화면이 바뀌었나요? 상단 [🔄 업데이트 확인] 또는 하단 [💬 질문·소통방]을 확인하세요.')
     finally:
+        was_stopped = _is_stop_requested(my_run_id)
+        set_active_diagnostics_platform('')
         with STATE_LOCK:
+            force_stop_merging = bool(STATE.get('force_stop_merging'))
             if STATE['active_run_id'] == my_run_id:
                 STATE['busy'] = False
                 STATE['stop_requested'] = False
+                STATE['current_platform_key'] = ''
+                STATE['current_platform_label'] = ''
+                STATE['skip_platform_key'] = ''
             elif not STATE['busy']:
                 STATE['stop_requested'] = False
             if ACTIVE_WORKER_THREAD is threading.current_thread():
                 ACTIVE_WORKER_THREAD = None
-        clean_and_unify_blackbox_files(clear_thumbs=naver_completed)
+
+        # 매 실행 종료 시(성공·실패·건너뜀·강제 중지·테스트 모드 포함) 항상 report.md 최신 리포트 저장
+        final_report_items = []
+        now_end_dt = datetime.datetime.now()
+        now_end_str = now_end_dt.strftime('%Y-%m-%d %H:%M:%S')
+        for pkey, plabel, _ in selected_platforms:
+            rec = platform_records.get(pkey)
+            if rec is not None:
+                final_report_items.append(rec)
+            else:
+                final_report_items.append({
+                    'key': pkey,
+                    'label': plabel,
+                    'status': '중단' if was_stopped else '실패',
+                    'msg': '강제 중지(미실행)' if was_stopped else '실행되지 않음',
+                    'url': '',
+                    'error': '사용자 강제 중지 요청으로 미실행' if was_stopped else (f'{type(top_level_exc).__name__}: {top_level_exc}' if top_level_exc else '예기치 않은 중단'),
+                    'traceback': top_level_tb or ('Stopped by user before execution' if was_stopped else 'Not executed'),
+                    'buttons': [],
+                    'captured_at': now_end_str,
+                })
+        if top_level_exc is not None and not any(x.get('status') == '실패' for x in final_report_items):
+            final_report_items.append({
+                'key': 'system',
+                'label': '공통 실행기',
+                'status': '실패',
+                'msg': str(top_level_exc)[:80],
+                'url': '',
+                'error': f'{type(top_level_exc).__name__}: {top_level_exc}',
+                'traceback': top_level_tb or str(top_level_exc),
+                'buttons': [],
+                'captured_at': now_end_str,
+            })
+        if write_run_report(
+            final_report_items,
+            mode_label=mode_label,
+            video_name=vn,
+            start_dt=run_start_dt,
+            end_dt=now_end_dt,
+            stopped_by_user=was_stopped,
+        ):
+            log('📝 [실행 리포트 저장] report.md에 이번 작업 결과를 기록했습니다.')
+
+        # 강제 중지 경로가 아닌 일반 완료 시 여기서 FFmpeg 단일 MP4 합본 저장
+        # (강제 중지 시에는 force_stop_active_task가 완료 로그 직후 합본 저장)
+        if not force_stop_merging:
+            _finalize_blackbox_session_merge_once()
+            clean_and_unify_blackbox_files(clear_thumbs=(False if test_mode else naver_completed))
+
+def get_done_storage_info():
+    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox_upload/ 폴더의 합산 용량 및 파일 개수 계산"""
+    total_bytes = 0
+    file_count = 0
+    for target_dir, exclude_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, set())):
+        if not os.path.isdir(target_dir):
+            continue
+        for root, _, files in os.walk(target_dir):
+            for fname in files:
+                if root == target_dir and fname in exclude_names:
+                    continue
+                fp = os.path.join(root, fname)
+                try:
+                    if os.path.isfile(fp):
+                        total_bytes += os.path.getsize(fp)
+                        file_count += 1
+                except Exception:
+                    pass
+    total_mb = round(total_bytes / (1024.0 * 1024.0), 1)
+    over_1gb = total_bytes >= (1024 * 1024 * 1024)
+    return {
+        'ok': True,
+        'total_bytes': total_bytes,
+        'total_mb': total_mb,
+        'file_count': file_count,
+        'over_1gb': over_1gb,
+    }
+
+
+def clear_done_and_thumbs():
+    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox_upload/ 폴더 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
+    with STATE_LOCK:
+        is_busy = STATE.get('busy')
+    if is_busy:
+        return {'ok': False, 'msg': '업로드/점검 작업이 진행 중입니다. 작업이 끝난 뒤 파일 비우기를 실행해 주세요.'}
+
+    before = get_done_storage_info()
+    removed_count = 0
+    for target_dir, keep_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, set())):
+        if not os.path.isdir(target_dir):
+            continue
+        for entry in list(os.listdir(target_dir)):
+            if entry in keep_names:
+                continue
+            ep = os.path.join(target_dir, entry)
+            try:
+                if os.path.isdir(ep):
+                    for _, _, sub_files in os.walk(ep):
+                        removed_count += len(sub_files)
+                    shutil.rmtree(ep, ignore_errors=True)
+                elif os.path.isfile(ep) or os.path.islink(ep):
+                    os.remove(ep)
+                    removed_count += 1
+            except Exception:
+                pass
+
+    after = get_done_storage_info()
+    freed_mb = round(max(0.0, (before['total_bytes'] - after['total_bytes']) / (1024.0 * 1024.0)), 1)
+    log(f"🗑️ [완료 파일 비우기] done/temp_thumbs/blackbox_upload 파일 {removed_count}개 삭제 ({freed_mb}MB 확보) — 로그인·대기 파일 안전 보호됨")
+    return {
+        'ok': True,
+        'removed_count': removed_count,
+        'freed_mb': freed_mb,
+        'storage': after,
+        'msg': f"완료·임시·블랙박스 파일 {removed_count}개({freed_mb}MB)를 깔끔하게 비웠습니다! (로그인 정보·대기 파일 안전 유지)",
+    }
+
+
+HISTORY_FIELDS = (
+    'source_text',
+    'naver_title', 'naver_body', 'naver_tags', 'naver_category',
+    'clip_title', 'clip_body', 'clip_tags',
+    'yt_title', 'yt_body', 'yt_tags',
+    'tt_title', 'tt_body', 'tt_tags',
+    'ig_body', 'ig_tags',
+    'pin_title', 'pin_body', 'pin_tags',
+    'threads_body', 'threads_tags',
+    'daangn_title', 'daangn_body',
+    'x_body', 'x_tags',
+)
+
+
+def _norm_history_text(val):
+    """기록 중복 판별용 문자열 정규화 (줄바꿈 통일 + 앞뒤 공백 제거)"""
+    return str(val or '').replace('\r\n', '\n').replace('\r', '\n').strip()
+
+
+def _history_dedup_key(rec):
+    """지난 기록 항목의 (대표 제목, 대표 본문) 앞뒤 공백 제거 기준 중복 판별 키 반환"""
+    if not isinstance(rec, dict):
+        return ('', '')
+    title = _norm_history_text(
+        rec.get('naver_title')
+        or rec.get('yt_title')
+        or rec.get('youtube_title')
+        or rec.get('clip_title')
+        or rec.get('daangn_title')
+        or ''
+    )
+    body = _norm_history_text(
+        rec.get('naver_body')
+        or rec.get('yt_body')
+        or rec.get('youtube_body')
+        or rec.get('ig_body')
+        or rec.get('instagram_body')
+        or rec.get('source_text')
+        or ''
+    )
+    return (title, body)
+
+
+HISTORY_PLATFORM_ORDER = ('yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'daangn', 'x')
+HISTORY_PLATFORM_ALIASES = {
+    'yt': 'yt', 'youtube': 'yt', 'youtube_shorts': 'yt',
+    'naver': 'naver', 'naver_blog': 'naver', 'blog': 'naver',
+    'clip': 'clip', 'naver_clip': 'clip',
+    'tt': 'tt', 'tiktok': 'tt',
+    'ig': 'ig', 'instagram': 'ig', 'reels': 'ig',
+    'pin': 'pin', 'pinterest': 'pin',
+    'threads': 'threads',
+    'daangn': 'daangn', 'karrot': 'daangn',
+    'x': 'x', 'twitter': 'x',
+}
+
+
+def _normalize_platform_key(raw_key):
+    s = str(raw_key or '').strip().lower()
+    return HISTORY_PLATFORM_ALIASES.get(s, '')
+
+
+def _normalize_uploaded_platforms(raw_list):
+    """기록의 uploaded_platforms 배열을 표준 9개 플랫폼 키 순서로 중복 제거·정규화 (없는 경우 빈 배열 반환)"""
+    if not isinstance(raw_list, (list, tuple, set)):
+        return []
+    seen = set()
+    for item in raw_list:
+        k = _normalize_platform_key(item)
+        if k:
+            seen.add(k)
+    return [k for k in HISTORY_PLATFORM_ORDER if k in seen]
+
+
+def build_history_record(raw_data, video_name='', source_text=None):
+    """미리보기 변환 결과 또는 업로드 요청 페이로드를 done/history.json 표준 레코드 형식으로 정규화"""
+    src = raw_data if isinstance(raw_data, dict) else {}
+    alias_map = {
+        'yt_title': ('yt_title', 'youtube_title'),
+        'yt_body': ('yt_body', 'youtube_body'),
+        'yt_tags': ('yt_tags', 'youtube_tags'),
+        'tt_title': ('tt_title', 'tiktok_title'),
+        'tt_body': ('tt_body', 'tiktok_body'),
+        'tt_tags': ('tt_tags', 'tiktok_tags'),
+        'ig_body': ('ig_body', 'instagram_body'),
+        'ig_tags': ('ig_tags', 'instagram_tags'),
+    }
+    now = datetime.datetime.now()
+    rec = {
+        'id': now.strftime('%Y%m%d_%H%M%S'),
+        'date': now.strftime('%Y-%m-%d %H:%M'),
+        'video_name': os.path.basename(video_name) if video_name else '',
+        'uploaded_platforms': _normalize_uploaded_platforms(src.get('uploaded_platforms')),
+    }
+    for k in HISTORY_FIELDS:
+        if k == 'source_text' and source_text is not None:
+            val = source_text
+        elif k in alias_map:
+            val = ''
+            for ak in alias_map[k]:
+                if src.get(ak) not in (None, ''):
+                    val = src.get(ak)
+                    break
+        else:
+            val = src.get(k, '')
+        rec[k] = normalize_branch_name(val) if isinstance(val, str) else val
+    return rec
+
+
+def save_history_record(rec):
+    """done/history.json에 기록 저장 (제목+본문 앞뒤 공백 제거 기준 완전 동일 항목이 이미 있으면 중복 저장 건너뜀)"""
+    new_key = _history_dedup_key(rec)
+    if new_key == ('', ''):
+        return {'saved': False, 'duplicate': False, 'empty': True, 'id': ''}
+
+    hf = os.path.join(DONE_DIR, 'history.json')
+    with HISTORY_LOCK:
+        hl = []
+        if os.path.exists(hf):
+            try:
+                with open(hf, 'r', encoding='utf-8') as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, list):
+                    hl = loaded
+            except Exception:
+                hl = []
+
+        for existing in hl:
+            if _history_dedup_key(existing) == new_key:
+                return {
+                    'saved': False,
+                    'duplicate': True,
+                    'empty': False,
+                    'id': str(existing.get('id', '')),
+                    'uploaded_platforms': _normalize_uploaded_platforms(existing.get('uploaded_platforms')),
+                }
+
+        existing_ids = {str(it.get('id', '')) for it in hl if isinstance(it, dict)}
+        base_id = str(rec.get('id') or datetime.datetime.now().strftime('%Y%m%d_%H%M%S'))
+        cand_id = base_id
+        suffix = 1
+        while cand_id in existing_ids:
+            cand_id = f"{base_id}_{suffix}"
+            suffix += 1
+        rec['id'] = cand_id
+        rec['uploaded_platforms'] = _normalize_uploaded_platforms(rec.get('uploaded_platforms'))
+
+        hl.insert(0, rec)
+        os.makedirs(DONE_DIR, exist_ok=True)
+        tmp_hf = f"{hf}.tmp"
+        with open(tmp_hf, 'w', encoding='utf-8') as f:
+            json.dump(hl[:50], f, ensure_ascii=False, indent=2)
+        os.replace(tmp_hf, hf)
+        return {
+            'saved': True,
+            'duplicate': False,
+            'empty': False,
+            'id': cand_id,
+            'uploaded_platforms': list(rec['uploaded_platforms']),
+        }
+
+
+def get_history_uploaded_platforms(history_id='', fallback_rec=None):
+    """특정 히스토리 항목의 기존 uploaded_platforms 목록 조회 (과거 기록에 필드가 없으면 빈 배열 반환)"""
+    hf = os.path.join(DONE_DIR, 'history.json')
+    if not os.path.exists(hf):
+        return []
+    hid = str(history_id or '').strip()
+    fb_key = _history_dedup_key(fallback_rec) if isinstance(fallback_rec, dict) else ('', '')
+    with HISTORY_LOCK:
+        try:
+            with open(hf, 'r', encoding='utf-8') as f:
+                hl = json.load(f)
+            if not isinstance(hl, list):
+                return []
+        except Exception:
+            return []
+        target = None
+        if hid:
+            target = next((it for it in hl if isinstance(it, dict) and str(it.get('id', '')) == hid), None)
+        if target is None and fb_key != ('', ''):
+            target = next((it for it in hl if isinstance(it, dict) and _history_dedup_key(it) == fb_key), None)
+        return _normalize_uploaded_platforms(target.get('uploaded_platforms')) if isinstance(target, dict) else []
+
+
+def record_history_uploaded_platform(history_id, platform_key, fallback_rec=None):
+    """업로드 성공한 플랫폼 키를 해당 히스토리 항목의 uploaded_platforms에 중복 없이 누적 저장"""
+    norm_key = _normalize_platform_key(platform_key)
+    if not norm_key:
+        return None
+    hf = os.path.join(DONE_DIR, 'history.json')
+    hid = str(history_id or '').strip()
+    fb_key = _history_dedup_key(fallback_rec) if isinstance(fallback_rec, dict) else ('', '')
+    with HISTORY_LOCK:
+        hl = []
+        if os.path.exists(hf):
+            try:
+                with open(hf, 'r', encoding='utf-8') as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, list):
+                    hl = loaded
+            except Exception:
+                hl = []
+
+        target = None
+        if hid:
+            target = next((it for it in hl if isinstance(it, dict) and str(it.get('id', '')) == hid), None)
+        if target is None and fb_key != ('', ''):
+            target = next((it for it in hl if isinstance(it, dict) and _history_dedup_key(it) == fb_key), None)
+        if target is None:
+            return None
+
+        cur_list = _normalize_uploaded_platforms(target.get('uploaded_platforms'))
+        if norm_key not in cur_list:
+            cur_list = _normalize_uploaded_platforms(cur_list + [norm_key])
+            target['uploaded_platforms'] = cur_list
+            os.makedirs(DONE_DIR, exist_ok=True)
+            tmp_hf = f"{hf}.tmp"
+            with open(tmp_hf, 'w', encoding='utf-8') as f:
+                json.dump(hl[:50], f, ensure_ascii=False, indent=2)
+            os.replace(tmp_hf, hf)
+        else:
+            target['uploaded_platforms'] = cur_list
+        return list(cur_list)
+
+
+def delete_history_records(ids):
+    """done/history.json에서 선택한 ID의 업로드 기록만 안전하게 삭제"""
+    if not isinstance(ids, list) or not ids:
+        return {'ok': False, 'msg': '삭제할 기록을 선택해 주세요.'}
+    id_set = {str(x) for x in ids if x is not None and str(x).strip()}
+    hf = os.path.join(DONE_DIR, 'history.json')
+    if not os.path.exists(hf):
+        return {'ok': True, 'deleted': 0, 'history': []}
+    try:
+        with open(hf, 'r', encoding='utf-8') as f:
+            hist = json.load(f)
+        if not isinstance(hist, list):
+            hist = []
+    except Exception:
+        hist = []
+    remaining = [it for it in hist if str(it.get('id', '')) not in id_set]
+    deleted = len(hist) - len(remaining)
+    os.makedirs(DONE_DIR, exist_ok=True)
+    with open(hf, 'w', encoding='utf-8') as f:
+        json.dump(remaining, f, ensure_ascii=False, indent=2)
+    return {'ok': True, 'deleted': deleted, 'history': remaining}
+
 
 class AppHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args): pass
@@ -2685,8 +4303,80 @@ class AppHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def do_GET(self):
+    def _stream_video_file(self, fpath, head_only=False):
+        if not fpath or not os.path.isfile(fpath):
+            self.send_error(404, 'Video Not Found')
+            return
+        file_size = os.path.getsize(fpath)
+        if file_size <= 0:
+            self.send_error(404, 'Video Empty')
+            return
+        ext = os.path.splitext(fpath)[1].lower()
+        if ext == '.mp4':
+            ctype = 'video/mp4'
+        elif ext == '.mov':
+            ctype = 'video/quicktime'
+        else:
+            ctype = mimetypes.guess_type(fpath)[0] or 'video/mp4'
+        range_hdr = self.headers.get('Range')
+        start_b, end_b = 0, file_size - 1
+        status_code = 200
+        if range_hdr and range_hdr.startswith('bytes='):
+            try:
+                r_spec = range_hdr.split('=', 1)[1].split(',')[0].strip()
+                p1, p2 = r_spec.split('-', 1)
+                if p1:
+                    start_b = int(p1)
+                    end_b = int(p2) if p2 else file_size - 1
+                else:
+                    suffix_len = int(p2)
+                    start_b = max(0, file_size - suffix_len)
+                    end_b = file_size - 1
+                start_b = max(0, min(start_b, file_size - 1))
+                end_b = max(start_b, min(end_b, file_size - 1))
+                status_code = 206
+            except Exception:
+                start_b, end_b, status_code = 0, file_size - 1, 200
+        chunk_len = (end_b - start_b) + 1
+        self.send_response(status_code)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Accept-Ranges', 'bytes')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('Content-Length', str(chunk_len))
+        if status_code == 206:
+            self.send_header('Content-Range', f'bytes {start_b}-{end_b}/{file_size}')
+        self.end_headers()
+        if head_only:
+            return
+        try:
+            with open(fpath, 'rb') as vf:
+                vf.seek(start_b)
+                remaining = chunk_len
+                while remaining > 0:
+                    buf = vf.read(min(65536, remaining))
+                    if not buf:
+                        break
+                    self.wfile.write(buf)
+                    remaining -= len(buf)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def do_HEAD(self):
         clean_path = self.path.split('?')[0]
+        if clean_path.startswith('/video/'):
+            fname = os.path.basename(unquote(clean_path[len('/video/'):]))
+            self._stream_video_file(os.path.join(UPLOAD_DIR, fname), head_only=True)
+        elif clean_path.startswith('/preview_video/'):
+            fname = os.path.basename(unquote(clean_path[len('/preview_video/'):]))
+            self._stream_video_file(os.path.join(THUMB_DIR, fname), head_only=True)
+        else:
+            self.send_response(200)
+            self.end_headers()
+
+    def do_GET(self):
+        parsed_url = urlsplit(self.path)
+        clean_path = parsed_url.path
+        qs = parse_qs(parsed_url.query)
         if clean_path == '/':
             with open(UI_FILE, 'rb') as f:
                 html = f.read()
@@ -2696,7 +4386,7 @@ class AppHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(html)
         elif clean_path == '/favicon.ico':
-            ico_path = os.path.join(BASE_DIR, 'planh_uploader.ico')
+            ico_path = os.path.join(BASE_DIR, 'salon_uploader.ico')
             if os.path.isfile(ico_path):
                 with open(ico_path, 'rb') as f:
                     ico_data = f.read()
@@ -2708,6 +4398,46 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.wfile.write(ico_data)
             else:
                 self.send_error(404, 'Icon Not Found')
+        elif clean_path == '/favicon.png':
+            fav_path = os.path.join(BASE_DIR, 'favicon.png')
+            fav_data = b''
+            if os.path.isfile(fav_path) and os.path.getsize(fav_path) > 100:
+                with open(fav_path, 'rb') as f:
+                    fav_data = f.read()
+            else:
+                # favicon.png 누락 시 salon_uploader.ico 내부 PNG 프레임에서 자동 복구
+                ico_path = os.path.join(BASE_DIR, 'salon_uploader.ico')
+                if os.path.isfile(ico_path):
+                    try:
+                        with open(ico_path, 'rb') as f:
+                            raw_ico = f.read()
+                        if len(raw_ico) >= 6:
+                            _, _, cnt = struct.unpack_from('<HHH', raw_ico, 0)
+                            best_area = -1
+                            for idx_f in range(cnt):
+                                off_dir = 6 + idx_f * 16
+                                if off_dir + 16 > len(raw_ico):
+                                    break
+                                w, h, _, _, _, _, sz, off = struct.unpack_from('<BBBBHHII', raw_ico, off_dir)
+                                rw, rh = (256 if w == 0 else w), (256 if h == 0 else h)
+                                chunk = raw_ico[off:off + sz]
+                                if chunk.startswith(b'\x89PNG\r\n\x1a\n') and (rw * rh > best_area):
+                                    best_area = rw * rh
+                                    fav_data = chunk
+                        if fav_data:
+                            with open(fav_path, 'wb') as out_f:
+                                out_f.write(fav_data)
+                    except Exception:
+                        fav_data = b''
+            if fav_data:
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/png')
+                self.send_header('Content-Length', str(len(fav_data)))
+                self.send_header('Cache-Control', 'public, max-age=86400')
+                self.end_headers()
+                self.wfile.write(fav_data)
+            else:
+                self.send_error(404, 'Favicon Not Found')
         elif clean_path.startswith('/thumbs/'):
             fname = os.path.basename(unquote(clean_path))
             fpath = os.path.join(THUMB_DIR, fname)
@@ -2726,51 +4456,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_error(404, 'Thumb Not Found')
         elif clean_path.startswith('/video/'):
             fname = os.path.basename(unquote(clean_path[len('/video/'):]))
-            fpath = os.path.join(UPLOAD_DIR, fname)
-            if not os.path.isfile(fpath):
-                self.send_error(404, 'Video Not Found')
-                return
-            file_size = os.path.getsize(fpath)
-            ctype = mimetypes.guess_type(fpath)[0] or 'video/mp4'
-            range_hdr = self.headers.get('Range')
-            start_b, end_b = 0, file_size - 1
-            status_code = 200
-            if range_hdr and range_hdr.startswith('bytes='):
-                try:
-                    r_spec = range_hdr.split('=', 1)[1].split(',')[0].strip()
-                    p1, p2 = r_spec.split('-', 1)
-                    if p1:
-                        start_b = int(p1)
-                        end_b = int(p2) if p2 else file_size - 1
-                    else:
-                        suffix_len = int(p2)
-                        start_b = max(0, file_size - suffix_len)
-                        end_b = file_size - 1
-                    start_b = max(0, min(start_b, file_size - 1))
-                    end_b = max(start_b, min(end_b, file_size - 1))
-                    status_code = 206
-                except Exception:
-                    start_b, end_b, status_code = 0, file_size - 1, 200
-            chunk_len = (end_b - start_b) + 1
-            self.send_response(status_code)
-            self.send_header('Content-Type', ctype)
-            self.send_header('Accept-Ranges', 'bytes')
-            self.send_header('Content-Length', str(chunk_len))
-            if status_code == 206:
-                self.send_header('Content-Range', f'bytes {start_b}-{end_b}/{file_size}')
-            self.end_headers()
-            try:
-                with open(fpath, 'rb') as vf:
-                    vf.seek(start_b)
-                    remaining = chunk_len
-                    while remaining > 0:
-                        buf = vf.read(min(65536, remaining))
-                        if not buf:
-                            break
-                        self.wfile.write(buf)
-                        remaining -= len(buf)
-            except (BrokenPipeError, ConnectionResetError):
-                pass
+            self._stream_video_file(os.path.join(UPLOAD_DIR, fname), head_only=False)
+        elif clean_path.startswith('/preview_video/'):
+            fname = os.path.basename(unquote(clean_path[len('/preview_video/'):]))
+            self._stream_video_file(os.path.join(THUMB_DIR, fname), head_only=False)
         elif clean_path == '/api/status':
             with STATE_LOCK:
                 status_payload = {
@@ -2778,6 +4467,12 @@ class AppHandler(BaseHTTPRequestHandler):
                     'logs': list(STATE['logs']),
                     'has_backup': has_backup_files(),
                     'last_results': dict(STATE.get('last_results', {})),
+                    'active_history_id': str(STATE.get('active_history_id', '')),
+                    'active_uploaded_platforms': list(STATE.get('active_uploaded_platforms', [])),
+                    'current_platform_key': str(STATE.get('current_platform_key', '')),
+                    'current_platform_label': str(STATE.get('current_platform_label', '')),
+                    'is_test_mode': bool(STATE.get('is_test_mode', False)),
+                    'auth_check_seq': int(STATE.get('auth_check_seq', 0)),
                 }
             self.send_json(status_payload)
         elif clean_path == '/api/profile':
@@ -2791,7 +4486,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 'is_configured': is_profile_ready(prof),
             })
         elif clean_path == '/api/setup_status':
-            self.send_json(get_setup_status())
+            deep_flag = str((qs.get('deep') or ['0'])[0]).strip().lower() in ('1', 'true', 'yes')
+            self.send_json(get_setup_status(deep=deep_flag))
         elif clean_path == '/api/quota_status':
             self.send_json(get_quota_status())
         elif clean_path == '/version.json':
@@ -2800,12 +4496,20 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({'ok': True, 'info': load_release_info()})
         elif clean_path == '/api/check_update':
             self.send_json(check_public_update(timeout=4))
+        elif clean_path == '/api/storage_info':
+            self.send_json(get_done_storage_info())
         elif clean_path == '/api/history':
             hf = os.path.join(DONE_DIR, 'history.json')
             hist = []
             if os.path.exists(hf):
                 with open(hf, 'r', encoding='utf-8') as f:
-                    hist = json.load(f)
+                    raw_hist = json.load(f)
+                if isinstance(raw_hist, list):
+                    for it in raw_hist:
+                        if isinstance(it, dict):
+                            item_copy = dict(it)
+                            item_copy['uploaded_platforms'] = _normalize_uploaded_platforms(it.get('uploaded_platforms'))
+                            hist.append(item_copy)
             self.send_json({'history': hist})
         else:
             self.send_error(404, 'Not Found')
@@ -2836,6 +4540,10 @@ class AppHandler(BaseHTTPRequestHandler):
             if idx + 1 >= total:
                 log(f'📎 영상 첨부 완료: {fn}')
                 resp_obj['video_meta'] = probe_video_metadata(sp)
+                prev_info = ensure_browser_preview_video(sp)
+                resp_obj['preview_url'] = prev_info.get('preview_url', '')
+                resp_obj['preview_transcoded'] = bool(prev_info.get('transcoded', False))
+                resp_obj['preview_codec'] = prev_info.get('codec', '')
             return self.send_json(resp_obj)
 
         l = int(self.headers.get('Content-Length', 0))
@@ -2844,6 +4552,24 @@ class AppHandler(BaseHTTPRequestHandler):
 
         if self.path == '/api/stop':
             self.send_json(force_stop_active_task())
+        elif self.path == '/api/skip_platform':
+            self.send_json(skip_current_platform())
+        elif self.path == '/api/logout_platform':
+            with STATE_LOCK:
+                is_busy = bool(STATE.get('busy'))
+            if is_busy:
+                return self.send_json({
+                    'ok': False,
+                    'msg': '업로드 또는 로그인 점검 작업이 진행 중입니다. 작업이 끝난 뒤 로그아웃해 주세요.',
+                })
+            plat_key = str(req.get('platform') or '').strip().lower()
+            res = logout_platform_session(plat_key)
+            if res.get('ok'):
+                log(f"🚪 [로그아웃] {res.get('msg')}")
+            else:
+                log(f"⚠️ [로그아웃 실패] {res.get('msg')}")
+            res['status'] = get_setup_status(deep=False)
+            self.send_json(res)
         elif self.path == '/api/profile':
             is_draft = bool(req.get('is_draft', False))
             saved = save_profile(req, is_draft=is_draft)
@@ -2862,6 +4588,10 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(reset_personal_data(req.get('confirm_text', '')))
         elif self.path == '/api/cleanup':
             self.send_json(handle_cleanup(req.get('action')))
+        elif self.path == '/api/clear_done':
+            self.send_json(clear_done_and_thumbs())
+        elif self.path == '/api/history/delete':
+            self.send_json(delete_history_records(req.get('ids', [])))
         elif self.path == '/api/apply_update':
             with STATE_LOCK:
                 is_busy = STATE['busy']
@@ -2883,8 +4613,10 @@ class AppHandler(BaseHTTPRequestHandler):
             r = next((it for it in hist_list if it.get('id') == req.get('id')), None)
             if not r: return self.send_json({'success': False, 'error': '없음'})
             r = {k: (normalize_branch_name(v) if isinstance(v, str) else v) for k, v in r.items()}
+            r['uploaded_platforms'] = _normalize_uploaded_platforms(r.get('uploaded_platforms'))
             vn = r.get('video_name')
             video_meta = None
+            prev_info = {}
             if vn and os.path.exists(os.path.join(DONE_DIR, vn)):
                 dst = os.path.join(UPLOAD_DIR, vn)
                 shutil.copy2(os.path.join(DONE_DIR, vn), dst)
@@ -2892,7 +4624,21 @@ class AppHandler(BaseHTTPRequestHandler):
                     STATE['video_path'] = dst
                     STATE['video_name'] = vn
                 video_meta = probe_video_metadata(dst)
-            self.send_json({'success': True, 'record': r, 'video_meta': video_meta})
+                prev_info = ensure_browser_preview_video(dst)
+            self.send_json({
+                'success': True,
+                'record': r,
+                'video_meta': video_meta,
+                'preview_url': prev_info.get('preview_url', ''),
+                'preview_transcoded': bool(prev_info.get('transcoded', False)),
+            })
+        elif self.path == '/api/ensure_preview':
+            with STATE_LOCK:
+                state_vn = STATE.get('video_name', '')
+                state_vp = STATE.get('video_path', '')
+            vn = req.get('video_name') or state_vn
+            vp = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
+            self.send_json(ensure_browser_preview_video(vp))
         elif self.path == '/api/capture_frame':
             with STATE_LOCK:
                 state_vn = STATE.get('video_name', '')
@@ -2900,6 +4646,22 @@ class AppHandler(BaseHTTPRequestHandler):
             vn = req.get('video_name') or state_vn
             vp = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
             self.send_json(capture_frame_at_time(vp, req.get('time_sec', 0.0)))
+        elif self.path == '/api/extract_thumbnails':
+            with STATE_LOCK:
+                state_vn = STATE.get('video_name', '')
+                state_vp = STATE.get('video_path', '')
+            vn = req.get('video_name') or state_vn
+            vp = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
+            try:
+                cnt = max(1, min(10, int(req.get('count', 4) or 4)))
+            except Exception:
+                cnt = 4
+            prefix = str(req.get('prefix') or 'daangn_thumb_').strip() or 'daangn_thumb_'
+            if not vp or not os.path.exists(vp):
+                self.send_json({'ok': False, 'msg': '첨부된 영상 파일을 찾을 수 없습니다.', 'thumbnails': []})
+            else:
+                thumbs = extract_10_thumbnails(vp, count=cnt, prefix=prefix)
+                self.send_json({'ok': bool(thumbs), 'thumbnails': thumbs, 'msg': f'사진 {len(thumbs)}장을 추출했습니다.' if thumbs else '영상에서 사진을 추출하지 못했습니다.'})
         elif self.path == '/api/create_gif':
             with STATE_LOCK:
                 state_vn = STATE.get('video_name', '')
@@ -2916,12 +4678,30 @@ class AppHandler(BaseHTTPRequestHandler):
                 vp = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
                 thumbs = extract_10_thumbnails(vp, count=10) if (vp and os.path.exists(vp)) else []
                 v_meta = probe_video_metadata(vp) if (vp and os.path.exists(vp)) else None
+                prev_info = ensure_browser_preview_video(vp) if (vp and os.path.exists(vp)) else {}
                 converted = convert_master_content(req.get('data_text', ''), vn)
+                save_history_flag = bool(req.get('save_history', False))
+                history_res = {'saved': False, 'duplicate': False}
+                if save_history_flag:
+                    try:
+                        rec = build_history_record(converted, video_name=vn, source_text=req.get('data_text', ''))
+                        history_res = save_history_record(rec)
+                        if history_res.get('saved'):
+                            log('💾 [지난 기록 저장] 미리보기 생성 결과를 지난 기록에 저장했습니다.')
+                        elif history_res.get('duplicate'):
+                            log('ℹ️ [중복 기록 건너뜀] 동일한 제목·본문이 이미 지난 기록에 있어 저장을 건너뛰었습니다.')
+                    except Exception:
+                        pass
                 self.send_json({
                     'ok': True,
                     'data': converted,
                     'thumbnails': thumbs,
-                    'video_meta': v_meta
+                    'video_meta': v_meta,
+                    'preview_url': prev_info.get('preview_url', ''),
+                    'preview_transcoded': bool(prev_info.get('transcoded', False)),
+                    'history_saved': bool(history_res.get('saved')),
+                    'history_duplicate': bool(history_res.get('duplicate')),
+                    'history_id': str(history_res.get('id') or ''),
                 })
             except Exception as e:
                 log(f'⚠️ [미리보기 변환 오류] {e}')
@@ -2947,22 +4727,23 @@ class AppHandler(BaseHTTPRequestHandler):
                 is_busy = STATE['busy']
                 state_vn = STATE['video_name']
             if is_busy: return self.send_json({'ok': False, 'msg': '이미 업로드가 진행 중입니다. 중지하려면 우측 상단 [🛑 강제 중지] 버튼을 눌러주세요.'})
-            try:
-                hf = os.path.join(DONE_DIR, 'history.json')
-                hl = []
-                if os.path.exists(hf):
-                    with open(hf, 'r', encoding='utf-8') as f:
-                        hl = json.load(f)
-                vn = req.get('video_name') or state_vn
-                rec = {'id': datetime.datetime.now().strftime('%Y%m%d_%H%M%S'), 'date': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'video_name': os.path.basename(vn) if vn else ''}
-                for k in ['source_text', 'naver_title', 'naver_body', 'naver_tags', 'naver_category', 'clip_title', 'clip_body', 'clip_tags', 'yt_title', 'yt_body', 'yt_tags', 'tt_title', 'tt_body', 'tt_tags', 'ig_body', 'ig_tags', 'pin_title', 'pin_body', 'pin_tags', 'threads_body', 'threads_tags', 'daangn_title', 'daangn_body', 'x_body', 'x_tags']:
-                    rec[k] = normalize_branch_name(req.get(k, '')) if isinstance(req.get(k, ''), str) else req.get(k, '')
-                hl.insert(0, rec)
-                with open(hf, 'w', encoding='utf-8') as f:
-                    json.dump(hl[:50], f, ensure_ascii=False, indent=2)
-            except Exception: pass
+            is_test = bool(req.get('test_mode', False))
+            resolved_history_id = '' if is_test else str(req.get('history_id') or '').strip()
+            rec = None
+            if not is_test:
+                try:
+                    vn = req.get('video_name') or state_vn
+                    rec = build_history_record(req, video_name=vn)
+                    h_res = save_history_record(rec)
+                    if h_res.get('id'):
+                        resolved_history_id = str(h_res.get('id'))
+                    if h_res.get('duplicate'):
+                        log('ℹ️ [중복 기록 건너뜀] 동일한 제목·본문이 이미 지난 기록에 있어 중복 저장하지 않았습니다.')
+                except Exception: pass
+            req['_history_id'] = resolved_history_id
+            req['_history_rec'] = rec
             threading.Thread(target=worker_publish, args=(req,), daemon=True).start()
-            self.send_json({'ok': True})
+            self.send_json({'ok': True, 'history_id': resolved_history_id, 'test_mode': is_test})
         else:
             self.send_error(404, 'Not Found')
 
