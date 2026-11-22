@@ -156,25 +156,26 @@ def is_facebook_logged_in(page):
         return False
 
 
-def _attach_video_to_composer(page, video_path):
-    """원본 .mp4 파일을 페이스북/비즈니스 스위트 릴스 업로드 input[type="file"]에 안전 첨부"""
-    file_sels = [
-        'input[type="file"][accept*="video"]',
-        'input[type="file"]',
-    ]
-    for _ in range(10):
-        for sel in file_sels:
-            try:
-                loc = page.locator(sel)
-                cnt = loc.count()
-                if cnt > 0:
-                    loc.first.set_input_files(video_path)
-                    return True
-            except Exception:
-                pass
-        time.sleep(0.7)
+def _is_image_only_file_input(loc):
+    """input[type='file']의 accept 속성이 이미지 전용(예: image/*)이고 video/mp4를 허용하지 않으면 True 반환"""
+    try:
+        acc = (loc.get_attribute("accept") or "").strip().lower()
+    except Exception:
+        return False
+    if not acc:
+        return False
+    has_image = "image" in acc
+    has_video = ("video" in acc) or ("mp4" in acc) or ("quicktime" in acc) or ("*/*" in acc)
+    return has_image and not has_video
 
-    # 폴백: '동영상 추가 / Add video' 버튼 클릭으로 파일 선택기 트리거
+
+def _attach_video_to_composer(page, video_path):
+    """원본 .mp4 파일을 페이스북/비즈니스 스위트 릴스 업로드 input에 안전 첨부.
+    홈 화면의 숨겨진 사진 전용 input(accept='image/*')에 오첨부되어 Can't Read Files가 나는 버그를 원천 차단."""
+    video_input_sels = [
+        'input[type="file"][accept*="video"]',
+        'input[type="file"][accept*="mp4"]',
+    ]
     add_btn_sels = [
         'div[role="button"]:has-text("동영상 추가")',
         'button:has-text("동영상 추가")',
@@ -183,8 +184,26 @@ def _attach_video_to_composer(page, video_path):
         'button:has-text("Add video")',
         'span:has-text("Add video")',
         'div[role="button"]:has-text("영상 업로드")',
-        'button:has-text("Upload")',
+        'button:has-text("Upload video")',
     ]
+
+    # 1순위: video / mp4 전용 input[type="file"] 탐색 (최대 ~6초 대기)
+    for _ in range(8):
+        for sel in video_input_sels:
+            try:
+                loc = page.locator(sel)
+                cnt = loc.count()
+                for idx in range(cnt):
+                    cand = loc.nth(idx)
+                    if _is_image_only_file_input(cand):
+                        continue
+                    cand.set_input_files(video_path)
+                    return True
+            except Exception:
+                pass
+        time.sleep(0.7)
+
+    # 2순위: '동영상 추가 / Add video' 버튼 클릭 후 file chooser로 안전 첨부
     for sel in add_btn_sels:
         try:
             btn = page.locator(sel).first
@@ -195,6 +214,23 @@ def _attach_video_to_composer(page, video_path):
                 return True
         except Exception:
             pass
+
+    # 3순위 (엄격 조건부 폴백): 릴스 작성기 URL(reels_composer / /reels/create)이 확실히 확인되고,
+    # accept 속성이 이미지 전용이 아닌 일반 input[type="file"]에만 제한적 허용
+    cur_url = (page.url or "").lower()
+    if "reels_composer" in cur_url or "/reels/create" in cur_url:
+        try:
+            loc = page.locator('input[type="file"]')
+            cnt = loc.count()
+            for idx in range(cnt):
+                cand = loc.nth(idx)
+                if _is_image_only_file_input(cand):
+                    continue
+                cand.set_input_files(video_path)
+                return True
+        except Exception:
+            pass
+
     return False
 
 
@@ -409,12 +445,48 @@ def _select_facebook_business_page(page, target_page=""):
         return ""
 
 
-def _open_business_suite_reel_composer(page):
-    """메타 비즈니스 스위트에서 릴스 만들기 화면으로 안전 진입"""
-    cur_url = (page.url or "").lower()
-    if "reels_composer" in cur_url or "reel" in cur_url:
-        if is_any_locator_visible(page, 'input[type="file"], div[role="button"]:has-text("동영상 추가"), div[role="button"]:has-text("Add video")'):
+def _is_business_suite_reel_composer_ready(page):
+    """현재 페이지가 메타 비즈니스 스위트 홈(/latest/home)이 아닌 실제 릴스 작성 화면인지 엄격 판별"""
+    if page is None:
+        return False
+    try:
+        cur_url = (page.url or "").lower()
+    except Exception:
+        return False
+    if "reels_composer" in cur_url:
+        return True
+    if "/latest/home" in cur_url:
+        return False
+    try:
+        if page.locator('input[type="file"][accept*="video"], input[type="file"][accept*="mp4"]').count() > 0:
             return True
+    except Exception:
+        pass
+    try:
+        if is_any_locator_visible(page, 'div[role="button"]:has-text("동영상 추가"), button:has-text("동영상 추가"), div[role="button"]:has-text("Add video"), button:has-text("Add video")'):
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _build_business_suite_reels_composer_url(cur_url):
+    """현재 비즈니스 스위트 URL의 asset_id / business_id 쿼리를 유지한 reels_composer 직행 URL 생성"""
+    params = []
+    for key in ("business_id", "asset_id"):
+        m = re.search(rf"[?&]({key}=\d+)", str(cur_url or ""))
+        if m:
+            params.append(m.group(1))
+    qs = ("?" + "&".join(params)) if params else ""
+    return f"https://business.facebook.com/latest/reels_composer{qs}"
+
+
+def _open_business_suite_reel_composer(page):
+    """메타 비즈니스 스위트에서 릴스 만들기 화면으로 확실히 진입.
+    1) [릴스 만들기] 클릭 후 최대 8초간 실제 reels_composer 전환 검증
+    2) 홈 화면에 머물러 있으면 asset_id를 유지한 reels_composer 주소로 직접 이동해 100% 진입 보장"""
+    if _is_business_suite_reel_composer_ready(page):
+        return True
 
     reel_btn_sels = [
         'a[href*="reels_composer"]',
@@ -429,27 +501,39 @@ def _open_business_suite_reel_composer(page):
         'button:has-text("Create reel")',
         'span:text-is("Create reel")',
     ]
+    clicked_sel = ""
     for sel in reel_btn_sels:
         try:
             el = page.locator(sel).first
-            if el.count() > 0 and el.is_visible(timeout=1800):
+            if el.count() > 0 and el.is_visible(timeout=1500):
                 el.scroll_into_view_if_needed()
                 el.click(force=True)
-                print(f"🎬 [페이스북(매장)] 릴스 만들기 진입 ({sel})", flush=True)
-                time.sleep(3.0)
-                return True
+                clicked_sel = sel
+                print(f"🎬 [페이스북(매장)] 릴스 만들기 버튼 클릭 ({sel}) — 작성기 전환 확인 중...", flush=True)
+                break
         except Exception:
             pass
 
-    # 현재 URL의 asset_id 쿼리를 보존한 채 reels_composer 직접 이동 폴백
-    asset_param = ""
-    m_asset = re.search(r"[?&](asset_id=\d+)", page.url or "")
-    if m_asset:
-        asset_param = "?" + m_asset.group(1)
-    composer_url = f"https://business.facebook.com/latest/reels_composer{asset_param}"
+    if clicked_sel:
+        deadline = time.time() + 8.0
+        while time.time() < deadline:
+            if _is_business_suite_reel_composer_ready(page):
+                print("✅ [페이스북(매장)] 릴스 작성기(reels_composer) 전환 확인 완료!", flush=True)
+                time.sleep(1.5)
+                return True
+            time.sleep(0.5)
+        print("↪ [페이스북(매장)] 버튼 클릭 후 홈 화면 유지 감지 → reels_composer 주소로 직접 이동합니다.", flush=True)
+
+    # asset_id / business_id를 유지한 채 reels_composer 직접 이동으로 100% 진입 보장
+    composer_url = _build_business_suite_reels_composer_url(page.url or "")
     page.goto(composer_url, wait_until="domcontentloaded", timeout=45000)
-    time.sleep(3.5)
-    return True
+    deadline2 = time.time() + 8.0
+    while time.time() < deadline2:
+        if _is_business_suite_reel_composer_ready(page):
+            time.sleep(1.5)
+            return True
+        time.sleep(0.5)
+    return _is_business_suite_reel_composer_ready(page)
 
 
 def upload_to_facebook_personal(body="", tags=None, video_path=None, login_only=False, stop_checker=None, test_mode=False):

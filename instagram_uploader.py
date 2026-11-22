@@ -67,6 +67,120 @@ def is_instagram_logged_in(page):
     return page.locator(logged_in_sels).count() > 0
 
 
+def _is_ig_upload_modal_open(page):
+    """인스타그램 파일 선택 모달('컴퓨터에서 선택' 버튼 또는 열린 dialog 내부 input[type='file'])이 실제로 열렸는지 확인"""
+    try:
+        if is_any_locator_visible(
+            page,
+            'button:has-text("컴퓨터에서 선택"), button:has-text("Select from computer"), '
+            'div[role="dialog"]:has-text("새 게시물 만들기"), div[role="dialog"]:has-text("Create new post"), '
+            'div[role="dialog"]:has-text("사진과 동영상을 여기에 끌어다 놓으세요"), div[role="dialog"]:has-text("Drag photos and videos here")',
+        ):
+            return True
+    except Exception:
+        pass
+    try:
+        dlg = page.locator('div[role="dialog"]').first
+        if dlg.count() > 0 and dlg.is_visible(timeout=200):
+            if dlg.locator('input[type="file"]').count() > 0:
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _click_ig_post_submenu_if_visible(page):
+    """'+ 만들기' 클릭 후 드롭다운 하위 메뉴('게시물' / 'Post')가 나타나면 클릭하고 True 반환"""
+    submenu_sels = [
+        'div[role="menuitem"]:has-text("게시물")',
+        'a[role="link"]:has-text("게시물")',
+        'span:text-is("게시물")',
+        'div[role="menuitem"]:has-text("Post")',
+        'a[role="link"]:has-text("Post")',
+        'span:text-is("Post")',
+    ]
+    for sel in submenu_sels:
+        try:
+            loc = page.locator(sel)
+            cnt = loc.count()
+            for idx in range(cnt - 1, -1, -1):
+                el = loc.nth(idx)
+                if el.is_visible(timeout=400):
+                    el.click(force=True)
+                    time.sleep(1.2)
+                    return True
+        except Exception:
+            pass
+    return False
+
+
+def _open_instagram_create_modal(page):
+    """좌측 사이드바 '+ 만들기' 클릭 후 작성 모달 또는 '게시물' 하위 메뉴 노출을 검증하며 최대 3회 재시도"""
+    if _is_ig_upload_modal_open(page):
+        return True
+
+    trigger_groups = [
+        [
+            'a[role="link"]:has-text("만들기")',
+            'a[role="link"]:has-text("Create")',
+            'svg[aria-label="새로운 게시물"] >> xpath=ancestor::a[1]',
+            'svg[aria-label="New post"] >> xpath=ancestor::a[1]',
+        ],
+        [
+            'svg[aria-label="새로운 게시물"] >> xpath=ancestor::div[@role="button"][1]',
+            'svg[aria-label="New post"] >> xpath=ancestor::div[@role="button"][1]',
+            'svg[aria-label="만들기"] >> xpath=ancestor::a[1]',
+            'svg[aria-label="Create"] >> xpath=ancestor::a[1]',
+            'svg[aria-label="만들기"] >> xpath=ancestor::div[@role="button"][1]',
+        ],
+        [
+            'a:has-text("만들기")',
+            'a:has-text("Create")',
+            'div[role="button"]:has-text("만들기")',
+            'svg[aria-label="새로운 게시물"]',
+            'svg[aria-label="만들기"]',
+            'span:has-text("만들기")',
+            'span:has-text("Create")',
+        ],
+    ]
+
+    for attempt in range(3):
+        clicked = False
+        # 회차별로 우선순위 셀렉터 그룹을 순환해 첫 클릭 무반응 시 상위 클릭 가능 요소(ancestor::a / div[@role="button"])로 보강
+        ordered_sels = trigger_groups[attempt] + [s for gi, grp in enumerate(trigger_groups) if gi != attempt for s in grp]
+        for sel in ordered_sels:
+            try:
+                el = page.locator(sel).first
+                if el.count() > 0 and el.is_visible(timeout=1200):
+                    el.scroll_into_view_if_needed()
+                    el.click(force=(attempt > 0))
+                    clicked = True
+                    break
+            except Exception:
+                pass
+
+        if not clicked:
+            time.sleep(0.8)
+            continue
+
+        # 클릭 후 모달 또는 '게시물/Post' 하위 메뉴가 떴는지 최대 2.5초 검증
+        for _ in range(5):
+            if _is_ig_upload_modal_open(page):
+                return True
+            if _click_ig_post_submenu_if_visible(page):
+                # 하위 메뉴 클릭 후 파일 선택 모달 노출까지 최대 4초 대기
+                for _ in range(8):
+                    if _is_ig_upload_modal_open(page):
+                        return True
+                    time.sleep(0.5)
+            time.sleep(0.5)
+
+        print(f"↪ [인스타그램] 만들기 모달 미오픈 감지 — 재시도 ({attempt + 1}/3)...", flush=True)
+        dismiss_instagram_login_popups(page)
+
+    return _is_ig_upload_modal_open(page)
+
+
 def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, login_only=False, place_name=None, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [인스타그램] 업로드할 영상 파일이 없습니다:", video_path, flush=True)
@@ -134,29 +248,8 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
                 except Exception:
                     pass
 
-            create_clicked = False
-            for sel in ['a:has-text("만들기")', 'a:has-text("Create")', 'svg[aria-label="새로운 게시물"]', 'svg[aria-label="만들기"]', 'svg[aria-label="New post"]', 'span:has-text("만들기")', 'span:has-text("Create")']:
-                try:
-                    el = page.locator(sel).first
-                    if el.is_visible(timeout=2000):
-                        el.click()
-                        create_clicked = True
-                        break
-                except Exception:
-                    pass
-
-            if not create_clicked:
-                raise RuntimeError("인스타그램 만들기 버튼을 찾지 못했습니다.")
-            time.sleep(1.5)
-
-            for sub in ["게시물", "Post"]:
-                try:
-                    m_item = page.locator(f'span:has-text("{sub}")').first
-                    if m_item.is_visible(timeout=1500):
-                        m_item.click(); time.sleep(1.5)
-                        break
-                except Exception:
-                    pass
+            if not _open_instagram_create_modal(page):
+                raise RuntimeError("인스타그램 만들기(+ 새로운 게시물) 작성 모달을 열지 못했습니다.")
 
             try:
                 with page.expect_file_chooser(timeout=10000) as fc_info:

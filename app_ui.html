@@ -246,26 +246,42 @@
   .cat-input-row input { flex: 1; min-width: 140px; }
   .platform-box.plat-hidden { display: none; }
 
-  /* 0~4단계 온보딩 마법사 */
+  /* 1~4단계 온보딩 마법사 */
   .wiz-modal-content { max-width: 840px; width: 94%; max-height: 91vh; }
   .wiz-header-right { display: flex; align-items: center; gap: 8px; }
   .wiz-autosave-pill { font-size: 11.5px; font-weight: 600; color: var(--ink-muted); background: #f3f4f6; border: 1px solid var(--border-soft); padding: 3px 9px; border-radius: 99px; }
   .wiz-progress-wrap { padding: 11px 18px 9px; background: var(--surface-info); border-bottom: 1px solid var(--border-soft); }
   .wiz-progress-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; color: var(--ink-strong); margin-bottom: 6px; }
   .wiz-progress-track { width: 100%; height: 6px; background: #e5e7eb; border-radius: 99px; overflow: hidden; margin-bottom: 9px; }
-  .wiz-progress-fill { height: 100%; width: 20%; background: var(--accent-blue); border-radius: 99px; transition: width 0.25s ease; }
-  .wiz-step-pills { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+  .wiz-progress-fill { height: 100%; width: 25%; background: var(--accent-blue); border-radius: 99px; transition: width 0.25s ease; }
+  .wiz-step-pills { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .wiz-step-pill { padding: 6px 4px; border: 1px solid var(--border-soft); background: #fff; border-radius: 7px; font-size: 12px; font-weight: 600; color: var(--ink-muted); cursor: pointer; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: all 0.15s; }
   .wiz-step-pill:hover { border-color: #9ca3af; color: var(--ink-strong); }
   .wiz-step-pill.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); font-weight: 700; }
   .wiz-step-pill.done { background: var(--accent-blue-soft); border-color: #bfdbfe; color: var(--accent-blue); }
   .wiz-footer { padding: 12px 18px; background: var(--surface-info); border-top: 1px solid var(--border-soft); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .wiz-plat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 10px 0 12px; }
-  .wiz-plat-card { border: 1.5px solid var(--border-soft); border-radius: 9px; padding: 10px 11px; background: #fff; cursor: pointer; display: flex; align-items: flex-start; gap: 8px; transition: all 0.15s; }
+  .wiz-plat-card { border: 1.5px solid var(--border-soft); border-radius: 10px; padding: 10px 11px; background: #fff; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; transition: all 0.15s; user-select: none; }
   .wiz-plat-card.selected { border-color: var(--accent-blue); background: var(--accent-blue-soft); }
-  .wiz-plat-card input { margin-top: 2px; flex-shrink: 0; accent-color: var(--accent-blue); }
-  .wiz-plat-name { font-size: 13px; font-weight: 700; color: var(--ink-strong); display: block; }
-  .wiz-plat-desc { font-size: 11.5px; color: var(--ink-subtle); display: block; margin-top: 2px; }
+  .wiz-plat-card.selected:hover { border-color: #1d4ed8; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12); }
+  .wiz-plat-card.inactive { opacity: 0.54; background: #f8fafc; border-style: dashed; border-color: #cbd5e1; }
+  .wiz-plat-card.inactive:hover { opacity: 0.78; border-color: #94a3b8; }
+  .wiz-plat-card-head { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+  .wiz-plat-card input[type="checkbox"] { margin-top: 2px; width: 15px; height: 15px; flex-shrink: 0; accent-color: var(--accent-blue); cursor: pointer; }
+  .wiz-plat-name { font-size: 13px; font-weight: 700; color: var(--ink-strong); display: block; line-height: 1.3; }
+  .wiz-plat-desc { font-size: 11px; color: var(--ink-subtle); display: block; margin-top: 2px; line-height: 1.35; }
+  .wiz-plat-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding-top: 6px; border-top: 1px solid rgba(148, 163, 184, 0.24); min-width: 0; }
+  .wiz-plat-login-txt { font-size: 11px; font-weight: 600; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .wiz-plat-card.selected .wiz-plat-login-txt.is-ok { color: #059669; }
+  .wiz-plat-card.selected .wiz-plat-login-txt.is-warn { color: #b45309; }
+  .wiz-plat-card.selected .wiz-plat-login-txt.is-no { color: #dc2626; }
+  .wiz-plat-card-actions { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .wiz-yt-details { border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-info); margin-bottom: 0; overflow: hidden; }
+  .wiz-yt-details summary { list-style: none; padding: 12px 14px; font-size: 13.5px; font-weight: 700; color: var(--ink-strong); cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .wiz-yt-details summary::-webkit-details-marker { display: none; }
+  .wiz-yt-details[open] summary { border-bottom: 1px solid var(--border-soft); background: #fff; }
+  .wiz-yt-details-body { padding: 12px 14px 14px; }
+  .wiz-yt-warn-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 700; background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
   .wiz-section-box { border: 1px solid var(--border-soft); border-radius: 10px; padding: 14px 15px; background: var(--surface-info); margin-bottom: 12px; }
   .wiz-section-title { font-size: 14px; font-weight: 700; color: var(--ink-strong); margin: 0 0 10px; display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap; }
   .wiz-desc-text { font-size: 12.5px; color: var(--ink-muted); line-height: 1.6; }
@@ -351,7 +367,7 @@
   .save-history-toggle:hover { border-color: var(--accent-blue); background: var(--accent-blue-soft); color: var(--accent-blue); }
   .save-history-toggle input { width: 15px; height: 15px; accent-color: var(--accent-blue); cursor: pointer; margin: 0; }
   @media (max-width: 720px) {
-    .wiz-step-pills { grid-template-columns: repeat(3, 1fr); }
+    .wiz-step-pills { grid-template-columns: repeat(2, 1fr); }
     .wiz-plat-grid, .wiz-preview-grid, .wiz-ready-grid, .wiz-mode-tabs { grid-template-columns: 1fr; }
   }
 </style>
@@ -361,7 +377,7 @@
   <!-- 좌측 메인 대시보드 -->
   <div class="container">
     <div class="header">
-      <h1 class="title"><img src="/favicon.png" alt="미용실 멀티업로더" class="brand-icon-img" onerror="this.onerror=null;this.src='/favicon.ico';"><span id="brandTitleText">미용실 멀티업로더</span><button type="button" class="brand-sub-pill" id="brandSubPill" onclick="openSetupGuide(1)" title="클릭하여 매장 기본정보(1단계) 바로 수정">초기 설정 필요</button></h1>
+      <h1 class="title"><img src="/favicon.png" alt="미용실 멀티업로더" class="brand-icon-img" onerror="this.onerror=null;this.src='/favicon.ico';"><span id="brandTitleText">미용실 멀티업로더</span><button type="button" class="brand-sub-pill" id="brandSubPill" onclick="openSetupGuide(1)" title="클릭하여 매장 기본정보(2단계) 바로 수정">초기 설정 필요</button></h1>
       <div class="header-actions">
         <button class="btn-tool btn-tool-primary" onclick="openSetupGuide()">⚙️ 매장 설정 &amp; 온보딩</button>
         <button class="btn-tool" id="btnCheckUpdate" onclick="checkForUpdates(true)">🔄 업데이트 확인</button>
@@ -411,10 +427,10 @@
             <div class="platform-box" data-platform="naver"><label class="platform-label"><input type="checkbox" id="chkNaver" checked><span class="status-dot" id="dotNaver" title="상태 확인 중">🔴</span><span class="platform-name">네이버 블로그</span><span class="platform-done-badge">완료</span></label><a id="linkNaverBlog" href="https://blog.naver.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="clip"><label class="platform-label"><input type="checkbox" id="chkClip" checked><span class="status-dot" id="dotClip" title="상태 확인 중">🔴</span><span class="platform-name">네이버 클립</span><span class="platform-done-badge">완료</span></label><a href="https://clipcreators.naver.com/web" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="tt"><label class="platform-label"><input type="checkbox" id="chkTt" checked><span class="status-dot" id="dotTt" title="상태 확인 중">🔴</span><span class="platform-name">틱톡</span><span class="platform-done-badge">완료</span></label><a href="https://www.tiktok.com/tiktokstudio/content" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="ig"><label class="platform-label"><input type="checkbox" id="chkIg" checked><span class="status-dot" id="dotIg" title="상태 확인 중">🔴</span><span class="platform-name">인스타그램</span><span class="platform-done-badge">완료</span></label><a href="https://www.instagram.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+            <div class="platform-box" data-platform="ig"><label class="platform-label"><input type="checkbox" id="chkIg" checked><span class="status-dot" id="dotIg" title="상태 확인 중">🔴</span><span class="platform-name">인스타그램</span><span class="platform-done-badge">완료</span></label><a id="linkInstagram" href="https://www.instagram.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="pin"><label class="platform-label"><input type="checkbox" id="chkPin" checked><span class="status-dot" id="dotPin" title="상태 확인 중">🔴</span><span class="platform-name">핀터레스트</span><span class="platform-done-badge">완료</span></label><a id="linkPinterest" href="https://kr.pinterest.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="threads"><label class="platform-label"><input type="checkbox" id="chkThreads" checked><span class="status-dot" id="dotThreads" title="상태 확인 중">🔴</span><span class="platform-name">쓰레드</span><span class="platform-done-badge">완료</span></label><a href="https://www.threads.net/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="x"><label class="platform-label"><input type="checkbox" id="chkX" checked><span class="status-dot" id="dotX" title="상태 확인 중">🔴</span><span class="platform-name">엑스(X)</span><span class="platform-done-badge">완료</span></label><a href="https://x.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+            <div class="platform-box" data-platform="threads"><label class="platform-label"><input type="checkbox" id="chkThreads" checked><span class="status-dot" id="dotThreads" title="상태 확인 중">🔴</span><span class="platform-name">쓰레드</span><span class="platform-done-badge">완료</span></label><a id="linkThreads" href="https://www.threads.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+            <div class="platform-box" data-platform="x"><label class="platform-label"><input type="checkbox" id="chkX" checked><span class="status-dot" id="dotX" title="상태 확인 중">🔴</span><span class="platform-name">엑스(X)</span><span class="platform-done-badge">완료</span></label><a id="linkX" href="https://x.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="fb"><label class="platform-label"><input type="checkbox" id="chkFb" checked><span class="status-dot" id="dotFb" title="상태 확인 중">🔴</span><span class="platform-name">페이스북(개인)</span><span class="platform-done-badge">완료</span></label><a href="https://www.facebook.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="fb_page"><label class="platform-label"><input type="checkbox" id="chkFbPage" checked><span class="status-dot" id="dotFbPage" title="상태 확인 중">🔴</span><span class="platform-name">페이스북(매장)</span><span class="platform-done-badge">완료</span></label><a href="https://business.facebook.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="daangn"><label class="platform-label"><input type="checkbox" id="chkDaangn" checked><span class="status-dot" id="dotDaangn" title="상태 확인 중">🔴</span><span class="platform-name">당근 비즈</span><span class="platform-done-badge">완료</span></label><a href="https://business.daangn.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
@@ -713,7 +729,7 @@
   </div>
 </div>
 
-<!-- 완성형 초보자 온보딩 마법사 모달 (0~4단계 Wizard + 진행률 바 + 자동 임시 저장) -->
+<!-- 완성형 초보자 온보딩 마법사 모달 (1~4단계 Wizard + 진행률 바 + 자동 임시 저장) -->
 <div class="modal-overlay" id="setupGuideModal">
   <div class="modal-content wiz-modal-content">
     <div class="modal-header">
@@ -726,39 +742,72 @@
 
     <div class="wiz-progress-wrap">
       <div class="wiz-progress-top">
-        <span id="wizProgressText">0단계 / 4단계 · 사용할 플랫폼 선택</span>
-        <span id="wizProgressPct">20%</span>
+        <span id="wizProgressText">1단계 / 4단계 · 플랫폼 선택 &amp; 로그인</span>
+        <span id="wizProgressPct">25%</span>
       </div>
       <div class="wiz-progress-track"><div class="wiz-progress-fill" id="wizProgressFill"></div></div>
       <div class="wiz-step-pills">
-        <button type="button" class="wiz-step-pill active" id="wizPill0" onclick="goWizardStep(0)">0. 플랫폼</button>
-        <button type="button" class="wiz-step-pill" id="wizPill1" onclick="goWizardStep(1)">1. 기본정보</button>
-        <button type="button" class="wiz-step-pill" id="wizPill2" onclick="goWizardStep(2)">2. 프로필·블로그</button>
-        <button type="button" class="wiz-step-pill" id="wizPill3" onclick="goWizardStep(3)">3. 로그인·유튜브</button>
-        <button type="button" class="wiz-step-pill" id="wizPill4" onclick="goWizardStep(4)">4. 프롬프트·체험</button>
+        <button type="button" class="wiz-step-pill active" id="wizPill0" onclick="goWizardStep(0)">1. 플랫폼·로그인</button>
+        <button type="button" class="wiz-step-pill" id="wizPill1" onclick="goWizardStep(1)">2. 기본정보</button>
+        <button type="button" class="wiz-step-pill" id="wizPill2" onclick="goWizardStep(2)">3. 프로필·블로그</button>
+        <button type="button" class="wiz-step-pill" id="wizPill3" onclick="goWizardStep(3)">4. 프롬프트·체험</button>
       </div>
     </div>
 
     <div class="modal-body" id="wizModalBody">
-      <!-- 0단계: 사용할 플랫폼 선택 -->
+      <!-- 1단계: 플랫폼 선택 & 통합 로그인 신호등 -->
       <div class="guide-pane active" id="wizPane0">
         <div class="wiz-section-box">
           <div class="wiz-section-title">
-            <span>🎯 0단계: 지금 바로 연결할 플랫폼만 골라주세요</span>
-            <div style="display:flex; gap:5px;">
+            <span>🎯 1단계: 사용할 플랫폼 선택 &amp; 로그인 연결</span>
+            <div style="display:flex; gap:5px; flex-wrap:wrap;">
               <button type="button" class="btn-tool" style="padding:3px 8px; font-size:11px;" onclick="setWizardPlatformPreset('core')">⭐ 핵심 3종 추천</button>
               <button type="button" class="btn-tool" style="padding:3px 8px; font-size:11px;" onclick="setWizardPlatformPreset('all')">전체 선택</button>
+              <button type="button" class="btn-tool" id="btnRefreshSetupStatus" style="padding:3px 8px; font-size:11px;" onclick="refreshSetupAndQuota(true)">🔄 상태 새로고침</button>
             </div>
           </div>
-          <div style="font-size:12.5px; color:#475569; line-height:1.55;">
-            선택하지 않은 플랫폼은 다음 단계의 입력칸·가이드·로그인 신호등에서 <b>자동으로 숨겨져</b> 부담 없이 시작할 수 있습니다.<br>
-            (나중에 언제든 <b>[⚙️ 플랫폼 표시 설정]</b>에서 다시 켤 수 있습니다.)
+          <div class="wiz-desc-text">
+            좌측 <b>체크박스</b>로 사용할 플랫폼만 고르고, 체크된 카드 본문을 클릭하면 해당 SNS 로그인 창만 바로 열립니다.<br>
+            <span style="font-size:12px; color:#2563eb; font-weight:600;">💡 체크 해제된 플랫폼은 다음 단계 입력칸과 일괄 로그인 창에서 자동으로 제외됩니다.</span>
           </div>
           <div class="wiz-plat-grid" id="wizPlatformGrid"></div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-submit" style="flex:1; font-size:13px;" onclick="loginMissingPlatforms()">🔐 안 켜진 SNS 한 번에 로그인창 띄우기</button>
+          </div>
+          <div class="wiz-info-callout" style="margin-top:10px; margin-bottom:0; background:#fff;">
+            • 열린 브라우저 창에서 로그인(로그인 상태 유지 체크)을 마친 뒤 창 우측 상단 <b>X</b>로 닫으면 자동으로 저장됩니다.<br>
+            • 네이버 블로그·네이버 클립, 페이스북(개인)·페이스북(매장)은 각각 같은 계정 쿠키를 공유해 한 번에 연결됩니다.
+          </div>
         </div>
+
+        <details class="wiz-yt-details" id="wizYtApiSection">
+          <summary>
+            <span>🔴 유튜브 쇼츠 무료 공식 API 설정 (펼치기/접기)</span>
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <span class="wiz-yt-warn-pill" id="ytSetupWarnBadge" style="display:none;">⚠️ 미설정 · 클릭하여 설정</span>
+              <span class="guide-badge-pill pill-no" id="ytSecretBadge">client_secret.json 미등록</span>
+              <span class="guide-badge-pill pill-no" id="ytTokenBadge">youtube_token.json 미인증</span>
+            </div>
+          </summary>
+          <div class="wiz-yt-details-body">
+            <div class="wiz-info-callout" style="margin-top:0;">
+              <b>🛟 초보자 막힘 방지 핵심 3가지</b><br>
+              1) OAuth 동의 화면에서 <b>[앱 게시]를 누르지 말고</b>, <b>[테스트 사용자]에 본인 Gmail 주소</b>를 추가하세요.<br>
+              2) 첫 유튜브 업로드 인증 시 <b>「Google에서 확인하지 않은 앱」</b> 경고가 뜨면 당황하지 말고 <b>[고급] ➔ [안전하지 않은 페이지로 이동]</b>을 클릭하세요.<br>
+              3) 다운로드한 JSON 파일 이름을 <code>client_secret.json</code>으로 바꿔 <code>auth_data/client_secret.json</code>에 넣으세요. (하루 최대 6건 무료 · 초과 시 과금 없음)
+            </div>
+            <ol class="guide-step-list" style="margin-bottom:0;">
+              <li><a href="https://console.cloud.google.com/" target="_blank" style="color:#2563eb; font-weight:700;">Google Cloud Console</a> 로그인 후 새 <b>프로젝트 생성</b>.</li>
+              <li><b>API 및 서비스 ➔ 라이브러리</b>에서 <code>YouTube Data API v3</code> 검색 후 <b>사용</b> 클릭.</li>
+              <li><b>OAuth 동의 화면</b> ➔ <b>외부(External)</b> 선택 ➔ 필수 항목 입력 ➔ <b>테스트 사용자에 본인 Gmail 추가</b> (앱 게시 불필요).</li>
+              <li><b>사용자 인증 정보 ➔ OAuth 클라이언트 ID 만들기 ➔ 데스크톱 앱</b> 생성 후 JSON 다운로드.</li>
+              <li>파일명을 <code>client_secret.json</code>으로 변경해 <code>auth_data/</code> 폴더에 넣고 상단 <b>[🔄 상태 새로고침]</b> 클릭!</li>
+            </ol>
+          </div>
+        </details>
       </div>
 
-      <!-- 1단계: 기본 정보 입력 + 플랫폼별 전용 설정 -->
+      <!-- 2단계: 기본 정보 입력 + 플랫폼별 전용 설정 -->
       <div class="guide-pane" id="wizPane1">
         <!-- (1) 핵심 기본 정보 -->
         <div class="wiz-section-box">
@@ -817,7 +866,7 @@
           </div>
         </div>
 
-        <!-- (3) 네이버 블로그 설정 전용 카드 (0단계 미선택 시 전체 숨김) -->
+        <!-- (3) 네이버 블로그 설정 전용 카드 (1단계 미선택 시 전체 숨김) -->
         <div class="wiz-section-box" id="wizNaverSectionCard">
           <div class="wiz-section-title"><span>🟢 네이버 블로그 설정</span></div>
           <div class="profile-grid">
@@ -838,12 +887,12 @@
                 <button type="button" class="btn-tool" onclick="addBlogCategoryFromInput('wizBlogCatInput')">+ 추가</button>
                 <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8;" onclick="fillDefaultBlogCategories()">✨ 기본 추천 채우기 (Men, Women)</button>
               </div>
-              <span class="profile-hint">💡 '오시는 길'은 일상 시술 업로드 목록에 섞지 않고, 2단계 초기 세팅 고정글로 별도 안내해 드립니다.</span>
+              <span class="profile-hint">💡 '오시는 길'은 일상 시술 업로드 목록에 섞지 않고, 3단계 초기 세팅 고정글로 별도 안내해 드립니다.</span>
             </div>
           </div>
         </div>
 
-        <!-- (4) 핀터레스트 설정 전용 카드 (0단계 미선택 시 전체 숨김) -->
+        <!-- (4) 핀터레스트 설정 전용 카드 (1단계 미선택 시 전체 숨김) -->
         <div class="wiz-section-box" id="wizPinSectionCard">
           <div class="wiz-section-title"><span>📌 핀터레스트 설정</span></div>
           <div class="profile-grid">
@@ -858,6 +907,38 @@
             <div id="wizPinBoardWrap">
               <span class="field-label">핀터레스트 보드명 (빈칸 시 첫 번째 보드)</span>
               <input type="text" id="wizPinBoard" placeholder="예: 강남역 미용실 헤어스타일" oninput="onWizardFieldInput()">
+            </div>
+          </div>
+        </div>
+
+        <!-- (4-2) 인스타그램 · 쓰레드 아이디 설정 전용 카드 (1단계 ig/threads 미선택 시 숨김) -->
+        <div class="wiz-section-box" id="wizIgSectionCard">
+          <div class="wiz-section-title"><span>🟣 인스타그램 · 쓰레드 프로필 바로가기 설정</span></div>
+          <div class="profile-grid">
+            <div id="wizIgIdWrap" style="grid-column: span 2;">
+              <span class="field-label">인스타그램 아이디 (또는 프로필 주소)</span>
+              <div class="prefix-input-wrap">
+                <span class="prefix-addon">instagram.com/</span>
+                <input type="text" id="wizIgId" placeholder="예: my_salon 또는 https://www.instagram.com/my_salon/" oninput="smartExtractIdInput('wizIgId', 'ig', 'wizIgIdStatus', true, false)" onblur="smartExtractIdInput('wizIgId', 'ig', 'wizIgIdStatus', true, true)" onchange="smartExtractIdInput('wizIgId', 'ig', 'wizIgIdStatus', true, true)">
+              </div>
+              <span class="wiz-id-badge" id="wizIgIdStatus"></span>
+              <span class="profile-hint">인스타·쓰레드 [열기 ↗] 버튼이 내 게시물 목록으로 바로 연결됩니다</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- (4-3) 엑스(X) 아이디 설정 전용 카드 (1단계 x 미선택 시 숨김) -->
+        <div class="wiz-section-box" id="wizXSectionCard">
+          <div class="wiz-section-title"><span>𝕏 엑스(X) 프로필 바로가기 설정</span></div>
+          <div class="profile-grid">
+            <div id="wizXIdWrap" style="grid-column: span 2;">
+              <span class="field-label">엑스(X) 아이디 (또는 프로필 주소)</span>
+              <div class="prefix-input-wrap">
+                <span class="prefix-addon">x.com/</span>
+                <input type="text" id="wizXId" placeholder="예: my_salon 또는 https://x.com/my_salon" oninput="smartExtractIdInput('wizXId', 'x', 'wizXIdStatus', true, false)" onblur="smartExtractIdInput('wizXId', 'x', 'wizXIdStatus', true, true)" onchange="smartExtractIdInput('wizXId', 'x', 'wizXIdStatus', true, true)">
+              </div>
+              <span class="wiz-id-badge" id="wizXIdStatus"></span>
+              <span class="profile-hint">엑스(X) [열기 ↗] 버튼이 내 포스팅 목록으로 바로 연결됩니다</span>
             </div>
           </div>
         </div>
@@ -878,58 +959,13 @@
         </div>
       </div>
 
-      <!-- 2단계: 선택한 플랫폼별 프로필 · 게시판 · 오시는 길 세팅 -->
+      <!-- 3단계: 선택한 플랫폼별 프로필 · 게시판 · 오시는 길 세팅 -->
       <div class="guide-pane" id="wizPane2">
         <div id="wizStep2DynamicContainer"></div>
       </div>
 
-      <!-- 3단계: 통합 로그인 신호등 & 유튜브 API -->
-      <div class="guide-pane" id="wizPane3">
-        <div class="wiz-section-box">
-          <div class="wiz-section-title">
-            <span>🔐 선택한 플랫폼 로그인 신호등</span>
-            <button type="button" class="btn-tool" id="btnRefreshSetupStatus" onclick="refreshSetupAndQuota(true)">🔄 상태 새로고침</button>
-          </div>
-          <div class="wiz-desc-text">
-            0단계에서 선택한 SNS만 표시됩니다. <b>🔴 빨간불</b>인 곳만 처음 한 번 로그인해 두면 다음부터 자동으로 유지됩니다.<br>
-            <span style="font-size:12px; color:#2563eb; font-weight:600;">💡 각 플랫폼 카드를 클릭하면 해당 플랫폼 로그인 창만 단독으로 열려 바로 로그인·재로그인할 수 있습니다.</span>
-          </div>
-          <div class="guide-status-grid" id="guideStatusGrid">로딩 중...</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button type="button" class="btn-submit" style="flex:1; font-size:13px;" onclick="loginMissingPlatforms()">🔐 안 켜진 SNS 한 번에 로그인창 띄우기</button>
-          </div>
-          <div class="wiz-info-callout" style="margin-top:10px; margin-bottom:0; background:#fff;">
-            • 열린 브라우저 창에서 로그인(로그인 상태 유지 체크)을 마친 뒤 창 우측 상단 <b>X</b>로 닫으면 자동으로 저장됩니다.<br>
-            • 네이버 블로그와 네이버 클립은 같은 네이버 아이디로 한 번에 연결됩니다.
-          </div>
-        </div>
-
-        <div class="wiz-section-box" id="wizYtApiSection" style="margin-bottom:0;">
-          <div class="wiz-section-title">
-            <span>🔴 유튜브 쇼츠 무료 공식 API 설정 (선택한 경우)</span>
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <span class="guide-badge-pill pill-no" id="ytSecretBadge">client_secret.json 미등록</span>
-              <span class="guide-badge-pill pill-no" id="ytTokenBadge">youtube_token.json 미인증</span>
-            </div>
-          </div>
-          <div class="wiz-info-callout">
-            <b>🛟 초보자 막힘 방지 핵심 3가지</b><br>
-            1) OAuth 동의 화면에서 <b>[앱 게시]를 누르지 말고</b>, <b>[테스트 사용자]에 본인 Gmail 주소</b>를 추가하세요.<br>
-            2) 첫 유튜브 업로드 인증 시 <b>「Google에서 확인하지 않은 앱」</b> 경고가 뜨면 당황하지 말고 <b>[고급] ➔ [안전하지 않은 페이지로 이동]</b>을 클릭하세요.<br>
-            3) 다운로드한 JSON 파일 이름을 <code>client_secret.json</code>으로 바꿔 <code>auth_data/client_secret.json</code>에 넣으세요. (하루 최대 6건 무료 · 초과 시 과금 없음)
-          </div>
-          <ol class="guide-step-list" style="margin-bottom:0;">
-            <li><a href="https://console.cloud.google.com/" target="_blank" style="color:#2563eb; font-weight:700;">Google Cloud Console</a> 로그인 후 새 <b>프로젝트 생성</b>.</li>
-            <li><b>API 및 서비스 ➔ 라이브러리</b>에서 <code>YouTube Data API v3</code> 검색 후 <b>사용</b> 클릭.</li>
-            <li><b>OAuth 동의 화면</b> ➔ <b>외부(External)</b> 선택 ➔ 필수 항목 입력 ➔ <b>테스트 사용자에 본인 Gmail 추가</b> (앱 게시 불필요).</li>
-            <li><b>사용자 인증 정보 ➔ OAuth 클라이언트 ID 만들기 ➔ 데스크톱 앱</b> 생성 후 JSON 다운로드.</li>
-            <li>파일명을 <code>client_secret.json</code>으로 변경해 <code>auth_data/</code> 폴더에 넣고 상단 <b>[🔄 상태 새로고침]</b> 클릭!</li>
-          </ol>
-        </div>
-      </div>
-
       <!-- 4단계: 나만의 '본문뽑기' 마스터 프롬프트 발급 (2모드: 기본 표준 vs 내 스타일 입히기) & 10초 체험 -->
-      <div class="guide-pane" id="wizPane4">
+      <div class="guide-pane" id="wizPane3">
         <div class="wiz-section-box">
           <div class="wiz-section-title">
             <span>🤖 4단계: 나만의 '본문뽑기' 마스터 프롬프트 발급</span>
@@ -1016,7 +1052,7 @@
   </div>
 </div>
 
-<!-- 인포크링크 만들기 가이드 보조 팝업 모달 (1단계에서 바로 호출) -->
+<!-- 인포크링크 만들기 가이드 보조 팝업 모달 (2단계에서 바로 호출) -->
 <div class="modal-overlay" id="inpockGuideModal" style="z-index: 10050;">
   <div class="modal-content inpock-modal-content">
     <div class="modal-header">
@@ -1041,7 +1077,7 @@
           <li><b>필수 버튼 4종 구성 추천:</b>
             <div id="wizInpockButtonHints" style="margin-top:5px; font-size:12.5px; color:#4b5563; line-height:1.65;"></div>
           </li>
-          <li><b>완성된 내 인포크링크 복사</b> 후 아래 입력칸에 붙여넣으면 1단계 기본정보와 모든 미리보기에 즉시 반영됩니다!</li>
+          <li><b>완성된 내 인포크링크 복사</b> 후 아래 입력칸에 붙여넣으면 2단계 기본정보와 모든 미리보기에 즉시 반영됩니다!</li>
         </ol>
 
         <div class="wiz-copy-card" style="margin-top:8px;">
@@ -1053,7 +1089,7 @@
         </div>
 
         <div style="margin-top:10px; padding:12px; background:#fff; border:1px solid #bfdbfe; border-radius:8px;">
-          <span class="field-label" style="color:#2563eb; font-weight:700;">✅ 완성된 내 인포크링크 붙여넣기 (1단계 대표 통합 링크와 실시간 동기화)</span>
+          <span class="field-label" style="color:#2563eb; font-weight:700;">✅ 완성된 내 인포크링크 붙여넣기 (2단계 대표 통합 링크와 실시간 동기화)</span>
           <input type="text" id="wizStep2InpockUrl" placeholder="예: https://link.inpock.co.kr/myid" oninput="syncInpockUrlFromStep2(this.value)">
         </div>
       </div>
@@ -1064,7 +1100,7 @@
   </div>
 </div>
 
-<!-- 플랫폼별 초기 세팅 가이드 모달 팝업 (2단계 체크리스트 [가이드] 클릭 시 오픈) -->
+<!-- 플랫폼별 초기 세팅 가이드 모달 팝업 (3단계 체크리스트 [가이드] 클릭 시 오픈) -->
 <div class="modal-overlay" id="platformGuideModal" style="z-index: 10060;" onclick="if(event.target===this) closePlatformGuideModal()">
   <div class="modal-content platform-guide-modal-content" role="dialog" aria-modal="true" aria-labelledby="platformGuideModalTitle">
     <div class="modal-header">
@@ -1101,7 +1137,7 @@ let currentVideoAspect = { width: 0, height: 0, mode: 'portrait' };
 let draggedThumbIdx = null;
 let currentProfile = {};
 let currentBlogCategories = [];
-let currentEnabledPlatforms = ['yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'daangn', 'x'];
+let currentEnabledPlatforms = ['yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'x', 'fb', 'fb_page', 'daangn'];
 let onboardingChecks = {};
 let onboardingPromptCopied = false;
 let isProfileConfigured = false;
@@ -1134,10 +1170,9 @@ const PLATFORM_META = [
 ];
 
 const WIZARD_STEP_TITLES = [
-  '0단계 / 4단계 · 사용할 플랫폼 선택',
-  '1단계 / 4단계 · 매장 기본 정보 & 게시판 입력',
-  '2단계 / 4단계 · 플랫폼별 프로필·게시판·오시는 길',
-  '3단계 / 4단계 · 통합 로그인 신호등 & 유튜브 API',
+  '1단계 / 4단계 · 플랫폼 선택 & 로그인',
+  '2단계 / 4단계 · 매장 기본 정보 & 게시판 입력',
+  '3단계 / 4단계 · 플랫폼별 프로필·게시판·오시는 길',
   '4단계 / 4단계 · 본문뽑기 마스터 프롬프트 & 10초 체험'
 ];
 
@@ -1153,7 +1188,7 @@ function statusIconAndTip(key, state, ageDays) {
     const daysText = (typeof ageDays === 'number' && ageDays >= 20) ? `로그인 후 ${ageDays}일 경과 · ` : '로그인 후 20일 경과 · ';
     return { icon: '🟡', tip: `${daysText}업로드 전 재로그인 권장` };
   }
-  return { icon: '🔴', tip: key === 'yt' ? '미설정 · 초기 설정 가이드 3단계에서 client_secret.json을 등록해 주세요' : '미로그인 · 로그인 점검창에서 1회 로그인해 주세요' };
+  return { icon: '🔴', tip: key === 'yt' ? '미설정 · 초기 설정 가이드 1단계에서 client_secret.json을 등록해 주세요' : '미로그인 · 로그인 점검창에서 1회 로그인해 주세요' };
 }
 
 function applyVideoAspectLayout(width, height, orientationHint) {
@@ -1342,11 +1377,37 @@ function extractPinterestId(raw) {
   return s;
 }
 
+function extractInstagramId(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  const mu = s.match(/(?:instagram\.com|threads\.(?:com|net))\/@?([A-Za-z0-9._]+)/i);
+  if (mu && !['accounts', 'explore', 'direct', 'reels', 'reel', 'p', 'stories', 'tv', 'login'].includes(mu[1].toLowerCase())) {
+    return mu[1].replace(/^@/, '');
+  }
+  s = s.replace(/^https?:\/\//i, '').replace(/^\/+/, '').split('/')[0].split('?')[0].trim().replace(/^@/, '');
+  if (s.includes('@')) s = s.split('@')[0].trim();
+  return s;
+}
+
+function extractXId(raw) {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  const mu = s.match(/(?:x\.com|twitter\.com)\/@?([A-Za-z0-9_]+)/i);
+  if (mu && !['home', 'explore', 'notifications', 'messages', 'compose', 'i', 'search', 'settings', 'login', 'intent'].includes(mu[1].toLowerCase())) {
+    return mu[1].replace(/^@/, '');
+  }
+  s = s.replace(/^https?:\/\//i, '').replace(/^\/+/, '').split('/')[0].split('?')[0].trim().replace(/^@/, '');
+  if (s.includes('@')) s = s.split('@')[0].trim();
+  return s;
+}
+
 function formatIdConnectText(type, extracted) {
   if (!extracted) return '';
-  return type === 'naver'
-    ? `✅ 연결 주소: blog.naver.com/${extracted}`
-    : `✅ 연결 주소: pinterest.com/${extracted}`;
+  if (type === 'naver') return `✅ 연결 주소: blog.naver.com/${extracted}`;
+  if (type === 'pin') return `✅ 연결 주소: pinterest.com/${extracted}`;
+  if (type === 'ig') return `✅ 연결 주소: instagram.com/${extracted}/ · threads.com/@${extracted}`;
+  if (type === 'x') return `✅ 연결 주소: x.com/${extracted}`;
+  return '';
 }
 
 function smartExtractIdInput(inputId, type, statusId, triggerWizardSync = false, forceNormalize = false) {
@@ -1354,11 +1415,16 @@ function smartExtractIdInput(inputId, type, statusId, triggerWizardSync = false,
   const stEl = document.getElementById(statusId);
   if (!el) return;
   const raw = (el.value || '').trim();
-  const extracted = (type === 'naver') ? extractNaverBlogId(raw) : extractPinterestId(raw);
-  const looksLikeUrl = /https?:\/\/|blog\.naver\.com|pinterest\.|[/?]/i.test(raw);
+  let extracted = '';
+  if (type === 'naver') extracted = extractNaverBlogId(raw);
+  else if (type === 'pin') extracted = extractPinterestId(raw);
+  else if (type === 'ig') extracted = extractInstagramId(raw);
+  else if (type === 'x') extracted = extractXId(raw);
+  const looksLikeUrl = /https?:\/\/|blog\.naver\.com|pinterest\.|instagram\.com|threads\.(?:com|net)|x\.com|twitter\.com|[/?]/i.test(raw);
+  const looksLikeAtHandle = raw.startsWith('@');
   const looksLikeFullEmail = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(raw);
 
-  if (raw && extracted && raw !== extracted && (forceNormalize || looksLikeUrl || looksLikeFullEmail)) {
+  if (raw && extracted && raw !== extracted && (forceNormalize || looksLikeUrl || looksLikeAtHandle || looksLikeFullEmail)) {
     el.value = extracted;
   }
   if (stEl) {
@@ -1576,7 +1642,7 @@ function resetUploadedPlatformsUI(restoreEnabledChecks = true) {
 
 function applyEnabledPlatformsToUI() {
   const enabledSet = new Set(currentEnabledPlatforms || []);
-  // 대시보드 상단 플랫폼 박스: 미선택 플랫폼은 숨기고 체크 해제 (언제든 0단계에서 복구 가능)
+  // 대시보드 상단 플랫폼 박스: 미선택 플랫폼은 숨기고 체크 해제 (언제든 1단계에서 복구 가능)
   document.querySelectorAll('.platform-box[data-platform]').forEach(box => {
     const key = box.getAttribute('data-platform');
     const isOn = enabledSet.size === 0 || enabledSet.has(key);
@@ -1586,13 +1652,17 @@ function applyEnabledPlatformsToUI() {
     if (chk) chk.checked = isOn && !uploadedPlatformsSet.has(key);
   });
 
-  // 마법사 1단계: 플랫폼별 전용 카드 전체 숨김/표시
+  // 마법사 1~2단계: 플랫폼별 전용 카드 전체 숨김/표시
   const naverOn = enabledSet.has('naver');
   const pinOn = enabledSet.has('pin');
+  const igOrThreadsOn = enabledSet.has('ig') || enabledSet.has('threads');
+  const xOn = enabledSet.has('x');
   const ytOn = enabledSet.has('yt');
   const showEl = (id, show) => { const el = document.getElementById(id); if (el) el.style.display = show ? 'block' : 'none'; };
   showEl('wizNaverSectionCard', naverOn);
   showEl('wizPinSectionCard', pinOn);
+  showEl('wizIgSectionCard', igOrThreadsOn);
+  showEl('wizXSectionCard', xOn);
   showEl('wizYtApiSection', ytOn);
   syncPreviewCardsVisibility();
 }
@@ -1606,7 +1676,7 @@ function applyProfileToUI(data) {
     ? [...prof.enabled_platforms]
     : PLATFORM_META.map(p => p.key);
   if (typeof prof.onboarding_step === 'number' && !isNaN(prof.onboarding_step)) {
-    wizardStep = Math.max(0, Math.min(4, prof.onboarding_step));
+    wizardStep = Math.max(0, Math.min(3, prof.onboarding_step));
   }
   onboardingChecks = (prof.onboarding_checks && typeof prof.onboarding_checks === 'object' && !Array.isArray(prof.onboarding_checks))
     ? { ...prof.onboarding_checks }
@@ -1626,6 +1696,8 @@ function applyProfileToUI(data) {
     ['wizPinBoard', prof.pinterest_board],
     ['wizNaverId', prof.naver_blog_id],
     ['wizPinId', prof.pinterest_id],
+    ['wizIgId', prof.instagram_id],
+    ['wizXId', prof.x_id],
     ['wizPersonalBanned', prof.personal_banned_tags],
     ['wizSalonAddress', prof.salon_address],
     ['wizLocationGuide', prof.location_guide],
@@ -1652,14 +1724,26 @@ function applyProfileToUI(data) {
 
   const naverId = extractNaverBlogId(prof.naver_blog_id || '');
   const pinId = extractPinterestId(prof.pinterest_id || '');
+  const igId = extractInstagramId(prof.instagram_id || '');
+  const xId = extractXId(prof.x_id || '');
   const naverStatusEl = document.getElementById('wizNaverIdStatus');
   if (naverStatusEl) naverStatusEl.innerText = formatIdConnectText('naver', naverId);
   const pinStatusEl = document.getElementById('wizPinIdStatus');
   if (pinStatusEl) pinStatusEl.innerText = formatIdConnectText('pin', pinId);
+  const igStatusEl = document.getElementById('wizIgIdStatus');
+  if (igStatusEl) igStatusEl.innerText = formatIdConnectText('ig', igId);
+  const xStatusEl = document.getElementById('wizXIdStatus');
+  if (xStatusEl) xStatusEl.innerText = formatIdConnectText('x', xId);
   const naverLink = document.getElementById('linkNaverBlog');
   const pinLink = document.getElementById('linkPinterest');
+  const igLink = document.getElementById('linkInstagram');
+  const threadsLink = document.getElementById('linkThreads');
+  const xLink = document.getElementById('linkX');
   if (naverLink) naverLink.href = naverId ? `https://blog.naver.com/${naverId}` : 'https://blog.naver.com/';
   if (pinLink) pinLink.href = pinId ? `https://kr.pinterest.com/${pinId}/` : 'https://kr.pinterest.com/';
+  if (igLink) igLink.href = igId ? `https://www.instagram.com/${encodeURIComponent(igId)}/` : 'https://www.instagram.com/';
+  if (threadsLink) threadsLink.href = igId ? `https://www.threads.com/@${encodeURIComponent(igId)}` : 'https://www.threads.com/';
+  if (xLink) xLink.href = xId ? `https://x.com/${encodeURIComponent(xId)}` : 'https://x.com/';
 
   renderBlogCategoryChips();
   applyEnabledPlatformsToUI();
@@ -1673,7 +1757,7 @@ function loadProfileFromServer(autoOpenGuideIfNeeded) {
     if (d && d.ok) {
       applyProfileToUI(d);
       if (autoOpenGuideIfNeeded && !d.is_configured) {
-        const resumeStep = typeof d.profile?.onboarding_step === 'number' ? Math.max(0, Math.min(4, d.profile.onboarding_step)) : 0;
+        const resumeStep = typeof d.profile?.onboarding_step === 'number' ? Math.max(0, Math.min(3, d.profile.onboarding_step)) : 0;
         openSetupGuide(resumeStep);
       }
     }
@@ -1694,6 +1778,8 @@ function collectProfilePayload() {
     pinterest_board: getVal('wizPinBoard'),
     naver_blog_id: extractNaverBlogId(getVal('wizNaverId')),
     pinterest_id: extractPinterestId(getVal('wizPinId')),
+    instagram_id: extractInstagramId(getVal('wizIgId')),
+    x_id: extractXId(getVal('wizXId')),
     salon_address: getVal('wizSalonAddress'),
     location_guide: getVal('wizLocationGuide'),
     parking_guide: getVal('wizParkingGuide'),
@@ -1717,19 +1803,58 @@ function collectProfilePayload() {
 function renderWizardPlatforms() {
   const grid = document.getElementById('wizPlatformGrid');
   if (!grid) return;
-  const enabledSet = new Set(currentEnabledPlatforms);
+  const enabledSet = new Set(Array.isArray(currentEnabledPlatforms) ? currentEnabledPlatforms : []);
+  const st = latestSetupStatus || {};
+  const ages = st.cookie_ages || {};
   grid.innerHTML = PLATFORM_META.map(p => {
     const checked = enabledSet.has(p.key);
+    const state = st[p.key] || 'red';
+    const info = statusIconAndTip(p.key, state, ages[p.key]);
+    const statusCls = !checked ? '' : (state === 'green' ? 'is-ok' : (state === 'yellow' ? 'is-warn' : 'is-no'));
+    const statusText = !checked
+      ? '미사용 · 클릭 시 사용 켜기'
+      : (p.key === 'yt'
+        ? (state === 'green' ? 'API 인증 완료' : (state === 'yellow' ? '인증 필요 · 가이드 보기' : '미설정 · 클릭하여 설정'))
+        : (state === 'green' ? '로그인됨 · 재로그인' : (state === 'yellow' ? '재로그인 권장' : '미로그인 · 클릭 로그인')));
+    const showLogout = checked && (
+      p.key === 'yt'
+        ? (state === 'green' && Boolean(st.has_youtube_token))
+        : (state === 'green' || state === 'yellow')
+    );
+    const logoutBtnHtml = showLogout
+      ? `<button type="button" class="btn-card-logout" onclick="event.stopPropagation(); logoutSinglePlatform('${p.key}', this)" title="${escapeHtml(p.label)} 완전 로그아웃">로그아웃</button>`
+      : '';
+    const cardTitle = checked
+      ? escapeHtml(`${p.label}: ${info.tip} (클릭하여 단독 열기)`)
+      : escapeHtml(`${p.label}: 현재 사용 안 함 (체크박스 또는 카드를 클릭해 활성화)`);
     return `
-      <label class="wiz-plat-card ${checked ? 'selected' : ''}" onclick="toggleWizardPlatform('${p.key}', event)">
-        <input type="checkbox" ${checked ? 'checked' : ''} onchange="event.stopPropagation(); setWizardPlatformState('${p.key}', this.checked)">
-        <div>
-          <span class="wiz-plat-name">${p.label}</span>
-          <span class="wiz-plat-desc">${p.desc || ''}</span>
+      <div class="wiz-plat-card ${checked ? 'selected' : 'inactive'}" data-wiz-platform="${p.key}" role="button" tabindex="0" title="${cardTitle}" onclick="onWizardPlatformCardClick('${p.key}', event)">
+        <div class="wiz-plat-card-head">
+          <input type="checkbox" ${checked ? 'checked' : ''} onclick="event.stopPropagation()" onchange="event.stopPropagation(); setWizardPlatformState('${p.key}', this.checked)" aria-label="${escapeHtml(p.label)} 사용 여부">
+          <div style="min-width:0;">
+            <span class="wiz-plat-name">${p.label}</span>
+            <span class="wiz-plat-desc">${p.desc || ''}</span>
+          </div>
         </div>
-      </label>
+        <div class="wiz-plat-card-foot">
+          <span class="wiz-plat-login-txt ${statusCls}">${statusText}</span>
+          <div class="wiz-plat-card-actions">${logoutBtnHtml}<span style="font-size:14px;" title="${escapeHtml(info.tip)}">${info.icon}</span></div>
+        </div>
+      </div>
     `;
   }).join('');
+}
+
+function onWizardPlatformCardClick(key, ev) {
+  if (ev && ev.target && ev.target.closest('input, button')) return;
+  if (!currentEnabledPlatforms.includes(key)) {
+    // 미사용(체크 해제) 카드는 로그인 창을 열지 않고 사용 체크만 안전하게 켬
+    setWizardPlatformState(key, true);
+    const meta = PLATFORM_META.find(p => p.key === key);
+    showAppToast(`✅ [${meta ? meta.label : key}] 사용을 켰습니다. 카드를 한 번 더 클릭하면 로그인 창이 열립니다.`);
+    return;
+  }
+  loginSinglePlatform(key);
 }
 
 function setWizardPlatformState(key, checked) {
@@ -1822,6 +1947,8 @@ function getLiveWizardValues() {
     booking: readField('wizBookingUrl', 'booking_url'),
     naverId: extractNaverBlogId(readField('wizNaverId', 'naver_blog_id')),
     pinId: extractPinterestId(readField('wizPinId', 'pinterest_id')),
+    igId: extractInstagramId(readField('wizIgId', 'instagram_id')),
+    xId: extractXId(readField('wizXId', 'x_id')),
     pinBoard: readField('wizPinBoard', 'pinterest_board'),
     address: readField('wizSalonAddress', 'salon_address'),
     locationGuide: readField('wizLocationGuide', 'location_guide'),
@@ -2125,10 +2252,13 @@ function calculateWizardProgress(vOpt) {
     if (isDone) done += 1;
   };
 
-  // 0단계: 사용할 플랫폼 1개 이상 선택
+  // 1단계: 사용할 플랫폼 1개 이상 선택 + 선택한 플랫폼 실제 로그인 완료(🟢) 여부 (유튜브 선택 시 API 인증 🟢 포함)
   countItem(enabledList.length >= 1);
+  enabledList.forEach(k => {
+    countItem(st[k] === 'green');
+  });
 
-  // 1단계: 핵심 기본정보 필수 항목 (선택 항목인 '주력 시술' 제외)
+  // 2단계: 핵심 기본정보 필수 항목 (선택 항목인 '주력 시술' 제외)
   countItem(Boolean(v.salonRaw));
   countItem(Boolean(v.region));
   countItem(Boolean(v.designer));
@@ -2137,20 +2267,15 @@ function calculateWizardProgress(vOpt) {
   if (enabled.has('naver')) countItem(Boolean(v.naverId));
   if (enabled.has('pin')) countItem(Boolean(v.pinId));
 
-  // 2단계: 선택한 플랫폼 사전 준비 체크리스트 + (네이버 선택 시) '오시는 길' 지도 첨부 완료
+  // 3단계: 선택한 플랫폼 사전 준비 체크리스트 + (네이버 선택 시) '오시는 길' 지도 첨부 완료
   if (enabled.has('naver')) {
     countItem(Boolean(onboardingChecks['directions_map']));
   }
-  const prepKeys = ['ig', 'clip', 'pin', 'daangn', 'tt', 'threads', 'x'];
+  const prepKeys = ['ig', 'clip', 'pin', 'tt', 'threads', 'x', 'fb', 'fb_page', 'daangn'];
   prepKeys.forEach(k => {
     if (enabled.has(k)) {
       countItem(Boolean(onboardingChecks['prep_' + k]));
     }
-  });
-
-  // 3단계: 선택한 플랫폼 실제 로그인 완료(🟢) 여부 (유튜브 선택 시 API 인증 🟢 포함)
-  enabledList.forEach(k => {
-    countItem(st[k] === 'green');
   });
 
   // 4단계: 마스터 프롬프트 발급·복사 완료 여부
@@ -2217,7 +2342,7 @@ function renderWizardStep2(v) {
           const isCk = onboardingChecks[ckKey] ? 'checked' : '';
           return `<label class="wiz-check-item"><span><input type="checkbox" ${isCk} onchange="toggleOnboardingCheck('${ckKey}', this.checked)"> 시술 업로드용 게시판 <b>「${escapeHtml(c)}」</b> 확인</span><span style="font-size:11.5px; color:#2563eb; font-weight:600;">자동 업로드용</span></label>`;
         }).join('')
-      : `<div style="font-size:12px; color:#6b7280;">1단계에서 자동 업로드할 블로그 게시판을 추가하면 여기에 체크리스트가 표시됩니다.</div>`;
+      : `<div style="font-size:12px; color:#6b7280;">2단계에서 자동 업로드할 블로그 게시판을 추가하면 여기에 체크리스트가 표시됩니다.</div>`;
     const dirCatCk = onboardingChecks['directions_cat'] ? 'checked' : '';
     const dirMapCk = onboardingChecks['directions_map'] ? 'checked' : '';
     blocks.push(`
@@ -2341,7 +2466,7 @@ function renderWizardStep2(v) {
     blocks.push(`<div class="wiz-section-box" style="margin-bottom:0;"><div class="wiz-section-title"><span>✅ 선택한 플랫폼 사전 준비 체크리스트</span></div><div class="wiz-check-list">${prepItems.join('')}</div></div>`);
   }
 
-  container.innerHTML = blocks.join('') || `<div class="wiz-section-box">0단계에서 사용할 플랫폼을 선택해 주세요.</div>`;
+  container.innerHTML = blocks.join('') || `<div class="wiz-section-box">1단계에서 사용할 플랫폼을 선택해 주세요.</div>`;
 }
 
 const PLATFORM_SETUP_GUIDES = {
@@ -2429,7 +2554,7 @@ const PLATFORM_SETUP_GUIDES = {
     name: '페이스북(매장)',
     steps: [
       '하단 [바로 이동하기 ↗] 버튼으로 메타 비즈니스 스위트(business.facebook.com)에 접속합니다.',
-      '좌측 상단 페이지 목록에 1단계에서 입력한 매장명과 동일한 페이스북 매장 페이지가 표시되는지 확인합니다.',
+      '좌측 상단 페이지 목록에 2단계에서 입력한 매장명과 동일한 페이스북 매장 페이지가 표시되는지 확인합니다.',
       '매장 페이지가 아직 없다면 페이스북에서 페이지를 개설한 뒤 메타 비즈니스 스위트에 연결해 주세요.'
     ],
     getShortcutUrl: () => 'https://business.facebook.com/',
@@ -2477,8 +2602,8 @@ function renderWizardReadiness(v) {
   const enabledBrowserPlats = currentEnabledPlatforms.filter(k => k !== 'yt');
   const loggedInCount = enabledBrowserPlats.filter(k => st[k] === 'green').length;
   const items = [
-    { label: '매장명 & 기본정보', ok: Boolean(v.salonRaw), detail: v.salonRaw ? v.salonRaw : '1단계에서 매장명 입력 필요' },
-    { label: '대표 통합 링크(인포크)', ok: Boolean(v.booking), detail: v.booking ? '연결됨' : '1단계에서 입력 권장' },
+    { label: '매장명 & 기본정보', ok: Boolean(v.salonRaw), detail: v.salonRaw ? v.salonRaw : '2단계에서 매장명 입력 필요' },
+    { label: '대표 통합 링크(인포크)', ok: Boolean(v.booking), detail: v.booking ? '연결됨' : '2단계에서 입력 권장' },
     { label: '네이버 블로그 게시판', ok: !currentEnabledPlatforms.includes('naver') || v.cats.length > 0, detail: v.cats.length ? `${v.cats.length}개 등록` : '기본 게시판 사용' },
     { label: '선택 플랫폼 로그인', ok: enabledBrowserPlats.length === 0 || loggedInCount === enabledBrowserPlats.length, detail: `${loggedInCount} / ${enabledBrowserPlats.length} 완료` }
   ];
@@ -2526,10 +2651,18 @@ function saveWizardDraftNow(markCompleted = false) {
       if (pinBoardEl) pinBoardEl.value = currentProfile.pinterest_board || '';
       const naverId = extractNaverBlogId(currentProfile.naver_blog_id || '');
       const pinId = extractPinterestId(currentProfile.pinterest_id || '');
+      const igId = extractInstagramId(currentProfile.instagram_id || '');
+      const xId = extractXId(currentProfile.x_id || '');
       const naverLink = document.getElementById('linkNaverBlog');
       const pinLink = document.getElementById('linkPinterest');
+      const igLink = document.getElementById('linkInstagram');
+      const threadsLink = document.getElementById('linkThreads');
+      const xLink = document.getElementById('linkX');
       if (naverLink) naverLink.href = naverId ? `https://blog.naver.com/${naverId}` : 'https://blog.naver.com/';
       if (pinLink) pinLink.href = pinId ? `https://kr.pinterest.com/${pinId}/` : 'https://kr.pinterest.com/';
+      if (igLink) igLink.href = igId ? `https://www.instagram.com/${encodeURIComponent(igId)}/` : 'https://www.instagram.com/';
+      if (threadsLink) threadsLink.href = igId ? `https://www.threads.com/@${encodeURIComponent(igId)}` : 'https://www.threads.com/';
+      if (xLink) xLink.href = xId ? `https://x.com/${encodeURIComponent(xId)}` : 'https://x.com/';
       setAutosaveBadge(markCompleted ? '저장 완료 ✓' : '자동 임시 저장됨 ✓', false);
     }
     return d;
@@ -2546,8 +2679,8 @@ function debouncedSaveWizardDraft() {
 }
 
 function goWizardStep(step) {
-  wizardStep = Math.max(0, Math.min(4, Number(step) || 0));
-  for (let i = 0; i <= 4; i++) {
+  wizardStep = Math.max(0, Math.min(3, Number(step) || 0));
+  for (let i = 0; i <= 3; i++) {
     const pill = document.getElementById('wizPill' + i);
     const pane = document.getElementById('wizPane' + i);
     if (pill) {
@@ -2562,7 +2695,7 @@ function goWizardStep(step) {
   const nextBtn = document.getElementById('wizBtnNext');
   if (prevBtn) prevBtn.style.visibility = (wizardStep === 0) ? 'hidden' : 'visible';
   if (nextBtn) {
-    if (wizardStep === 4) {
+    if (wizardStep === 3) {
       nextBtn.innerText = '✅ 설정 완료 · 닫기';
       nextBtn.style.background = '#2563eb';
     } else {
@@ -2573,12 +2706,12 @@ function goWizardStep(step) {
   const bodyEl = document.getElementById('wizModalBody');
   if (bodyEl) bodyEl.scrollTop = 0;
   updateWizardLivePreviews();
-  if (wizardStep === 3 || wizardStep === 4) refreshSetupStatus();
+  if (wizardStep === 0 || wizardStep === 3) refreshSetupStatus();
   debouncedSaveWizardDraft();
 }
 
 function stepWizard(delta) {
-  if (delta > 0 && wizardStep === 4) {
+  if (delta > 0 && wizardStep === 3) {
     completeOnboardingAndClose();
     return;
   }
@@ -2602,7 +2735,7 @@ function closeSetupGuide() {
 function completeOnboardingAndClose() {
   const salonVal = (document.getElementById('wizSalonName')?.value || '').trim();
   if (!salonVal) {
-    alert('⚠️ 1단계에서 매장명을 입력해야 설정이 완료됩니다!');
+    alert('⚠️ 2단계에서 매장명을 입력해야 설정이 완료됩니다!');
     goWizardStep(1);
     return;
   }
@@ -2615,7 +2748,7 @@ function completeOnboardingAndClose() {
 function runSampleOnboardingPreview() {
   const v = getLiveWizardValues();
   if (!v.salonRaw) {
-    alert('⚠️ 샘플 변환 체험을 위해 1단계에서 매장명을 먼저 입력해 주세요!');
+    alert('⚠️ 샘플 변환 체험을 위해 2단계에서 매장명을 먼저 입력해 주세요!');
     goWizardStep(1);
     return;
   }
@@ -2655,25 +2788,12 @@ function refreshSetupStatus(deep = false) {
       }
     });
 
-    const enabledSet = new Set(currentEnabledPlatforms || PLATFORM_META.map(p => p.key));
-    const grid = document.getElementById('guideStatusGrid');
-    if (grid) {
-      const filtered = PLATFORM_META.filter(p => enabledSet.has(p.key));
-      grid.innerHTML = filtered.map(p => {
-        const state = st[p.key] || 'red';
-        const info = statusIconAndTip(p.key, state, ages[p.key]);
-        const subHint = p.key === 'yt'
-          ? (state === 'green' ? 'API 인증 완료' : '클릭하여 설정 가이드 보기')
-          : (state === 'green' ? '로그인됨 · 클릭 시 재로그인' : (state === 'yellow' ? '재로그인 권장 · 클릭 시 재로그인' : '미로그인 · 클릭하여 로그인'));
-        const showLogout = (p.key === 'yt')
-          ? (state === 'green' && Boolean(st.has_youtube_token))
-          : (state === 'green' || state === 'yellow');
-        const logoutBtnHtml = showLogout
-          ? `<button type="button" class="btn-card-logout" onclick="event.stopPropagation(); logoutSinglePlatform('${p.key}', this)" title="${escapeHtml(p.label)} 완전 로그아웃">로그아웃</button>`
-          : '';
-        const safeTip = escapeHtml(`${p.label}: ${info.tip} (클릭하여 단독 열기)`);
-        return `<div class="guide-status-item" role="button" tabindex="0" title="${safeTip}" onclick="loginSinglePlatform('${p.key}')"><div style="min-width:0;"><span>${p.label}</span><span class="guide-status-sub">${subHint}</span></div><div class="guide-status-right">${logoutBtnHtml}<span style="font-size:15px;">${info.icon}</span></div></div>`;
-      }).join('');
+    renderWizardPlatforms();
+
+    const enabledSet = new Set(Array.isArray(currentEnabledPlatforms) ? currentEnabledPlatforms : []);
+    const ytWarnBadge = document.getElementById('ytSetupWarnBadge');
+    if (ytWarnBadge) {
+      ytWarnBadge.style.display = (enabledSet.has('yt') && (st.yt || 'red') === 'red') ? 'inline-flex' : 'none';
     }
 
     const secBadge = document.getElementById('ytSecretBadge');
@@ -2776,6 +2896,7 @@ function loginSinglePlatform(key) {
     const ytSec = document.getElementById('wizYtApiSection');
     if (ytSec) {
       ytSec.style.display = 'block';
+      if ('open' in ytSec) ytSec.open = true;
       ytSec.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     showAppToast('🔴 유튜브 쇼츠는 아래 무료 공식 API 설정 가이드를 따라 연결해 주세요.');
@@ -2807,28 +2928,36 @@ function loginSinglePlatform(key) {
 
 function loginMissingPlatforms() {
   const st = latestSetupStatus || {};
-  const enabled = new Set(currentEnabledPlatforms || PLATFORM_META.map(p => p.key));
+  const enabled = new Set(Array.isArray(currentEnabledPlatforms) ? currentEnabledPlatforms : []);
+  const needLogin = (k) => enabled.has(k) && st[k] !== 'green';
+
+  // 쿠키 공유 쌍(네이버 블로그·클립, 페이스북 개인·매장)은 둘 다 체크·미로그인일 때 중복 탭 방지
+  const needNaver = needLogin('naver');
+  const needClip = needLogin('clip') && !needNaver;
+  const needFb = needLogin('fb');
+  const needFbPage = needLogin('fb_page') && !needFb;
+
   const payload = {
-    use_naver: enabled.has('naver') && st.naver !== 'green',
-    use_clip: enabled.has('clip') && st.clip !== 'green',
-    use_tt: enabled.has('tt') && st.tt !== 'green',
-    use_ig: enabled.has('ig') && st.ig !== 'green',
-    use_pin: enabled.has('pin') && st.pin !== 'green',
-    use_threads: enabled.has('threads') && st.threads !== 'green',
-    use_x: enabled.has('x') && st.x !== 'green',
-    use_fb: enabled.has('fb') && st.fb !== 'green',
-    use_fb_page: enabled.has('fb_page') && st.fb_page !== 'green',
-    use_daangn: enabled.has('daangn') && st.daangn !== 'green'
+    use_naver: needNaver,
+    use_clip: needClip,
+    use_tt: needLogin('tt'),
+    use_ig: needLogin('ig'),
+    use_pin: needLogin('pin'),
+    use_threads: needLogin('threads'),
+    use_x: needLogin('x'),
+    use_fb: needFb,
+    use_fb_page: needFbPage,
+    use_daangn: needLogin('daangn')
   };
   const anyMissing = Object.values(payload).some(Boolean);
   if (!anyMissing) {
-    alert('✅ 선택하신 브라우저 기반 플랫폼이 이미 모두 로그인되어 있습니다!\n(유튜브를 선택하셨다면 아래 API 가이드를 확인해 주세요.)');
+    showAppToast('✅ 선택한 SNS가 모두 이미 로그인되어 있습니다!');
     return;
   }
   fetch('/api/auth_check', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
   .then(r => r.json()).then(d => {
     if (!d.ok) alert(d.msg);
-    else alert('🔐 전용 크롬 1창에 미로그인 플랫폼 탭을 한 번에 띄웁니다. 로그인 후 창 X로 닫아주세요!');
+    else showAppToast('🔐 전용 크롬 1창에 선택한 미로그인 SNS 탭만 띄웁니다. 로그인 후 창 X로 닫아주세요!');
   });
 }
 

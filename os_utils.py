@@ -45,6 +45,8 @@ EMPTY_PROFILE_TEMPLATE = {
     "pinterest_board": "",
     "naver_blog_id": "",
     "pinterest_id": "",
+    "instagram_id": "",
+    "x_id": "",
     "place_search_keyword": "",
     "personal_banned_tags": "",
     "salon_address": "",
@@ -1312,6 +1314,40 @@ def extract_pinterest_id(raw):
     return s
 
 
+def extract_instagram_id(raw):
+    """인스타그램/쓰레드 전체 URL 또는 @아이디에서 순수 인스타그램 아이디만 자동 추출"""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    m_u = re.search(r"(?:instagram\.com|threads\.(?:com|net))/@?([A-Za-z0-9._]+)", s, re.IGNORECASE)
+    if m_u:
+        cand = m_u.group(1).strip().lstrip("@")
+        if cand.lower() not in ("accounts", "explore", "direct", "reels", "reel", "p", "stories", "tv", "login"):
+            return cand
+    s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
+    s = s.split("/")[0].split("?")[0].strip().lstrip("@")
+    if "@" in s:
+        s = s.split("@", 1)[0].strip()
+    return s
+
+
+def extract_x_id(raw):
+    """엑스(X / twitter.com) 전체 URL 또는 @아이디에서 순수 X 아이디만 자동 추출"""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    m_u = re.search(r"(?:x\.com|twitter\.com)/@?([A-Za-z0-9_]+)", s, re.IGNORECASE)
+    if m_u:
+        cand = m_u.group(1).strip().lstrip("@")
+        if cand.lower() not in ("home", "explore", "notifications", "messages", "compose", "i", "search", "settings", "login", "intent"):
+            return cand
+    s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
+    s = s.split("/")[0].split("?")[0].strip().lstrip("@")
+    if "@" in s:
+        s = s.split("@", 1)[0].strip()
+    return s
+
+
 def _clean_blog_categories(raw_cats):
     """블로그 게시판 목록 정제 ('오시는 길' 고정글용 제외, 중복 제거)"""
     if isinstance(raw_cats, str):
@@ -1370,6 +1406,8 @@ def load_profile():
                 prof["region_keyword"] = normalize_region_keyword(prof.get("region_keyword", ""))
                 prof["naver_blog_id"] = extract_naver_blog_id(prof.get("naver_blog_id", ""))
                 prof["pinterest_id"] = extract_pinterest_id(prof.get("pinterest_id", ""))
+                prof["instagram_id"] = extract_instagram_id(prof.get("instagram_id", ""))
+                prof["x_id"] = extract_x_id(prof.get("x_id", ""))
                 pm = str(prof.get("prompt_mode") or "standard").strip().lower()
                 prof["prompt_mode"] = "custom" if pm == "custom" else "standard"
                 prof["custom_style_guide"] = str(prof.get("custom_style_guide") or "").strip()
@@ -1402,6 +1440,8 @@ def save_profile(data, is_draft=False):
         "pinterest_board",
         "naver_blog_id",
         "pinterest_id",
+        "instagram_id",
+        "x_id",
         "place_search_keyword",
         "personal_banned_tags",
         "salon_address",
@@ -1420,6 +1460,10 @@ def save_profile(data, is_draft=False):
                 cleaned = extract_naver_blog_id(cleaned)
             elif k == "pinterest_id":
                 cleaned = extract_pinterest_id(cleaned)
+            elif k == "instagram_id":
+                cleaned = extract_instagram_id(cleaned)
+            elif k == "x_id":
+                cleaned = extract_x_id(cleaned)
             prof[k] = cleaned
 
     if "prompt_mode" in data:

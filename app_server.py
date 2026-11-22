@@ -1373,7 +1373,8 @@ def handle_cleanup(action='clean_all'):
             except Exception:
                 pass
             continue
-        if fn in TEMP_ROOT_FILES or fn.lower().endswith(('.tmp', '.bak', '.old')) or not _is_protected_root_file(fn):
+        is_total_code_temp = fn.lower().startswith('total_code') and fn.lower().endswith('.txt')
+        if fn in TEMP_ROOT_FILES or is_total_code_temp or fn.lower().endswith(('.tmp', '.bak', '.old')) or not _is_protected_root_file(fn):
             try:
                 os.remove(src)
                 removed_temp_root.append(fn)
@@ -3116,7 +3117,7 @@ def upload_to_youtube(title, body='', tags=None, video_path=None, privacy='publi
     scopes = ['https://www.googleapis.com/auth/youtube.upload', 'https://www.googleapis.com/auth/youtube.readonly']
     token_path, secret_path = get_auth_file('youtube_token.json'), get_auth_file('client_secret.json')
     if not os.path.exists(secret_path) or os.path.getsize(secret_path) <= 10:
-        raise RuntimeError("client_secret.json 파일이 없습니다. 초기 설정 가이드 3단계를 확인해 주세요.")
+        raise RuntimeError("client_secret.json 파일이 없습니다. 초기 설정 가이드 1단계를 확인해 주세요.")
     creds = Credentials.from_authorized_user_file(token_path, scopes) if os.path.exists(token_path) else None
     if creds and creds.expired and creds.refresh_token:
         try:
