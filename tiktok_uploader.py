@@ -14,6 +14,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     load_profile,
     get_place_search_keyword,
     get_region_tags,
@@ -211,7 +212,14 @@ def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=N
                 time.sleep(1.5)
 
             if test_mode:
-                print("🧪 [테스트 모드 - 틱톡] 최종 게시 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                aim_res = verify_publish_button_aim(
+                    post_btn,
+                    expected_keywords=["게시", "Post"],
+                    platform_name="틱톡",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 틱톡] 최종 게시 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "틱톡")
                 wait_for_test_mode_close(context, "틱톡", stop_checker=stop_checker)
                 return True

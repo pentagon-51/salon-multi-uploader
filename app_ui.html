@@ -420,7 +420,10 @@
         <div>
           <div class="section-title">
             <span>3. 업로드 플랫폼 선택 및 바로가기</span>
-            <button type="button" class="btn-tool" style="padding:2px 8px; font-size:11px;" onclick="openSetupGuide(0)">⚙️ 플랫폼 표시 설정</button>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button type="button" class="btn-tool" id="btnToggleAllPlatforms" style="padding:2px 8px; font-size:11px;" onclick="toggleAllVisiblePlatforms()">☐ 전체 해제</button>
+              <button type="button" class="btn-tool" style="padding:2px 8px; font-size:11px;" onclick="openSetupGuide(0)">⚙️ 플랫폼 표시 설정</button>
+            </div>
           </div>
           <div class="platforms-container">
             <div class="platform-box" data-platform="yt"><label class="platform-label"><input type="checkbox" id="chkYt" checked><span class="status-dot" id="dotYt" title="상태 확인 중">🔴</span><span class="platform-name">유튜브 쇼츠</span><span class="platform-done-badge">완료</span></label><a href="https://studio.youtube.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
@@ -478,7 +481,7 @@
       <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
         <button type="button" class="btn-submit btn-submit-secondary" id="btnAuthCheck" style="flex:1; min-width:170px;" onclick="startAuthCheck()">🔐 Step 1: 로그인 점검창 띄우기</button>
         <button type="button" class="btn-submit" id="btnUpload" style="flex:1.25; min-width:190px;" onclick="startUpload()">🚀 Step 2: 체크된 플랫폼 일괄 업로드</button>
-        <button type="button" class="btn-submit btn-submit-secondary" id="btnTestMode" style="flex:0.85; min-width:140px;" onclick="startUpload(null, { testMode: true })" title="실제 게시 직전까지만 실행하고 녹화본을 바탕화면 (HH-MM_YYMMDD).mp4로 합본 저장">🧪 테스트 모드</button>
+        <button type="button" class="btn-submit btn-submit-secondary" id="btnTestMode" style="flex:0.85; min-width:140px;" onclick="startUpload(null, { testMode: true })" title="실제 게시 없이 최종 게시 버튼 조준 검증까지 수행하고 녹화본·리포트를 blackbox_upload 폴더에 저장">🧪 테스트 모드</button>
       </div>
       <div class="publish-result-box" id="publishResultBox"></div>
 
@@ -1576,6 +1579,31 @@ function updateProfileHeaderBar() {
   if (banner) banner.style.display = isProfileConfigured ? 'none' : 'flex';
 }
 
+function getVisiblePlatformCheckboxes() {
+  return Array.from(document.querySelectorAll('.platform-box[data-platform]:not(.plat-hidden) input[type="checkbox"]'));
+}
+
+function updateToggleAllPlatformsBtn() {
+  const btn = document.getElementById('btnToggleAllPlatforms');
+  if (!btn) return;
+  const visibleChks = getVisiblePlatformCheckboxes();
+  const allChecked = visibleChks.length > 0 && visibleChks.every(chk => chk.checked);
+  btn.innerText = allChecked ? '☐ 전체 해제' : '☑️ 전체 선택';
+  btn.disabled = visibleChks.length === 0;
+}
+
+function toggleAllVisiblePlatforms() {
+  const visibleChks = getVisiblePlatformCheckboxes();
+  if (!visibleChks.length) return;
+  const allChecked = visibleChks.every(chk => chk.checked);
+  const nextChecked = !allChecked;
+  visibleChks.forEach(chk => {
+    chk.checked = nextChecked;
+  });
+  syncPreviewCardsVisibility();
+  updateToggleAllPlatformsBtn();
+}
+
 function syncPreviewCardsVisibility() {
   let visibleCount = 0;
   PLATFORM_META.forEach(p => {
@@ -1592,6 +1620,7 @@ function syncPreviewCardsVisibility() {
   if (emptyEl) {
     emptyEl.style.display = visibleCount === 0 ? 'block' : 'none';
   }
+  updateToggleAllPlatformsBtn();
 }
 
 function toggleQuotaDetail() {
@@ -3892,7 +3921,7 @@ function startUpload(overrideTargets = null, opts = {}) {
     } else if (!testMode && d.history_id) {
       activeHistoryId = d.history_id;
     } else if (testMode) {
-      showAppToast('🧪 테스트 모드를 시작했습니다. 종료 또는 강제 중지 시 바탕화면에 합본 영상이 저장됩니다.');
+      showAppToast('🧪 테스트 모드를 시작했습니다. 종료 또는 강제 중지 시 blackbox_upload 폴더에 합본 영상과 report.md가 저장됩니다.');
     }
   });
 }

@@ -14,6 +14,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     load_profile,
     get_salon_name,
 )
@@ -724,13 +725,20 @@ def upload_to_daangn(title="", body="", video_path=None, login_only=False, selec
             page.keyboard.press(f"{MOD_KEY}+v")
             time.sleep(1.5)
 
+            sub_btn = page.locator('button:has-text("발행"), button:has-text("등록"), button:has-text("완료"), button[type="submit"]').last
             if test_mode:
-                print("🧪 [테스트 모드 - 당근 비즈] 최종 발행 직전까지 입력·설정 확인 완료 (실제 발행 안 함)", flush=True)
+                aim_res = verify_publish_button_aim(
+                    sub_btn,
+                    expected_keywords=["발행", "등록", "완료"],
+                    platform_name="당근",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 당근 비즈] 최종 발행 버튼 조준 검증 통과 (실제 발행 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "당근 비즈", mark_verified=True)
                 wait_for_test_mode_close(context, "당근 비즈", stop_checker=stop_checker)
                 return True
 
-            sub_btn = page.locator('button:has-text("발행"), button:has-text("등록"), button:has-text("완료"), button[type="submit"]').last
             if sub_btn.count() > 0:
                 sub_btn.click(force=True)
                 time.sleep(5.0)

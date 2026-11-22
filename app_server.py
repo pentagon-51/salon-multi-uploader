@@ -62,7 +62,7 @@ DONE_DIR = os.path.join(BASE_DIR, 'done')
 BACKUP_DIR = os.path.join(BASE_DIR, '_old_backup')
 THUMB_DIR = os.path.join(BASE_DIR, 'temp_thumbs')
 DEBUG_DIR = os.path.join(BASE_DIR, 'debug_records')
-REPORT_PATH = os.path.join(BASE_DIR, 'report.md')
+REPORT_PATH = os.path.join(BLACKBOX_UPLOAD_DIR, 'report.md')
 UI_FILE = os.path.join(BASE_DIR, 'app_ui.html')
 migrate_legacy_auth_files()
 DAILY_USAGE_PATH = get_auth_file('daily_usage.json')
@@ -857,27 +857,26 @@ def merge_blackbox_session_to_mp4(session_dir, out_dir, start_dt=None, is_test_m
 
         _force_rmtree(session_dir)
         if saved_ok:
+            prune_blackbox_upload_dir(max_keep=3)
             if is_test_mode:
-                log(f"🎬 테스트 블랙박스 영상이 바탕화면에 저장되었습니다: {out_name} (오류 문의 시 첨부해 주세요)")
+                log(f"🎬 테스트 블랙박스 합본 영상이 저장되었습니다: blackbox_upload/{out_name} (최신 3개 자동 유지 · 오류 문의 시 첨부해 주세요)")
             else:
-                prune_blackbox_upload_dir(max_keep=3)
                 log(f"🎬 업로드 블랙박스 합본 영상이 저장되었습니다: blackbox_upload/{out_name} (최신 3개 자동 유지)")
             return out_path
         if is_test_mode:
-            log("⚠️ [테스트 모드] 합본할 수 있는 유효한 블랙박스 녹화본이 없어 바탕화면 저장을 건너뛰었습니다.")
+            log("⚠️ [테스트 모드] 합본할 수 있는 유효한 블랙박스 녹화본이 없어 blackbox_upload 저장을 건너뛰었습니다.")
         else:
             log("⚠️ [업로드 블랙박스] 합본할 수 있는 유효한 녹화본이 없어 MP4 저장을 건너뛰었습니다.")
         return ''
 
 
 def merge_test_blackbox_to_desktop(session_dir, start_dt=None):
-    """기존 호환 래퍼: 테스트 모드 블랙박스 세션을 바탕화면(~/Desktop) 단일 MP4로 합본 저장"""
-    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
-    return merge_blackbox_session_to_mp4(session_dir, desktop_dir, start_dt=start_dt, is_test_mode=True)
+    """기존 호환 래퍼: 테스트 모드 블랙박스 세션을 blackbox_upload/ 단일 MP4로 합본 저장"""
+    return merge_blackbox_session_to_mp4(session_dir, BLACKBOX_UPLOAD_DIR, start_dt=start_dt, is_test_mode=True)
 
 
 def _finalize_blackbox_session_merge_once():
-    """실행(테스트 모드 또는 일반 업로드) 세션당 정확히 1회만 FFmpeg 단일 MP4 합본 저장을 실행"""
+    """실행(테스트 모드 또는 일반 업로드) 세션당 정확히 1회만 FFmpeg 단일 MP4 합본을 blackbox_upload/에 저장"""
     with STATE_LOCK:
         if STATE.get('test_merged_done'):
             return ''
@@ -891,8 +890,7 @@ def _finalize_blackbox_session_merge_once():
     set_blackbox_session_dir('')
     if not sdir:
         return ''
-    out_dir = os.path.join(os.path.expanduser('~'), 'Desktop') if is_test else BLACKBOX_UPLOAD_DIR
-    return merge_blackbox_session_to_mp4(sdir, out_dir, start_dt=sdt, is_test_mode=is_test)
+    return merge_blackbox_session_to_mp4(sdir, BLACKBOX_UPLOAD_DIR, start_dt=sdt, is_test_mode=is_test)
 
 
 def _finalize_test_mode_merge_once():
@@ -925,6 +923,8 @@ def _diagnose_run_issue(item):
         return '사용자 건너뜀 ([이 플랫폼만 건너뛰기] 요청)'
     if status == '중단' or '강제 중지' in err_msg or 'interruptederror' in combined:
         return '사용자 강제 중지 ([강제 중지] 요청으로 중단)'
+    if '조준 검증 실패' in err_msg:
+        return '테스트 모드 최종 게시 버튼 조준 검증 실패'
     if any(k in combined for k in (
         'targetclosederror',
         'target page, context or browser has been closed',
@@ -969,7 +969,7 @@ def _md_cell(text):
 
 
 def write_run_report(platform_results, mode_label='실업로드', video_name='', start_dt=None, end_dt=None, stopped_by_user=False):
-    """성공·실패·건너뜀·강제 중지·테스트 모드 여부와 관계없이 매 실행 종료 시 프로젝트 루트 report.md에 최신 실행 리포트를 저장"""
+    """성공·실패·건너뜀·강제 중지·테스트 모드 여부와 관계없이 매 실행 종료 시 blackbox_upload/report.md에 최신 실행 리포트를 저장"""
     end_t = end_dt if isinstance(end_dt, datetime.datetime) else datetime.datetime.now()
     start_t = start_dt if isinstance(start_dt, datetime.datetime) else end_t
     elapsed_sec = max(0.0, (end_t - start_t).total_seconds())
@@ -994,7 +994,7 @@ def write_run_report(platform_results, mode_label='실업로드', video_name='',
         result_summary += f' / 중단 {stop_cnt}건'
 
     lines = [
-        '# 실행 결과 리포트 (`report.md`)',
+        '# 실행 결과 리포트 (`blackbox_upload/report.md`)',
         '',
         '## 1. 실행 요약',
         f'- **기록 시각**: {now_str}',
@@ -1085,6 +1085,7 @@ def write_run_report(platform_results, mode_label='실업로드', video_name='',
             lines.append('')
 
     try:
+        os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
         with open(REPORT_PATH, 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines).rstrip() + '\n')
         return REPORT_PATH
@@ -3595,6 +3596,10 @@ def worker_publish(payload):
             return
 
         if ok:
+            aim_msg = str(diag.get('aim_result') or '').strip() if test_mode else ''
+            if aim_msg:
+                final_msg = aim_msg
+                mark_res(pkey, True, aim_msg)
             platform_records[pkey] = {
                 'key': pkey,
                 'label': label,
@@ -3649,9 +3654,9 @@ def worker_publish(payload):
                 yt_tb = ''
                 try:
                     if test_mode:
-                        log('🧪 [테스트 모드 - 유튜브 쇼츠] 공식 API 실업로드를 건너뛰고 정상 통과합니다.')
+                        log('🧪 [테스트 모드 - 유튜브 쇼츠] API 테스트 통과 (버튼 조준 대상 아님)')
                         yt_ok = True
-                        mark_res('yt', True, '테스트 통과')
+                        mark_res('yt', True, 'API 테스트 통과 (버튼 조준 대상 아님)')
                     else:
                         log('🔴 [유튜브 쇼츠] 업로드 시작...')
                         yt_url = upload_to_youtube(normalize_branch_name(payload.get('yt_title', '')), normalize_branch_name(payload.get('yt_body', '')), split_tags(payload.get('yt_tags')), video_path, 'public')
@@ -4018,7 +4023,7 @@ def worker_publish(payload):
             if ACTIVE_WORKER_THREAD is threading.current_thread():
                 ACTIVE_WORKER_THREAD = None
 
-        # 매 실행 종료 시(성공·실패·건너뜀·강제 중지·테스트 모드 포함) 항상 report.md 최신 리포트 저장
+        # 매 실행 종료 시(성공·실패·건너뜀·강제 중지·테스트 모드 포함) 항상 blackbox_upload/report.md 최신 리포트 저장
         final_report_items = []
         now_end_dt = datetime.datetime.now()
         now_end_str = now_end_dt.strftime('%Y-%m-%d %H:%M:%S')
@@ -4058,7 +4063,7 @@ def worker_publish(payload):
             end_dt=now_end_dt,
             stopped_by_user=was_stopped,
         ):
-            log('📝 [실행 리포트 저장] report.md에 이번 작업 결과를 기록했습니다.')
+            log('📝 [실행 리포트 저장] blackbox_upload/report.md에 이번 작업 결과를 기록했습니다.')
 
         # 강제 중지 경로가 아닌 일반 완료 시 여기서 FFmpeg 단일 MP4 합본 저장
         # (강제 중지 시에는 force_stop_active_task가 완료 로그 직후 합본 저장)
@@ -4067,10 +4072,10 @@ def worker_publish(payload):
             clean_and_unify_blackbox_files(clear_thumbs=(False if test_mode else naver_completed))
 
 def get_done_storage_info():
-    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox_upload/ 폴더의 합산 용량 및 파일 개수 계산"""
+    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox_upload/(report.md 제외) 폴더의 합산 용량 및 파일 개수 계산"""
     total_bytes = 0
     file_count = 0
-    for target_dir, exclude_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, set())):
+    for target_dir, exclude_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, {'report.md'})):
         if not os.path.isdir(target_dir):
             continue
         for root, _, files in os.walk(target_dir):
@@ -4096,7 +4101,7 @@ def get_done_storage_info():
 
 
 def clear_done_and_thumbs():
-    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox_upload/ 폴더 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
+    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox_upload/ 폴더(report.md 보존) 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
     with STATE_LOCK:
         is_busy = STATE.get('busy')
     if is_busy:
@@ -4104,7 +4109,7 @@ def clear_done_and_thumbs():
 
     before = get_done_storage_info()
     removed_count = 0
-    for target_dir, keep_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, set())):
+    for target_dir, keep_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, {'report.md'})):
         if not os.path.isdir(target_dir):
             continue
         for entry in list(os.listdir(target_dir)):

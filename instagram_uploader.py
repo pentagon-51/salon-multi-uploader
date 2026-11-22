@@ -14,6 +14,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     load_profile,
     get_place_search_keyword,
     get_region_tags,
@@ -309,20 +310,31 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
             except Exception:
                 pass
 
+            share_btn = None
+            for sh in ["공유하기", "Share"]:
+                try:
+                    cand = page.locator(f'div[role="button"]:has-text("{sh}"), button:has-text("{sh}")').first
+                    if cand.is_visible(timeout=4000):
+                        share_btn = cand
+                        break
+                except Exception:
+                    pass
+
             if test_mode:
-                print("🧪 [테스트 모드 - 인스타그램] 최종 공유 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                aim_res = verify_publish_button_aim(
+                    share_btn,
+                    expected_keywords=["공유하기", "Share"],
+                    platform_name="인스타그램",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 인스타그램] 최종 공유 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "인스타그램")
                 wait_for_test_mode_close(context, "인스타그램", stop_checker=stop_checker)
                 return "test_mode_ok"
 
-            for sh in ["공유하기", "Share"]:
-                try:
-                    s_btn = page.locator(f'div[role="button"]:has-text("{sh}"), button:has-text("{sh}")').first
-                    if s_btn.is_visible(timeout=4000):
-                        s_btn.click()
-                        break
-                except Exception:
-                    pass
+            if share_btn is not None:
+                share_btn.click()
             for _ in range(20):
                 time.sleep(1.5)
                 if page.locator('text="게시물이 공유되었습니다"').count() > 0 or page.locator('text="Your post has been shared"').count() > 0:

@@ -14,6 +14,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     load_profile,
     get_region_tags,
     get_effective_banned_tags,
@@ -147,7 +148,14 @@ def upload_to_x(body="", tags=None, video_path=None, login_only=False, stop_chec
                 if post_btn.get_attribute("disabled") is None and post_btn.get_attribute("aria-disabled") != "true": break
                 time.sleep(1.5)
             if test_mode:
-                print("🧪 [테스트 모드 - 엑스(X)] 최종 게시 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                aim_res = verify_publish_button_aim(
+                    post_btn,
+                    expected_keywords=["게시", "Post", "트윗"],
+                    platform_name="엑스",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 엑스(X)] 최종 게시 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "엑스(X)")
                 wait_for_test_mode_close(context, "엑스(X)", stop_checker=stop_checker)
                 return True

@@ -961,7 +961,7 @@ def capture_page_diagnostics(page):
 
 def attach_diagnostics_tracker(context, platform_name=""):
     """컨텍스트의 페이지 이동/로드 시점에 최신 URL과 표시 버튼 목록을 스레드 안전하게 캐시
-    (강제 건너뛰기·브라우저 급종료 시에도 직전 페이지 URL/버튼 정보를 report.md에 보존)"""
+    (강제 건너뛰기·브라우저 급종료 시에도 직전 페이지 URL/버튼 정보를 blackbox_upload/report.md에 보존)"""
     if context is None:
         return
 
@@ -1042,6 +1042,203 @@ def get_platform_diagnostics(platform_name):
         return dict(_PLATFORM_DIAGNOSTICS.get(str(platform_name or "").strip()) or {})
 
 
+DEFAULT_FORBIDDEN_PUBLISH_KEYWORDS = (
+    "옵션",
+    "options",
+    "option",
+    "취소",
+    "cancel",
+    "임시저장",
+    "임시 저장",
+    "draft",
+    "닫기",
+    "close",
+)
+
+
+def _store_platform_aim_result(platform_name, message, page_url=""):
+    pname = str(platform_name or "").strip()
+    if not pname:
+        with _DIAG_LOCK:
+            pname = _ACTIVE_DIAG_PLATFORM
+    if not pname:
+        return
+    with _DIAG_LOCK:
+        cur = dict(_PLATFORM_DIAGNOSTICS.get(pname) or {})
+        cur["aim_result"] = str(message or "").strip()
+        if page_url:
+            cur["url"] = str(page_url).strip()
+        cur["captured_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _PLATFORM_DIAGNOSTICS[pname] = cur
+
+
+def verify_publish_button_aim(
+    locator,
+    expected_keywords=None,
+    forbidden_keywords=None,
+    platform_name="",
+    highlight=True,
+):
+    """테스트 모드 전용 최종 게시 버튼 조준 검증 헬퍼 (버튼을 절대 클릭하지 않음).
+    실업로드 시 누를 최종 버튼이 화면에 보이고 활성화되어 있으며 금지 키워드(옵션/취소 등)가 아닌지 검증하고,
+    통과 시 0.5초간 빨간 테두리 하이라이트(블랙박스 녹화 확인용) 후 결과를 진단에 기록합니다."""
+    label = str(platform_name or "").strip() or "플랫폼"
+    page_url = ""
+    try:
+        if locator is not None and getattr(locator, "page", None) is not None:
+            page_url = str(locator.page.url or "").strip()
+    except Exception:
+        page_url = ""
+
+    def _fail(reason_msg, btn_text="", enabled=False):
+        full_msg = f"조준 검증 실패 — {reason_msg}"
+        _store_platform_aim_result(platform_name, full_msg, page_url=page_url)
+        print(f"❌ [{label} 최종 게시 버튼 조준 검증 실패] {reason_msg}", flush=True)
+        return {"ok": False, "text": btn_text, "enabled": enabled, "message": full_msg}
+
+    if locator is None:
+        return _fail("최종 게시 버튼을 찾지 못했습니다 (대상 요소 없음)")
+
+    try:
+        cnt = locator.count()
+    except Exception as e:
+        return _fail(f"최종 게시 버튼 조회 오류 ({e})")
+    if cnt <= 0:
+        return _fail("최종 게시 버튼이 DOM에 존재하지 않습니다")
+
+    try:
+        visible = locator.is_visible(timeout=2000)
+    except Exception:
+        visible = False
+    if not visible:
+        return _fail("최종 게시 버튼이 화면에 표시되지 않았습니다")
+
+    btn_text = ""
+    try:
+        raw_txt = locator.inner_text(timeout=2000) or ""
+        btn_text = re.sub(r"\s+", " ", raw_txt).strip()
+    except Exception:
+        btn_text = ""
+    if not btn_text:
+        try:
+            raw_fb = locator.evaluate(
+                """(el) => (
+                    el.innerText || el.textContent || el.getAttribute('aria-label') || el.getAttribute('title') || el.value || ''
+                ).trim()"""
+            )
+            btn_text = re.sub(r"\s+", " ", str(raw_fb or "")).strip()
+        except Exception:
+            btn_text = ""
+
+    # 활성화(클릭 가능) 상태 정밀 확인
+    enabled = True
+    disable_reason = ""
+    try:
+        if locator.is_disabled():
+            enabled = False
+            disable_reason = "disabled 상태"
+    except Exception:
+        pass
+
+    if enabled:
+        try:
+            state = locator.evaluate(
+                """(el) => {
+                    const cs = window.getComputedStyle(el);
+                    const ariaDis = (el.getAttribute('aria-disabled') || '').toLowerCase();
+                    const dataDis = (el.getAttribute('data-disabled') || '').toLowerCase();
+                    const dataLoad = (el.getAttribute('data-loading') || '').toLowerCase();
+                    const hasDisAttr = el.disabled === true || el.hasAttribute('disabled');
+                    const anc = el.closest('[aria-disabled="true"], [disabled]');
+                    const op = parseFloat(cs.opacity || '1');
+                    return {
+                        disabled: hasDisAttr || ariaDis === 'true' || dataDis === 'true' || dataLoad === 'true' || Boolean(anc),
+                        pointerEvents: cs.pointerEvents || '',
+                        opacity: Number.isNaN(op) ? 1 : op,
+                        loading: dataLoad === 'true',
+                    };
+                }"""
+            )
+            if isinstance(state, dict):
+                if state.get("loading"):
+                    enabled = False
+                    disable_reason = "로딩 중(data-loading=true)"
+                elif state.get("disabled"):
+                    enabled = False
+                    disable_reason = "비활성화(disabled/aria-disabled)"
+                elif str(state.get("pointerEvents") or "").lower() == "none":
+                    enabled = False
+                    disable_reason = "클릭 불가(pointer-events: none)"
+                elif float(state.get("opacity", 1.0)) < 0.65:
+                    enabled = False
+                    disable_reason = f"반투명 비활성 상태(opacity={state.get('opacity')})"
+        except Exception:
+            try:
+                if locator.get_attribute("disabled") is not None or (locator.get_attribute("aria-disabled") or "").lower() == "true":
+                    enabled = False
+                    disable_reason = "비활성화(disabled/aria-disabled)"
+            except Exception:
+                pass
+
+    if not enabled:
+        disp_txt = btn_text or "(텍스트 없음)"
+        return _fail(f'버튼 "{disp_txt}" 비활성화 상태 ({disable_reason})', btn_text=btn_text, enabled=False)
+
+    # 금지 키워드 검사 (예: "게시물 옵션", "취소", "임시저장" 등 오조준 차단)
+    forbid_list = list(forbidden_keywords) if forbidden_keywords is not None else list(DEFAULT_FORBIDDEN_PUBLISH_KEYWORDS)
+    txt_low = btn_text.lower()
+    for fk in forbid_list:
+        fk_s = str(fk or "").strip()
+        if fk_s and fk_s.lower() in txt_low:
+            return _fail(f'금지된 버튼 오인 감지: "{btn_text}" (금지 키워드: "{fk_s}")', btn_text=btn_text, enabled=True)
+
+    # 기대 키워드 검사 (지정된 경우 최소 1개 이상 일치 필요)
+    if expected_keywords:
+        exp_clean = [str(k or "").strip() for k in expected_keywords if str(k or "").strip()]
+        if exp_clean:
+            if not btn_text:
+                return _fail(f'버튼 텍스트가 비어 있습니다 (기대 키워드: {", ".join(exp_clean)})', btn_text="", enabled=True)
+            if not any(k.lower() in txt_low for k in exp_clean):
+                return _fail(
+                    f'예상 게시 버튼과 불일치: "{btn_text}" (기대: {", ".join(exp_clean)})',
+                    btn_text=btn_text,
+                    enabled=True,
+                )
+
+    # 블랙박스 영상에서 육안 확인이 쉽도록 0.5초간 빨간 테두리 하이라이트 (클릭 절대 안 함)
+    if highlight:
+        try:
+            locator.scroll_into_view_if_needed(timeout=2000)
+        except Exception:
+            pass
+        try:
+            prev_style = locator.evaluate(
+                """(el) => {
+                    const prev = { outline: el.style.outline || '', outlineOffset: el.style.outlineOffset || '' };
+                    el.style.outline = '3px solid red';
+                    el.style.outlineOffset = '2px';
+                    return prev;
+                }"""
+            )
+            time.sleep(0.5)
+            locator.evaluate(
+                """(el, prev) => {
+                    if (!prev) return;
+                    el.style.outline = prev.outline || '';
+                    el.style.outlineOffset = prev.outlineOffset || '';
+                }""",
+                prev_style,
+            )
+        except Exception:
+            pass
+
+    disp_txt = btn_text or "(아이콘/submit 버튼)"
+    ok_msg = f'조준 검증 통과 — 버튼: "{disp_txt}" (활성화됨)'
+    _store_platform_aim_result(platform_name, ok_msg, page_url=page_url)
+    print(f"🎯 [{label}] {ok_msg}", flush=True)
+    return {"ok": True, "text": btn_text, "enabled": True, "message": ok_msg}
+
+
 def set_blackbox_session_dir(dir_path="", session_kind="upload"):
     """업로드/테스트 실행 중 각 플랫폼 녹화 클립(.webm)을 1회 실행 임시 세션 폴더에 순차 수집하도록 지정"""
     global _TEST_BLACKBOX_DIR, _TEST_BLACKBOX_SEQ, _TEST_BLACKBOX_KIND
@@ -1084,14 +1281,16 @@ def _next_test_blackbox_path(platform_name):
 
 
 def prune_blackbox_upload_dir(max_keep=3):
-    """내부 blackbox_upload/ 폴더에 녹화 파일(.mp4 합본 및 .webm)을 최신 max_keep(기본 3개)만 유지하고 오래된 파일부터 자동 삭제"""
+    """내부 blackbox_upload/ 폴더의 영상 파일(.mp4, .webm, .mov)만 최신 max_keep(기본 3개) 유지하고
+    오래된 영상부터 자동 삭제 (report.md 등 리포트 파일은 절대 삭제하지 않음)"""
     upload_bb_dir = get_blackbox_upload_dir()
     if not os.path.isdir(upload_bb_dir):
         return []
+    video_exts = (".mp4", ".webm", ".mov")
     vids = []
     for fn in os.listdir(upload_bb_dir):
         fp = os.path.join(upload_bb_dir, fn)
-        if os.path.isfile(fp) and fn.lower().endswith((".webm", ".mp4")):
+        if os.path.isfile(fp) and fn.lower().endswith(video_exts):
             try:
                 vids.append((os.path.getmtime(fp), fn, fp))
             except Exception:

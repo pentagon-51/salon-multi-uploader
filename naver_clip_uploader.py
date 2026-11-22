@@ -14,6 +14,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     load_profile,
     get_place_search_keyword,
     get_region_tags,
@@ -355,12 +356,19 @@ def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_na
             # 7단계: 하단 [등록] 버튼 클릭
             page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             time.sleep(1.0)
+            sub_btn = page.locator('button:text-is("등록"), button:has-text("등록"), button:has-text("발행")').last
             if test_mode:
-                print("🧪 [테스트 모드 - 네이버 클립] 최종 등록 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                aim_res = verify_publish_button_aim(
+                    sub_btn,
+                    expected_keywords=["등록", "발행"],
+                    platform_name="네이버클립",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 네이버 클립] 최종 등록 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "네이버 클립")
                 wait_for_test_mode_close(context, "네이버 클립", stop_checker=stop_checker)
                 return True
-            sub_btn = page.locator('button:text-is("등록"), button:has-text("등록"), button:has-text("발행")').last
             if sub_btn.count() > 0:
                 sub_btn.scroll_into_view_if_needed()
                 time.sleep(0.5)

@@ -14,6 +14,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     normalize_branch_name,
     load_profile,
     get_salon_name,
@@ -170,12 +171,6 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
                     time.sleep(1.0)
             except Exception: pass
 
-            if test_mode:
-                print("🧪 [테스트 모드 - 핀터레스트] 최종 발행 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
-                save_storage_state_safely(context, COOKIES_PATH, "핀터레스트")
-                wait_for_test_mode_close(context, "핀터레스트", stop_checker=stop_checker)
-                return "test_mode_ok"
-
             publish_btn = page.locator('[data-test-id="board-dropdown-save-button"], button:has-text("발행"), button:has-text("게시"), button:has-text("Publish")').last
             if publish_btn.count() > 0:
                 for _ in range(40):
@@ -183,6 +178,21 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
                     if dis is None and not publish_btn.is_disabled():
                         break
                     time.sleep(1.5)
+
+            if test_mode:
+                aim_res = verify_publish_button_aim(
+                    publish_btn,
+                    expected_keywords=["발행", "게시", "Publish"],
+                    platform_name="핀터레스트",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 핀터레스트] 최종 발행 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
+                save_storage_state_safely(context, COOKIES_PATH, "핀터레스트")
+                wait_for_test_mode_close(context, "핀터레스트", stop_checker=stop_checker)
+                return "test_mode_ok"
+
+            if publish_btn.count() > 0:
                 time.sleep(1.5)
                 publish_btn.click(force=True)
                 time.sleep(8)

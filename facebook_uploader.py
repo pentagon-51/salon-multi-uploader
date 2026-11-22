@@ -16,6 +16,7 @@ from os_utils import (
     finalize_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
+    verify_publish_button_aim,
     load_profile,
     get_salon_name,
     get_region_tags,
@@ -234,8 +235,8 @@ def _attach_video_to_composer(page, video_path):
     return False
 
 
-def _click_visible_button_by_texts(page, texts, timeout_ms=2500):
-    """우선순위 텍스트 목록 중 현재 화면에 활성화된 버튼/role=button을 찾아 클릭"""
+def _find_visible_button_by_texts(page, texts, timeout_ms=2500):
+    """우선순위 텍스트 목록 중 현재 화면에 활성화된 버튼/role=button을 찾아 (locator, matched_text) 반환"""
     for txt in texts:
         sels = [
             f'div[role="button"]:text-is("{txt}")',
@@ -256,12 +257,23 @@ def _click_visible_button_by_texts(page, texts, timeout_ms=2500):
                             continue
                     except Exception:
                         pass
-                    el.scroll_into_view_if_needed()
-                    el.click(force=True)
-                    return txt
+                    return el, txt
             except Exception:
                 pass
-    return ""
+    return None, ""
+
+
+def _click_visible_button_by_texts(page, texts, timeout_ms=2500):
+    """우선순위 텍스트 목록 중 현재 화면에 활성화된 버튼/role=button을 찾아 클릭"""
+    el, txt = _find_visible_button_by_texts(page, texts, timeout_ms=timeout_ms)
+    if el is None:
+        return ""
+    try:
+        el.scroll_into_view_if_needed()
+        el.click(force=True)
+        return txt
+    except Exception:
+        return ""
 
 
 def _fill_caption_textbox(page, full_caption):
@@ -611,13 +623,22 @@ def upload_to_facebook_personal(body="", tags=None, video_path=None, login_only=
             print("✍️ [페이스북(개인)] 본문 및 해시태그 입력 완료!", flush=True)
             time.sleep(1.5)
 
+            pub_texts = ["게시", "공유", "Publish", "Share", "Post"]
             if test_mode:
-                print("🧪 [테스트 모드 - 페이스북(개인)] 최종 게시 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                pub_btn, _ = _find_visible_button_by_texts(page, pub_texts, timeout_ms=4000)
+                aim_res = verify_publish_button_aim(
+                    pub_btn,
+                    expected_keywords=pub_texts,
+                    platform_name="페이스북개인",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 페이스북(개인)] 최종 게시 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "페이스북(개인)", mark_verified=True)
                 wait_for_test_mode_close(context, "페이스북(개인)", stop_checker=stop_checker)
                 return "test_mode_ok"
 
-            clicked_pub = _click_visible_button_by_texts(page, ["게시", "공유", "Publish", "Share", "Post"], timeout_ms=4000)
+            clicked_pub = _click_visible_button_by_texts(page, pub_texts, timeout_ms=4000)
             if not clicked_pub:
                 raise RuntimeError("페이스북(개인) 최종 게시(공유) 버튼을 찾지 못했습니다.")
 
@@ -739,13 +760,22 @@ def upload_to_facebook_page(body="", tags=None, video_path=None, page_name="", l
             print("✍️ [페이스북(매장)] 본문 및 해시태그 입력 완료!", flush=True)
             time.sleep(1.5)
 
+            page_pub_texts = ["공유", "게시", "지금 공유", "Share", "Publish", "Share now"]
             if test_mode:
-                print("🧪 [테스트 모드 - 페이스북(매장)] 최종 게시 직전까지 입력·설정 확인 완료 (실제 게시 안 함)", flush=True)
+                pub_btn, _ = _find_visible_button_by_texts(page, page_pub_texts, timeout_ms=4000)
+                aim_res = verify_publish_button_aim(
+                    pub_btn,
+                    expected_keywords=page_pub_texts,
+                    platform_name="페이스북매장",
+                )
+                if not aim_res["ok"]:
+                    raise RuntimeError(aim_res["message"])
+                print("🧪 [테스트 모드 - 페이스북(매장)] 최종 게시 버튼 조준 검증 통과 (실제 게시 안 함)", flush=True)
                 save_storage_state_safely(context, COOKIES_PATH, "페이스북(매장)", mark_verified=True)
                 wait_for_test_mode_close(context, "페이스북(매장)", stop_checker=stop_checker)
                 return "test_mode_ok"
 
-            clicked_pub = _click_visible_button_by_texts(page, ["공유", "게시", "지금 공유", "Share", "Publish", "Share now"], timeout_ms=4000)
+            clicked_pub = _click_visible_button_by_texts(page, page_pub_texts, timeout_ms=4000)
             if not clicked_pub:
                 raise RuntimeError("페이스북(매장) 최종 게시(공유) 버튼을 찾지 못했습니다.")
 
