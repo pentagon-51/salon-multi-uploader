@@ -77,8 +77,10 @@ SAFE_DAILY_LIMITS = {
     'ig': 3,
     'pin': 10,
     'threads': 5,
-    'daangn': 2,
     'x': 5,
+    'fb': 3,
+    'fb_page': 3,
+    'daangn': 2,
 }
 YOUTUBE_POINTS_PER_UPLOAD = 1600
 YOUTUBE_MAX_POINTS = 10000
@@ -146,7 +148,7 @@ ESSENTIAL_ITEMS = {
     'build_release.py', '2-1. 맥북 최초설치.command', '2-2. 맥북 프로그램 실행.command',
     'version.json', 'LICENSE.txt', '.gitignore', '.gitattributes', 'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
     '0. 처음사용자 안내서.html', '1-1. 윈도우 최초설치.bat', '1-2. 윈도우 프로그램 실행.bat', '.installed_done', '_설치완료_보관함',
-    'naver_blog_uploader.py', 'naver_clip_uploader.py', 'tiktok_uploader.py', 'instagram_uploader.py', 'pinterest_uploader.py', 'threads_uploader.py', 'daangn_uploader.py', 'x_uploader.py',
+    'naver_blog_uploader.py', 'naver_clip_uploader.py', 'tiktok_uploader.py', 'instagram_uploader.py', 'pinterest_uploader.py', 'threads_uploader.py', 'daangn_uploader.py', 'x_uploader.py', 'facebook_uploader.py',
     'app.log',
     'auth_data', 'blackbox_login', 'blackbox_upload', 'upload', 'done', 'debug_records', '_old_backup', 'temp_thumbs', '__pycache__'
 }
@@ -239,7 +241,7 @@ def _check_cookie_status_and_age(cookie_filename, deep=False):
         return 'green', 0
 
 def get_setup_status(deep=False):
-    """9개 플랫폼 로그인/API 상태 신호등(green/yellow/red) 및 쿠키 경과 일수 반환.
+    """11개 플랫폼 로그인/API 상태 신호등(green/yellow/red) 및 쿠키 경과 일수 반환.
     deep=True는 로그인 창 닫힘 직후 및 [상태 새로고침] 수동 클릭 시에만 1회 실행."""
     migrate_legacy_auth_files()
     secret_path = get_auth_file('client_secret.json')
@@ -258,8 +260,9 @@ def get_setup_status(deep=False):
     ig_state, ig_age = _check_cookie_status_and_age('instagram_cookies.json', deep=deep)
     pin_state, pin_age = _check_cookie_status_and_age('pinterest_cookies.json', deep=deep)
     th_state, th_age = _check_cookie_status_and_age('threads_cookies.json', deep=deep)
-    dg_state, dg_age = _check_cookie_status_and_age('daangn_cookies.json', deep=deep)
     x_state, x_age = _check_cookie_status_and_age('x_cookies.json', deep=deep)
+    fb_state, fb_age = _check_cookie_status_and_age('facebook_cookies.json', deep=deep)
+    dg_state, dg_age = _check_cookie_status_and_age('daangn_cookies.json', deep=deep)
 
     return {
         'yt': yt_state,
@@ -269,8 +272,10 @@ def get_setup_status(deep=False):
         'ig': ig_state,
         'pin': pin_state,
         'threads': th_state,
-        'daangn': dg_state,
         'x': x_state,
+        'fb': fb_state,
+        'fb_page': fb_state,
+        'daangn': dg_state,
         'cookie_ages': {
             'naver': naver_age,
             'clip': naver_age,
@@ -278,8 +283,10 @@ def get_setup_status(deep=False):
             'ig': ig_age,
             'pin': pin_age,
             'threads': th_age,
-            'daangn': dg_age,
             'x': x_age,
+            'fb': fb_age,
+            'fb_page': fb_age,
+            'daangn': dg_age,
         },
         'has_client_secret': has_secret,
         'has_youtube_token': has_token,
@@ -1159,7 +1166,7 @@ def clean_and_unify_blackbox_files(clear_thumbs=False):
     """1) 구버전 auth/블랙박스 파일 전용 폴더 이관 2) 불필요한 .png 삭제
     3) 로그인용(blackbox_login/)과 업로드용(blackbox_upload/)으로 녹화본 분리 통합
     4) 구버전 blackbox/ 폴더 이관 후 제거 및 debug_records/temp_thumbs 임시 찌꺼기 정리"""
-    platforms = ['네이버블로그', '네이버클립', '틱톡', '인스타그램', '핀터레스트', '쓰레드', '당근', '엑스']
+    platforms = ['네이버블로그', '네이버클립', '틱톡', '인스타그램', '핀터레스트', '쓰레드', '엑스', '페이스북개인', '페이스북매장', '당근']
     try:
         migrate_legacy_auth_files()
         os.makedirs(BLACKBOX_LOGIN_DIR, exist_ok=True)
@@ -2417,7 +2424,7 @@ def _prepare_instagram_preserved_body(raw_text):
 
 
 def convert_master_content(data_text, video_name='', profile_override=None):
-    """순수 파이썬 메인 원고 변환 엔진 (API 키 불필요 · 9개 플랫폼 자동 분배 및 인스타 커스텀 스타일 보호)"""
+    """순수 파이썬 메인 원고 변환 엔진 (API 키 불필요 · 11개 플랫폼 자동 분배 및 인스타 커스텀 스타일 보호)"""
     nl = chr(10)
     prof = profile_override if isinstance(profile_override, dict) else load_profile()
     salon_name = get_salon_name(prof, fallback='우리 매장')
@@ -3095,8 +3102,10 @@ def convert_master_content(data_text, video_name='', profile_override=None):
         'instagram_body': ig_body, 'instagram_tags': tags_5_str,
         'pin_title': pin_title, 'pin_body': pin_body, 'pin_tags': tags_5_str,
         'threads_body': threads_body, 'threads_tags': threads_tags_str,
+        'x_body': x_body, 'x_tags': x_tags_str,
+        'fb_body': ig_body, 'fb_tags': tags_5_str,
+        'fb_page_body': ig_body, 'fb_page_tags': tags_5_str,
         'daangn_title': daangn_title, 'daangn_body': daangn_body,
-        'x_body': x_body, 'x_tags': x_tags_str
     }
 
 # 기존 내부 호출 호환 별칭 (순수 파이썬 메인 변환 엔진 단일화)
@@ -3185,8 +3194,10 @@ def worker_auth_check(payload):
         (payload.get('use_ig'), 'ig', 'instagram_cookies.json', '인스타그램', 'https://www.instagram.com/'),
         (payload.get('use_pin'), 'pin', 'pinterest_cookies.json', '핀터레스트', 'https://kr.pinterest.com/pin-creation-tool/'),
         (payload.get('use_threads'), 'threads', 'threads_cookies.json', '쓰레드', 'https://www.threads.com/'),
-        (payload.get('use_daangn'), 'daangn', 'daangn_cookies.json', '당근 비즈', 'https://business.daangn.com/'),
         (payload.get('use_x'), 'x', 'x_cookies.json', '엑스(X)', 'https://x.com/compose/post'),
+        (payload.get('use_fb'), 'fb', 'facebook_cookies.json', '페이스북(개인)', 'https://www.facebook.com/'),
+        (payload.get('use_fb_page'), 'fb_page', 'facebook_cookies.json', '페이스북(매장)', 'https://business.facebook.com/'),
+        (payload.get('use_daangn'), 'daangn', 'daangn_cookies.json', '당근 비즈', 'https://business.daangn.com/'),
     ]
     selected = [(key, cfile, label, url) for enabled, key, cfile, label, url in login_targets if enabled]
     checked_cookie_files = {cfile for _, cfile, _, _ in selected}
@@ -3199,19 +3210,21 @@ def worker_auth_check(payload):
         ('instagram_cookies.json', ('instagram.com/accounts/login',), ('instagram.com',)),
         ('pinterest_cookies.json', ('pinterest.com/login', '/login/'), ('pinterest.com',)),
         ('threads_cookies.json', ('threads.com/login', 'threads.net/login'), ('threads.com', 'threads.net')),
-        ('daangn_cookies.json', ('accounts.daangn.com', '/login', '/signin', '/auth'), ('daangn.com', 'karrotmarket.com')),
         ('x_cookies.json', ('x.com/i/flow/login', 'x.com/login', 'twitter.com/i/flow/login'), ('x.com', 'twitter.com')),
+        ('facebook_cookies.json', ('facebook.com/login', 'login.php', 'checkpoint', '/recover'), ('facebook.com',)),
+        ('daangn_cookies.json', ('accounts.daangn.com', '/login', '/signin', '/auth'), ('daangn.com', 'karrotmarket.com')),
     )
 
     def _inspect_live_tabs(ctx):
         """열려 있는 브라우저 탭을 정밀 점검:
-        1) 당근 비즈 실제 대시보드 진입 여부 확인(단순 열었다 닫기 시 절대 초록불 불가)
+        1) 당근 비즈·쓰레드·페이스북 실제 대시보드 진입 여부 확인(단순 열었다 닫기 시 절대 초록불 불가)
         2) 각 플랫폼 탭이 로그인 페이지로 리다이렉트된 채 머물러 있는지 감지해 잔여 쿠키 가짜 초록불 차단"""
         if ctx is None:
             return
         try:
             from daangn_uploader import is_daangn_logged_in
             from threads_uploader import is_threads_logged_in
+            from facebook_uploader import is_facebook_logged_in
             pages = list(ctx.pages)
         except Exception:
             return
@@ -3221,6 +3234,8 @@ def worker_auth_check(payload):
         daangn_seen_any = False
         threads_logged_in_any = False
         threads_seen_any = False
+        fb_logged_in_any = False
+        fb_seen_any = False
         for pg in pages:
             try:
                 if pg.is_closed():
@@ -3237,6 +3252,11 @@ def worker_auth_check(payload):
                     threads_seen_any = True
                     if is_threads_logged_in(pg):
                         threads_logged_in_any = True
+                    continue
+                if 'facebook.com' in cur_u:
+                    fb_seen_any = True
+                    if is_facebook_logged_in(pg):
+                        fb_logged_in_any = True
                     continue
                 for cfile, login_markers, dom_markers in LOGIN_PAGE_REDIRECT_RULES:
                     if any(dm in cur_u for dm in dom_markers):
@@ -3260,6 +3280,13 @@ def worker_auth_check(payload):
             else:
                 verified_platforms.discard('threads_cookies.json')
                 seen_login_page.add('threads_cookies.json')
+        if fb_seen_any:
+            if fb_logged_in_any:
+                verified_platforms.add('facebook_cookies.json')
+                seen_non_login_page.add('facebook_cookies.json')
+            else:
+                verified_platforms.discard('facebook_cookies.json')
+                seen_login_page.add('facebook_cookies.json')
         active_login_page_cfiles.clear()
         for cf in seen_login_page:
             if cf not in seen_non_login_page:
@@ -3505,8 +3532,10 @@ def worker_publish(payload):
         ('ig', '인스타그램', '인스타그램', 'use_ig'),
         ('pin', '핀터레스트', '핀터레스트', 'use_pin'),
         ('threads', '쓰레드', '쓰레드', 'use_threads'),
-        ('daangn', '당근 비즈', '당근', 'use_daangn'),
         ('x', '엑스(X)', '엑스', 'use_x'),
+        ('fb', '페이스북(개인)', '페이스북개인', 'use_fb'),
+        ('fb_page', '페이스북(매장)', '페이스북매장', 'use_fb_page'),
+        ('daangn', '당근 비즈', '당근', 'use_daangn'),
     ]
     selected_platforms = [(k, lbl, bbn) for k, lbl, bbn, flag in platform_order if payload.get(flag)]
     platform_records = {}
@@ -3836,6 +3865,94 @@ def worker_publish(payload):
 
             if _is_stop_requested(my_run_id):
                 break
+            if payload.get('use_x'):
+                _begin_platform('x', '엑스(X)', '엑스')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'x')
+                x_ok = False
+                x_exc = None
+                x_tb = ''
+                try:
+                    from x_uploader import upload_to_x
+                    log('𝕏 [엑스(X)] 게시 시작...')
+                    x_ok = bool(upload_to_x(body=normalize_branch_name(payload.get('x_body', '')), tags=split_tags(payload.get('x_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
+                    if x_ok:
+                        if not test_mode:
+                            record_daily_usage('x')
+                        mark_res('x', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'x'):
+                        mark_res('x', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [엑스(X)] ' + ('테스트 완료!' if test_mode else '게시 완료!') if x_ok else '⚠️ [엑스(X)] 게시 실패')
+                except Exception as e:
+                    x_exc = e
+                    x_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'x'):
+                        mark_res('x', False, str(e)[:80])
+                    if not p_stop():
+                        log(f'⚠️ [엑스(X)] 오류: {e}')
+                _finish_platform('x', '엑스(X)', '엑스', x_ok, exc_obj=x_exc, err_tb=x_tb)
+
+            if _is_stop_requested(my_run_id):
+                break
+            if payload.get('use_fb'):
+                _begin_platform('fb', '페이스북(개인)', '페이스북개인')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'fb')
+                fb_ok = False
+                fb_exc = None
+                fb_tb = ''
+                try:
+                    from facebook_uploader import upload_to_facebook_personal
+                    log('📘 [페이스북(개인)] 릴스 게시 시작...')
+                    fb_ok = bool(upload_to_facebook_personal(body=normalize_branch_name(payload.get('fb_body', '')), tags=split_tags(payload.get('fb_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
+                    if fb_ok:
+                        if not test_mode:
+                            record_daily_usage('fb')
+                        mark_res('fb', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'fb'):
+                        mark_res('fb', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [페이스북(개인)] ' + ('테스트 완료!' if test_mode else '게시 완료!') if fb_ok else '⚠️ [페이스북(개인)] 게시 실패')
+                except Exception as e:
+                    fb_exc = e
+                    fb_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'fb'):
+                        mark_res('fb', False, str(e)[:80])
+                    if not p_stop():
+                        log(f'⚠️ [페이스북(개인)] 오류: {e}')
+                _finish_platform('fb', '페이스북(개인)', '페이스북개인', fb_ok, exc_obj=fb_exc, err_tb=fb_tb)
+
+            if _is_stop_requested(my_run_id):
+                break
+            if payload.get('use_fb_page'):
+                _begin_platform('fb_page', '페이스북(매장)', '페이스북매장')
+                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'fb_page')
+                fbp_ok = False
+                fbp_exc = None
+                fbp_tb = ''
+                try:
+                    from facebook_uploader import upload_to_facebook_page
+                    fb_page_name = normalize_branch_name(payload.get('fb_page_name') or get_salon_name(prof, fallback=''))
+                    log(f'🏪 [페이스북(매장)] 메타 비즈니스 스위트 릴스 게시 시작 ({fb_page_name or "기본 페이지"})...')
+                    fbp_ok = bool(upload_to_facebook_page(body=normalize_branch_name(payload.get('fb_page_body', '')), tags=split_tags(payload.get('fb_page_tags')), video_path=video_path, page_name=fb_page_name, stop_checker=p_stop, test_mode=test_mode))
+                    if fbp_ok:
+                        if not test_mode:
+                            record_daily_usage('fb_page')
+                        mark_res('fb_page', True, '테스트 통과' if test_mode else '게시 완료')
+                    elif not _was_platform_skipped(my_run_id, 'fb_page'):
+                        mark_res('fb_page', False, '게시 실패')
+                    if not p_stop():
+                        log('✅ [페이스북(매장)] ' + ('테스트 완료!' if test_mode else '게시 완료!') if fbp_ok else '⚠️ [페이스북(매장)] 게시 실패')
+                except Exception as e:
+                    fbp_exc = e
+                    fbp_tb = traceback.format_exc()
+                    if not _was_platform_skipped(my_run_id, 'fb_page'):
+                        mark_res('fb_page', False, str(e)[:80])
+                    if not p_stop():
+                        log(f'⚠️ [페이스북(매장)] 오류: {e}')
+                _finish_platform('fb_page', '페이스북(매장)', '페이스북매장', fbp_ok, exc_obj=fbp_exc, err_tb=fbp_tb)
+
+            if _is_stop_requested(my_run_id):
+                break
             if payload.get('use_daangn'):
                 _begin_platform('daangn', '당근 비즈', '당근')
                 p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'daangn')
@@ -3863,35 +3980,6 @@ def worker_publish(payload):
                     if not p_stop():
                         log(f'⚠️ [당근 비즈프로필] 오류: {e}')
                 _finish_platform('daangn', '당근 비즈', '당근', d_ok, exc_obj=d_exc, err_tb=d_tb)
-
-            if _is_stop_requested(my_run_id):
-                break
-            if payload.get('use_x'):
-                _begin_platform('x', '엑스(X)', '엑스')
-                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'x')
-                x_ok = False
-                x_exc = None
-                x_tb = ''
-                try:
-                    from x_uploader import upload_to_x
-                    log('𝕏 [엑스(X)] 게시 시작...')
-                    x_ok = bool(upload_to_x(body=normalize_branch_name(payload.get('x_body', '')), tags=split_tags(payload.get('x_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
-                    if x_ok:
-                        if not test_mode:
-                            record_daily_usage('x')
-                        mark_res('x', True, '테스트 통과' if test_mode else '게시 완료')
-                    elif not _was_platform_skipped(my_run_id, 'x'):
-                        mark_res('x', False, '게시 실패')
-                    if not p_stop():
-                        log('✅ [엑스(X)] ' + ('테스트 완료!' if test_mode else '게시 완료!') if x_ok else '⚠️ [엑스(X)] 게시 실패')
-                except Exception as e:
-                    x_exc = e
-                    x_tb = traceback.format_exc()
-                    if not _was_platform_skipped(my_run_id, 'x'):
-                        mark_res('x', False, str(e)[:80])
-                    if not p_stop():
-                        log(f'⚠️ [엑스(X)] 오류: {e}')
-                _finish_platform('x', '엑스(X)', '엑스', x_ok, exc_obj=x_exc, err_tb=x_tb)
 
         if _is_stop_requested(my_run_id):
             log('🛑 [작업 중지 완료] 사용자 요청으로 남은 업로드를 모두 취소했습니다.')
@@ -4054,8 +4142,10 @@ HISTORY_FIELDS = (
     'ig_body', 'ig_tags',
     'pin_title', 'pin_body', 'pin_tags',
     'threads_body', 'threads_tags',
-    'daangn_title', 'daangn_body',
     'x_body', 'x_tags',
+    'fb_body', 'fb_tags',
+    'fb_page_body', 'fb_page_tags',
+    'daangn_title', 'daangn_body',
 )
 
 
@@ -4088,7 +4178,7 @@ def _history_dedup_key(rec):
     return (title, body)
 
 
-HISTORY_PLATFORM_ORDER = ('yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'daangn', 'x')
+HISTORY_PLATFORM_ORDER = ('yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'x', 'fb', 'fb_page', 'daangn')
 HISTORY_PLATFORM_ALIASES = {
     'yt': 'yt', 'youtube': 'yt', 'youtube_shorts': 'yt',
     'naver': 'naver', 'naver_blog': 'naver', 'blog': 'naver',
@@ -4097,8 +4187,10 @@ HISTORY_PLATFORM_ALIASES = {
     'ig': 'ig', 'instagram': 'ig', 'reels': 'ig',
     'pin': 'pin', 'pinterest': 'pin',
     'threads': 'threads',
-    'daangn': 'daangn', 'karrot': 'daangn',
     'x': 'x', 'twitter': 'x',
+    'fb': 'fb', 'facebook': 'fb', 'fb_personal': 'fb',
+    'fb_page': 'fb_page', 'facebook_page': 'fb_page',
+    'daangn': 'daangn', 'karrot': 'daangn',
 }
 
 
@@ -4108,7 +4200,7 @@ def _normalize_platform_key(raw_key):
 
 
 def _normalize_uploaded_platforms(raw_list):
-    """기록의 uploaded_platforms 배열을 표준 9개 플랫폼 키 순서로 중복 제거·정규화 (없는 경우 빈 배열 반환)"""
+    """기록의 uploaded_platforms 배열을 표준 11개 플랫폼 키 순서로 중복 제거·정규화 (없는 경우 빈 배열 반환)"""
     if not isinstance(raw_list, (list, tuple, set)):
         return []
     seen = set()

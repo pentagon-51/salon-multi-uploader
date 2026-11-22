@@ -16,7 +16,7 @@ MOD_KEY = "Meta" if sys.platform == "darwin" else "Control"
 BRANCH_NAME = ""
 BRANCH_ADDRESS = ""
 
-ALL_PLATFORM_KEYS = ("yt", "naver", "clip", "tt", "ig", "pin", "threads", "daangn", "x")
+ALL_PLATFORM_KEYS = ("yt", "naver", "clip", "tt", "ig", "pin", "threads", "x", "fb", "fb_page", "daangn")
 
 
 def normalize_branch_name(text, profile=None):
@@ -169,6 +169,7 @@ PERSISTENT_COOKIE_RULES = (
         },
     ),
     ("x_cookies.json", ("x.com", "twitter.com"), {"auth_token", "twid"}),
+    ("facebook_cookies.json", ("facebook.com",), {"c_user", "xs"}),
 )
 
 DAANGN_VISITOR_COOKIE_PREFIXES = ("ch-session", "ch-veil", "_ga", "_gcl", "_fbp", "_clck", "_clsk", "_dd_", "_interaction")
@@ -287,6 +288,12 @@ def _has_logged_in_session_cookie(filename, matched_cookies, session_names, auth
         has_tok = any(len(v) >= 10 for v, _ in active_by_name.get("auth_token", []))
         has_twid = any(len(v) >= 3 for v, _ in active_by_name.get("twid", []))
         return has_tok and has_twid
+
+    # 8) 페이스북(개인/매장 공용): c_user(숫자 UID) + xs(>=10) 모두 존재해야 실제 로그인 세션
+    if filename == "facebook_cookies.json":
+        has_cuser = any(v.isdigit() and len(v) >= 4 for v, _ in active_by_name.get("c_user", []))
+        has_xs = any(len(v) >= 10 for v, _ in active_by_name.get("xs", []))
+        return has_cuser and has_xs
 
     for cname in session_names:
         if active_by_name.get(cname):
@@ -1765,6 +1772,28 @@ PLATFORM_LOGOUT_CONFIG = {
         "cookie_file": "x_cookies.json",
         "domains": ("x.com", "twitter.com"),
         "origins": ("https://x.com", "https://twitter.com"),
+    },
+    "fb": {
+        "label": "페이스북(개인·매장)",
+        "cookie_file": "facebook_cookies.json",
+        "domains": ("facebook.com",),
+        "origins": (
+            "https://www.facebook.com",
+            "https://business.facebook.com",
+            "https://m.facebook.com",
+            "https://facebook.com",
+        ),
+    },
+    "fb_page": {
+        "label": "페이스북(개인·매장)",
+        "cookie_file": "facebook_cookies.json",
+        "domains": ("facebook.com",),
+        "origins": (
+            "https://www.facebook.com",
+            "https://business.facebook.com",
+            "https://m.facebook.com",
+            "https://facebook.com",
+        ),
     },
 }
 

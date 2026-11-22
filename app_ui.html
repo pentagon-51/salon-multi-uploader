@@ -414,8 +414,10 @@
             <div class="platform-box" data-platform="ig"><label class="platform-label"><input type="checkbox" id="chkIg" checked><span class="status-dot" id="dotIg" title="상태 확인 중">🔴</span><span class="platform-name">인스타그램</span><span class="platform-done-badge">완료</span></label><a href="https://www.instagram.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="pin"><label class="platform-label"><input type="checkbox" id="chkPin" checked><span class="status-dot" id="dotPin" title="상태 확인 중">🔴</span><span class="platform-name">핀터레스트</span><span class="platform-done-badge">완료</span></label><a id="linkPinterest" href="https://kr.pinterest.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="threads"><label class="platform-label"><input type="checkbox" id="chkThreads" checked><span class="status-dot" id="dotThreads" title="상태 확인 중">🔴</span><span class="platform-name">쓰레드</span><span class="platform-done-badge">완료</span></label><a href="https://www.threads.net/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="daangn"><label class="platform-label"><input type="checkbox" id="chkDaangn" checked><span class="status-dot" id="dotDaangn" title="상태 확인 중">🔴</span><span class="platform-name">당근 비즈</span><span class="platform-done-badge">완료</span></label><a href="https://business.daangn.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
             <div class="platform-box" data-platform="x"><label class="platform-label"><input type="checkbox" id="chkX" checked><span class="status-dot" id="dotX" title="상태 확인 중">🔴</span><span class="platform-name">엑스(X)</span><span class="platform-done-badge">완료</span></label><a href="https://x.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+            <div class="platform-box" data-platform="fb"><label class="platform-label"><input type="checkbox" id="chkFb" checked><span class="status-dot" id="dotFb" title="상태 확인 중">🔴</span><span class="platform-name">페이스북(개인)</span><span class="platform-done-badge">완료</span></label><a href="https://www.facebook.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+            <div class="platform-box" data-platform="fb_page"><label class="platform-label"><input type="checkbox" id="chkFbPage" checked><span class="status-dot" id="dotFbPage" title="상태 확인 중">🔴</span><span class="platform-name">페이스북(매장)</span><span class="platform-done-badge">완료</span></label><a href="https://business.facebook.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+            <div class="platform-box" data-platform="daangn"><label class="platform-label"><input type="checkbox" id="chkDaangn" checked><span class="status-dot" id="dotDaangn" title="상태 확인 중">🔴</span><span class="platform-name">당근 비즈</span><span class="platform-done-badge">완료</span></label><a href="https://business.daangn.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
           </div>
         </div>
       </div>
@@ -451,7 +453,7 @@
       </div>
       <div class="status-bar-detail" id="quotaDetailPanel">
         <div class="quota-sub-row" id="quotaPlatformsText">
-          블로그 0/5 · 클립 0/5 · 틱톡 0/5 · 인스타 0/3 · 핀터 0/10 · 쓰레드 0/5 · 당근 0/2 · X 0/5 (API 0원 · 계정 보호 권장선) · 원고변환 무제한
+          블로그 0/5 · 클립 0/5 · 틱톡 0/5 · 인스타 0/3 · 핀터 0/10 · 쓰레드 0/5 · X 0/5 · 페북(개인) 0/3 · 페북(매장) 0/3 · 당근 0/2 (API 0원 · 계정 보호 권장선) · 원고변환 무제한
         </div>
       </div>
     </div>
@@ -635,6 +637,21 @@
           <div><span class="field-label">소통형 본문</span><textarea id="threadsBody" rows="6"></textarea></div>
           <div><span class="field-label">대표 토픽 태그 (1개 권장)</span><input type="text" id="threadsTags"></div>
         </div>
+        <div class="card" data-platform="x">
+          <div class="card-header"><h3 class="card-title">𝕏 엑스(X / 트위터) 편집</h3><button class="btn-single" onclick="uploadSingle('x')">개별 업로드</button></div>
+          <div><span class="field-label">초간결 본문 (140자 제한 맞춤)</span><textarea id="xBody" rows="5"></textarea></div>
+          <div><span class="field-label">핵심 해시태그 (2개)</span><input type="text" id="xTags"></div>
+        </div>
+        <div class="card" data-platform="fb">
+          <div class="card-header"><h3 class="card-title">📘 페이스북(개인) 릴스 편집</h3><button class="btn-single" onclick="uploadSingle('fb')">개별 업로드</button></div>
+          <div><span class="field-label">릴스 본문</span><textarea id="fbBody" rows="6"></textarea></div>
+          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="fbTags"></div>
+        </div>
+        <div class="card" data-platform="fb_page">
+          <div class="card-header"><h3 class="card-title">🏪 페이스북(매장) 페이지 릴스 편집</h3><button class="btn-single" onclick="uploadSingle('fb_page')">개별 업로드</button></div>
+          <div><span class="field-label">매장 페이지 릴스 본문 (메타 비즈니스 스위트 연동)</span><textarea id="fbPageBody" rows="6"></textarea></div>
+          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="fbPageTags"></div>
+        </div>
         <div class="card" data-platform="daangn">
           <div class="card-header"><h3 class="card-title">🥕 당근 비즈프로필 소식 편집</h3><button class="btn-single" onclick="uploadSingle('daangn')">개별 업로드</button></div>
           <div><span class="field-label">소식 제목 (30자 이내 권장)</span><input type="text" id="daangnTitle" maxlength="30"></div>
@@ -654,11 +671,6 @@
               </div>
             </div>
           </div>
-        </div>
-        <div class="card" data-platform="x">
-          <div class="card-header"><h3 class="card-title">𝕏 엑스(X / 트위터) 편집</h3><button class="btn-single" onclick="uploadSingle('x')">개별 업로드</button></div>
-          <div><span class="field-label">초간결 본문 (140자 제한 맞춤)</span><textarea id="xBody" rows="5"></textarea></div>
-          <div><span class="field-label">핵심 해시태그 (2개)</span><input type="text" id="xTags"></div>
         </div>
       </div>
     </div>
@@ -1115,8 +1127,10 @@ const PLATFORM_META = [
   { key: 'ig', dotId: 'dotIg', chkId: 'chkIg', label: '인스타그램', desc: '릴스 저장/예약 전환 핵심' },
   { key: 'pin', dotId: 'dotPin', chkId: 'chkPin', label: '핀터레스트', desc: '스타일 검색 + 링크 유입' },
   { key: 'threads', dotId: 'dotThreads', chkId: 'chkThreads', label: '쓰레드', desc: '대화형 소통 · 인스타 연동' },
-  { key: 'daangn', dotId: 'dotDaangn', chkId: 'chkDaangn', label: '당근 비즈', desc: '동네 이웃 단골 확보' },
-  { key: 'x', dotId: 'dotX', chkId: 'chkX', label: '엑스(X)', desc: '초간결 스타일 피드' }
+  { key: 'x', dotId: 'dotX', chkId: 'chkX', label: '엑스(X)', desc: '초간결 스타일 피드' },
+  { key: 'fb', dotId: 'dotFb', chkId: 'chkFb', label: '페이스북(개인)', desc: '개인 계정 릴스 노출' },
+  { key: 'fb_page', dotId: 'dotFbPage', chkId: 'chkFbPage', label: '페이스북(매장)', desc: '매장 전용 · 메타 비즈니스 페이지 릴스' },
+  { key: 'daangn', dotId: 'dotDaangn', chkId: 'chkDaangn', label: '당근 비즈', desc: '매장 전용 · 동네 이웃 단골 확보' }
 ];
 
 const WIZARD_STEP_TITLES = [
@@ -2269,15 +2283,6 @@ function renderWizardStep2(v) {
       shortcutLabel: '핀터레스트 ↗'
     }));
   }
-  if (enabled.has('daangn')) {
-    prepItems.push(buildPrepRow({
-      key: 'daangn',
-      labelHtml: '<b>당근 비즈프로필:</b> 동네 매장 비즈프로필 개설 및 소개글 반영',
-      hasGuide: true,
-      shortcutUrl: 'https://business.daangn.com/',
-      shortcutLabel: '비즈프로필 ↗'
-    }));
-  }
   if (enabled.has('tt')) {
     prepItems.push(buildPrepRow({
       key: 'tt',
@@ -2303,6 +2308,33 @@ function renderWizardStep2(v) {
       hasGuide: true,
       shortcutUrl: 'https://x.com/',
       shortcutLabel: 'X 홈 ↗'
+    }));
+  }
+  if (enabled.has('fb')) {
+    prepItems.push(buildPrepRow({
+      key: 'fb',
+      labelHtml: '<b>페이스북(개인):</b> 개인 계정 로그인 및 릴스 공개 범위 확인',
+      hasGuide: true,
+      shortcutUrl: 'https://www.facebook.com/',
+      shortcutLabel: '페이스북 ↗'
+    }));
+  }
+  if (enabled.has('fb_page')) {
+    prepItems.push(buildPrepRow({
+      key: 'fb_page',
+      labelHtml: '<b>페이스북(매장):</b> 메타 비즈니스 스위트에서 매장 페이지 연결 확인',
+      hasGuide: true,
+      shortcutUrl: 'https://business.facebook.com/',
+      shortcutLabel: '비즈니스 스위트 ↗'
+    }));
+  }
+  if (enabled.has('daangn')) {
+    prepItems.push(buildPrepRow({
+      key: 'daangn',
+      labelHtml: '<b>당근 비즈프로필:</b> 동네 매장 비즈프로필 개설 및 소개글 반영',
+      hasGuide: true,
+      shortcutUrl: 'https://business.daangn.com/',
+      shortcutLabel: '비즈프로필 ↗'
     }));
   }
   if (prepItems.length) {
@@ -2382,6 +2414,26 @@ const PLATFORM_SETUP_GUIDES = {
     ],
     getShortcutUrl: () => 'https://x.com/',
     helpUrl: 'https://help.x.com/ko'
+  },
+  fb: {
+    name: '페이스북(개인)',
+    steps: [
+      '하단 [바로 이동하기 ↗] 버튼으로 페이스북에 접속해 릴스를 게시할 계정으로 로그인합니다.',
+      '프로필 설정에서 릴스 기본 공개 범위가 [전체 공개]로 되어 있는지 확인합니다.',
+      '페이스북 개인·매장 페이지는 동일한 페이스북 계정 쿠키를 공유하므로 한 번만 로그인하면 둘 다 연동됩니다.'
+    ],
+    getShortcutUrl: () => 'https://www.facebook.com/',
+    helpUrl: 'https://www.facebook.com/help'
+  },
+  fb_page: {
+    name: '페이스북(매장)',
+    steps: [
+      '하단 [바로 이동하기 ↗] 버튼으로 메타 비즈니스 스위트(business.facebook.com)에 접속합니다.',
+      '좌측 상단 페이지 목록에 1단계에서 입력한 매장명과 동일한 페이스북 매장 페이지가 표시되는지 확인합니다.',
+      '매장 페이지가 아직 없다면 페이스북에서 페이지를 개설한 뒤 메타 비즈니스 스위트에 연결해 주세요.'
+    ],
+    getShortcutUrl: () => 'https://business.facebook.com/',
+    helpUrl: 'https://www.facebook.com/business/help'
   }
 };
 
@@ -2656,7 +2708,7 @@ function refreshQuotaStatus() {
     const fmt = (k, name) => `${name} ${(p[k]?.used ?? 0)}/${(p[k]?.limit ?? 0)}`;
     const sub = document.getElementById('quotaPlatformsText');
     if (sub) {
-      sub.innerText = `${fmt('naver', '블로그')} · ${fmt('clip', '클립')} · ${fmt('tt', '틱톡')} · ${fmt('ig', '인스타')} · ${fmt('pin', '핀터')} · ${fmt('threads', '쓰레드')} · ${fmt('daangn', '당근')} · ${fmt('x', 'X')} (API 0원 · 계정 보호 권장선) · 원고변환 무제한`;
+      sub.innerText = `${fmt('naver', '블로그')} · ${fmt('clip', '클립')} · ${fmt('tt', '틱톡')} · ${fmt('ig', '인스타')} · ${fmt('pin', '핀터')} · ${fmt('threads', '쓰레드')} · ${fmt('x', 'X')} · ${fmt('fb', '페북(개인)')} · ${fmt('fb_page', '페북(매장)')} · ${fmt('daangn', '당근')} (API 0원 · 계정 보호 권장선) · 원고변환 무제한`;
     }
   }).catch(() => {});
 }
@@ -2681,9 +2733,11 @@ function logoutSinglePlatform(key, btnEl) {
   const label = meta ? meta.label : key;
   const confirmMsg = (key === 'naver' || key === 'clip')
     ? '네이버 블로그와 네이버 클립은 같은 계정으로 함께 로그아웃됩니다.\n로그아웃하시겠습니까?'
-    : (key === 'yt'
-      ? '유튜브 쇼츠 인증 토큰(youtube_token.json)을 삭제해 로그아웃하시겠습니까?\n(client_secret.json 파일은 유지됩니다)'
-      : `[${label}] 계정을 로그아웃하시겠습니까?\n(해당 플랫폼의 쿠키·브라우저 세션만 삭제되며 다른 플랫폼은 유지됩니다)`);
+    : ((key === 'fb' || key === 'fb_page')
+      ? '페이스북(개인)과 페이스북(매장)은 같은 계정으로 함께 로그아웃됩니다.\n로그아웃하시겠습니까?'
+      : (key === 'yt'
+        ? '유튜브 쇼츠 인증 토큰(youtube_token.json)을 삭제해 로그아웃하시겠습니까?\n(client_secret.json 파일은 유지됩니다)'
+        : `[${label}] 계정을 로그아웃하시겠습니까?\n(해당 플랫폼의 쿠키·브라우저 세션만 삭제되며 다른 플랫폼은 유지됩니다)`));
   if (!confirm(confirmMsg)) return;
 
   if (btnEl) {
@@ -2736,8 +2790,10 @@ function loginSinglePlatform(key) {
     ig: 'use_ig',
     pin: 'use_pin',
     threads: 'use_threads',
-    daangn: 'use_daangn',
-    x: 'use_x'
+    x: 'use_x',
+    fb: 'use_fb',
+    fb_page: 'use_fb_page',
+    daangn: 'use_daangn'
   };
   const field = keyToField[key];
   if (!field) return;
@@ -2759,8 +2815,10 @@ function loginMissingPlatforms() {
     use_ig: enabled.has('ig') && st.ig !== 'green',
     use_pin: enabled.has('pin') && st.pin !== 'green',
     use_threads: enabled.has('threads') && st.threads !== 'green',
-    use_daangn: enabled.has('daangn') && st.daangn !== 'green',
-    use_x: enabled.has('x') && st.x !== 'green'
+    use_x: enabled.has('x') && st.x !== 'green',
+    use_fb: enabled.has('fb') && st.fb !== 'green',
+    use_fb_page: enabled.has('fb_page') && st.fb_page !== 'green',
+    use_daangn: enabled.has('daangn') && st.daangn !== 'green'
   };
   const anyMissing = Object.values(payload).some(Boolean);
   if (!anyMissing) {
@@ -2780,10 +2838,15 @@ const FIELD_MAP = {
   clipTitle: ['clip_title'], clipBody: ['clip_body'], clipTags: ['clip_tags'],
   ttTitle: ['tiktok_title', 'tt_title'], ttBody: ['tiktok_body', 'tt_body'], ttTags: ['tiktok_tags', 'tt_tags'],
   igBody: ['instagram_body', 'ig_body'], igTags: ['instagram_tags', 'ig_tags'],
-  pinTitle: ['pin_title'], pinBody: ['pin_body'], pinTags: ['pin_tags'], threadsBody: ['threads_body'], threadsTags: ['threads_tags'], daangnTitle: ['daangn_title'], daangnBody: ['daangn_body'], xBody: ['x_body'], xTags: ['x_tags']
+  pinTitle: ['pin_title'], pinBody: ['pin_body'], pinTags: ['pin_tags'],
+  threadsBody: ['threads_body'], threadsTags: ['threads_tags'],
+  xBody: ['x_body'], xTags: ['x_tags'],
+  fbBody: ['fb_body'], fbTags: ['fb_tags'],
+  fbPageBody: ['fb_page_body'], fbPageTags: ['fb_page_tags'],
+  daangnTitle: ['daangn_title'], daangnBody: ['daangn_body']
 };
 
-const TAG_INPUT_IDS = ['ytTags', 'naverTags', 'clipTags', 'ttTags', 'igTags', 'pinTags', 'threadsTags', 'xTags'];
+const TAG_INPUT_IDS = ['ytTags', 'naverTags', 'clipTags', 'ttTags', 'igTags', 'pinTags', 'threadsTags', 'xTags', 'fbTags', 'fbPageTags'];
 
 function cleanTagsString(raw) {
   if (!raw) return '';
@@ -3640,7 +3703,11 @@ function transformData(btn) {
 function startAuthCheck() {
   let payload = {
     use_naver: document.getElementById('chkNaver').checked, use_clip: document.getElementById('chkClip').checked,
-    use_tt: document.getElementById('chkTt').checked, use_ig: document.getElementById('chkIg').checked, use_pin: document.getElementById('chkPin').checked, use_threads: document.getElementById('chkThreads').checked, use_daangn: document.getElementById('chkDaangn').checked, use_x: document.getElementById('chkX').checked
+    use_tt: document.getElementById('chkTt').checked, use_ig: document.getElementById('chkIg').checked,
+    use_pin: document.getElementById('chkPin').checked, use_threads: document.getElementById('chkThreads').checked,
+    use_x: document.getElementById('chkX').checked,
+    use_fb: document.getElementById('chkFb').checked, use_fb_page: document.getElementById('chkFbPage').checked,
+    use_daangn: document.getElementById('chkDaangn').checked
   };
   fetch('/api/auth_check', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
   .then(r => r.json()).then(d => { if(!d.ok) alert(d.msg); });
@@ -3682,9 +3749,11 @@ function startUpload(overrideTargets = null, opts = {}) {
     use_ig: isEnabled('ig', 'chkIg'), ig_body: getBranchVal('igBody'), ig_tags: cleanTagsString(getVal('igTags')), ig_location: getBranchVal('igLocation'),
     use_pin: isEnabled('pin', 'chkPin'), pin_title: getBranchVal('pinTitle'), pin_body: getBranchVal('pinBody'), pin_tags: cleanTagsString(getVal('pinTags')), pin_dest_url: getVal('pinDestUrl'), pin_board: getVal('pinBoard'),
     use_threads: isEnabled('threads', 'chkThreads'), threads_body: getBranchVal('threadsBody'), threads_tags: cleanTagsString(getVal('threadsTags')),
+    use_x: isEnabled('x', 'chkX'), x_body: getBranchVal('xBody'), x_tags: cleanTagsString(getVal('xTags')),
+    use_fb: isEnabled('fb', 'chkFb'), fb_body: getBranchVal('fbBody'), fb_tags: cleanTagsString(getVal('fbTags')),
+    use_fb_page: isEnabled('fb_page', 'chkFbPage'), fb_page_body: getBranchVal('fbPageBody'), fb_page_tags: cleanTagsString(getVal('fbPageTags')),
     use_daangn: isEnabled('daangn', 'chkDaangn'), daangn_title: getBranchVal('daangnTitle'), daangn_body: getBranchVal('daangnBody'),
-    daangn_selected_images: daangnThumbs.filter(t => t && t.active && t.path && !String(t.path).toLowerCase().endsWith('.gif')).slice(0, 10).map(t => t.path),
-    use_x: isEnabled('x', 'chkX'), x_body: getBranchVal('xBody'), x_tags: cleanTagsString(getVal('xTags'))
+    daangn_selected_images: daangnThumbs.filter(t => t && t.active && t.path && !String(t.path).toLowerCase().endsWith('.gif')).slice(0, 10).map(t => t.path)
   };
   fetch('/api/publish', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
   .then(r => r.json()).then(d => {
