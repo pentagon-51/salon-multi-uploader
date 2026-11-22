@@ -143,9 +143,9 @@ def log(msg):
 
 ESSENTIAL_ITEMS = {
     'app_server.py', 'app_ui.html', 'os_utils.py', 'auto_updater.py', 'AI_RULES.md', 'check_personal_leak.py',
-    'build_release.py', '1_맥북_최초설치.command', '2_맥북_프로그램_실행.command',
-    'version.json', 'LICENSE.txt', '.gitignore', 'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
-    '0_처음사용자_안내서.html', '1_최초설치_자동인스톨.bat', '2_프로그램_실행.bat', '.installed_done', '_설치완료_보관함',
+    'build_release.py', '2-1. 맥북 최초설치.command', '2-2. 맥북 프로그램 실행.command',
+    'version.json', 'LICENSE.txt', '.gitignore', '.gitattributes', 'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
+    '0. 처음사용자 안내서.html', '1-1. 윈도우 최초설치.bat', '1-2. 윈도우 프로그램 실행.bat', '.installed_done', '_설치완료_보관함',
     'naver_blog_uploader.py', 'naver_clip_uploader.py', 'tiktok_uploader.py', 'instagram_uploader.py', 'pinterest_uploader.py', 'threads_uploader.py', 'daangn_uploader.py', 'x_uploader.py',
     'app.log',
     'auth_data', 'blackbox_login', 'blackbox_upload', 'upload', 'done', 'debug_records', '_old_backup', 'temp_thumbs', '__pycache__'
@@ -1308,9 +1308,10 @@ def has_backup_files():
 
 PROTECTED_CODE_EXTS = ('.py', '.html', '.bat', '.command')
 PROTECTED_ROOT_FILES = {
-    'version.json', 'LICENSE.txt', '.gitignore', '.installed_done',
+    'version.json', 'LICENSE.txt', '.gitignore', '.gitattributes', '.installed_done',
     'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
-    '1_맥북_최초설치.command', '2_맥북_프로그램_실행.command',
+    '0. 처음사용자 안내서.html', '1-1. 윈도우 최초설치.bat', '1-2. 윈도우 프로그램 실행.bat',
+    '2-1. 맥북 최초설치.command', '2-2. 맥북 프로그램 실행.command',
     'AI_RULES.md', 'export_code.py', 'check_personal_leak.py', 'build_release.py',
     'app.log',
     'youtube_token.json', 'client_secret.json', 'user_profile.json', 'daily_usage.json', 'login_credentials.json',

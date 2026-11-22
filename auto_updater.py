@@ -8,6 +8,7 @@ import shutil
 import zipfile
 import tempfile
 import threading
+import subprocess
 import py_compile
 import urllib.request
 import urllib.error
@@ -35,12 +36,13 @@ ALLOWED_EXACT_NAMES = {
     "version.json",
     "LICENSE.txt",
     ".gitignore",
+    ".gitattributes",
     "salon_uploader.ico",
     "favicon.png",
-    "1_맥북_최초설치.command",
-    "2_맥북_프로그램_실행.command",
+    "2-1. 맥북 최초설치.command",
+    "2-2. 맥북 프로그램 실행.command",
 }
-INSTALL_ONLY_FILES = {"0_처음사용자_안내서.html", "1_최초설치_자동인스톨.bat"}
+INSTALL_ONLY_FILES = {"0. 처음사용자 안내서.html", "1-1. 윈도우 최초설치.bat"}
 EXCLUDED_DEV_FILES = {
     "export_code.py",
     "total_code.txt",
@@ -223,6 +225,44 @@ def is_allowed_code_file(rel_path, skip_install_files=False):
     return ext in ALLOWED_EXTENSIONS
 
 
+def refresh_windows_desktop_shortcut(dest_base):
+    """Windows 환경에서 바탕화면에 기존 '미용실 멀티업로더.lnk' 바로가기가 존재하면
+    타겟 경로를 최신 '1-2. 윈도우 프로그램 실행.bat'으로 자동 갱신 (기존 사용자 호환 보호)"""
+    if sys.platform != "win32":
+        return False
+    target_bat = os.path.join(os.path.abspath(dest_base), "1-2. 윈도우 프로그램 실행.bat")
+    if not os.path.isfile(target_bat):
+        return False
+    ps_cmd = (
+        "$d = $env:SNS_DIR.TrimEnd('\\'); "
+        "$desk = [Environment]::GetFolderPath('Desktop'); "
+        "$lnk = Join-Path $desk '미용실 멀티업로더.lnk'; "
+        "if (Test-Path $lnk) { "
+        "$ws = New-Object -ComObject WScript.Shell; "
+        "$s = $ws.CreateShortcut($lnk); "
+        "$s.TargetPath = Join-Path $d '1-2. 윈도우 프로그램 실행.bat'; "
+        "$s.WorkingDirectory = $d; "
+        "$s.Description = '미용실 멀티업로더'; "
+        "$ico = Join-Path $d 'salon_uploader.ico'; "
+        "if (Test-Path $ico) { $s.IconLocation = $ico + ',0' }; "
+        "$s.Save() "
+        "}"
+    )
+    try:
+        env = dict(os.environ)
+        env["SNS_DIR"] = os.path.abspath(dest_base)
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-Command", ps_cmd],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+        return proc.returncode == 0
+    except Exception:
+        return False
+
+
 def apply_public_update(branch="main", report=None, target_dir=None, timeout=30):
     """GitHub main 브랜치 ZIP을 임시 폴더에 받아 문법 검사 후 코드 파일만 안전 덮어쓰기 (개인 데이터 100% 보호)"""
     def _report(pct, msg):
@@ -343,6 +383,8 @@ def apply_public_update(branch="main", report=None, target_dir=None, timeout=30)
             except PermissionError:
                 continue
 
+        refresh_windows_desktop_shortcut(dest_base)
+
         final_ver = new_version_from_zip or read_local_version()
         _report(100, f"업데이트 완료! (v{final_ver})")
         return {
@@ -350,7 +392,7 @@ def apply_public_update(branch="main", report=None, target_dir=None, timeout=30)
             "new_version": final_ver,
             "updated_count": updated_count,
             "total_files": len(extracted_files),
-            "msg": f"v{final_ver} 업데이트 완료! 프로그램을 다시 실행해 주세요. (Mac: 2_맥북_프로그램_실행.command / Windows: 2_프로그램_실행.bat)",
+            "msg": f"v{final_ver} 업데이트 완료! 프로그램을 다시 실행해 주세요. (Windows: 1-2. 윈도우 프로그램 실행.bat / Mac: 2-2. 맥북 프로그램 실행.command)",
         }
     except Exception as e:
         return {"ok": False, "msg": f"업데이트 중 오류가 발생했습니다 (기존 버전은 안전하게 유지됨): {e}"}

@@ -21,7 +21,7 @@ find_python() {
 
 PYTHON_BIN="$(find_python)"
 if [ -z "$PYTHON_BIN" ]; then
-  echo "❌ 파이썬이 설치되어 있지 않습니다. 먼저 [1_맥북_최초설치.command]를 실행해 주세요."
+  echo "❌ 파이썬이 설치되어 있지 않습니다. 먼저 [2-1. 맥북 최초설치.command]를 실행해 주세요."
   read -r -p "내용을 확인한 뒤 엔터를 누르면 창이 닫힙니다..."
   exit 1
 fi

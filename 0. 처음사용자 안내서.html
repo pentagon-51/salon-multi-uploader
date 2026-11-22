@@ -117,6 +117,17 @@
     padding: 1px 7px;
     border-radius: 5px;
   }
+  .warn-box {
+    margin: 0 0 10px;
+    padding: 11px 14px;
+    border-radius: 9px;
+    background: #fffbeb;
+    border: 1.5px solid #f59e0b;
+    font-size: 13px;
+    font-weight: 700;
+    color: #92400e;
+    line-height: 1.6;
+  }
   .note-box {
     margin-top: 8px;
     padding: 9px 12px;
@@ -340,19 +351,20 @@
           <h2 class="step-title">원클릭 자동 설치 (Windows / Mac)</h2>
         </div>
         <div class="step-body">
+          <div class="warn-box">⚠️ 먼저 다운로드한 ZIP 파일의 압축을 완전히 풀어주세요! (압축 파일 안에서 [실행]을 누르면 설치되지 않습니다. 팝업이 뜨면 반드시 [압축 풀기]를 눌러주세요.)</div>
           사용 중인 PC에 맞는 설치 파일을 실행하세요. 필요한 프로그램이 자동으로 설치됩니다.
           <div class="os-grid">
             <div class="os-box">
               <h4>🪟 Windows (윈도우 PC)</h4>
               <ul>
-                <li>폴더 안의 <span class="file-chip">1_최초설치_자동인스톨.bat</span>을 <b>더블클릭</b>하세요.</li>
+                <li>압축을 푼 폴더 안의 <span class="file-chip">1-1. 윈도우 최초설치.bat</span>을 <b>더블클릭</b>하세요.</li>
                 <li>설치가 끝나면 바탕화면에 <b>「미용실 멀티업로더」</b> 아이콘이 자동 생성되고 프로그램이 바로 열립니다.</li>
               </ul>
             </div>
             <div class="os-box">
               <h4>🍎 Mac (맥북 · 아이맥)</h4>
               <ul>
-                <li>폴더 안의 <span class="file-chip">1_맥북_최초설치.command</span>를 실행하세요.</li>
+                <li>압축을 푼 폴더 안의 <span class="file-chip">2-1. 맥북 최초설치.command</span>를 실행하세요.</li>
                 <li>보안 경고가 뜨면 파일에 <b>우클릭 ➔ 열기 ➔ 열기</b>를 누르면 정상 실행됩니다.</li>
               </ul>
             </div>
@@ -387,8 +399,8 @@
         <div class="step-body">
           설치가 끝나면 매일 클릭 한 번으로 바로 사용할 수 있습니다.
           <ul>
-            <li><b>Windows:</b> 바탕화면 <b>「미용실 멀티업로더」</b> 아이콘(또는 <span class="file-chip">2_프로그램_실행.bat</span>) 더블클릭</li>
-            <li><b>Mac:</b> 폴더 안의 <span class="file-chip">2_맥북_프로그램_실행.command</span> 더블클릭</li>
+            <li><b>Windows:</b> 바탕화면 <b>「미용실 멀티업로더」</b> 아이콘(또는 <span class="file-chip">1-2. 윈도우 프로그램 실행.bat</span>) 더블클릭</li>
+            <li><b>Mac:</b> 폴더 안의 <span class="file-chip">2-2. 맥북 프로그램 실행.command</span> 더블클릭</li>
             <li><b>영상 첨부 ➔ 글 붙여넣기 ➔ [✨ 미리보기 생성] ➔ [🚀 일괄 업로드]</b> 순서로 간편하게 완료됩니다.</li>
           </ul>
         </div>
@@ -403,7 +415,7 @@
           <li>프로그램을 열면 새 버전을 자동 확인하며, 상단 <b>[🔄 업데이트 확인]</b> 버튼으로 언제든 확인할 수 있습니다.</li>
           <li>새 버전 안내가 뜨면 <b>[🚀 원클릭 업데이트]</b> 버튼만 누르세요.</li>
           <li>로그인 정보, 매장 설정, 아직 올리지 않은 영상은 그대로 안전하게 유지되며 프로그램 기능만 최신으로 바뀝니다.</li>
-          <li>완료 안내가 뜨면 실행 파일(Windows: <code>2_프로그램_실행.bat</code> / Mac: <code>2_맥북_프로그램_실행.command</code>)을 다시 열어주세요.</li>
+          <li>완료 안내가 뜨면 실행 파일(Windows: <code>1-2. 윈도우 프로그램 실행.bat</code> / Mac: <code>2-2. 맥북 프로그램 실행.command</code>)을 다시 열어주세요.</li>
         </ul>
       </div>
       <div class="info-card" style="background:#f8fafc; border-color:#cbd5e1;">
@@ -428,11 +440,11 @@
         </div>
         <div class="sec-item">
           <h4>2) 안랩 V3에서 차단 또는 경고가 뜰 때</h4>
-          <p><b>V3 실행</b> ➔ 우측 상단 <b>톱니바퀴(환경설정)</b> ➔ <b>검사 설정</b> ➔ <b>검사 예외 대상</b> ➔ <b>[추가]</b> 버튼을 눌러 <span class="file-chip">sns_auto</span> 폴더를 등록하세요.</p>
+          <p><b>V3 실행</b> ➔ 우측 상단 <b>톱니바퀴(환경설정)</b> ➔ <b>검사 설정</b> ➔ <b>검사 예외 대상</b> ➔ <b>[추가]</b> 버튼을 눌러 프로그램 폴더를 등록하세요.</p>
         </div>
         <div class="sec-item">
           <h4>3) Windows Defender(윈도우 보안)에서 차단될 때</h4>
-          <p><b>Windows 보안</b> ➔ <b>바이러스 및 위협 방지</b> ➔ <b>설정 관리</b> ➔ <b>제외 항목 추가 또는 제거</b> ➔ <b>[제외 사항 추가]</b> ➔ <b>폴더</b> 선택 ➔ <span class="file-chip">sns_auto</span> 폴더를 등록하세요.</p>
+          <p><b>Windows 보안</b> ➔ <b>바이러스 및 위협 방지</b> ➔ <b>설정 관리</b> ➔ <b>제외 항목 추가 또는 제거</b> ➔ <b>[제외 사항 추가]</b> ➔ <b>폴더</b> 선택 ➔ 프로그램 폴더를 등록하세요.</p>
         </div>
       </div>
     </details>
@@ -478,7 +490,7 @@
 <div class="toast" id="copyToast">✅ 명령어가 클립보드에 복사되었습니다!</div>
 
 <script>
-const DEFAULT_RELEASE_META = /*RELEASE_META_START*/{"version":"1.0.2","author":"@hair_auto_lab","notion_url":"#","youtube_url":"#","chat_url":"#","instagram_url":"https://www.instagram.com/hair_auto_lab/"}/*RELEASE_META_END*/;
+const DEFAULT_RELEASE_META = /*RELEASE_META_START*/{"version":"1.0.3","author":"@hair_auto_lab","notion_url":"#","youtube_url":"#","chat_url":"#","instagram_url":"https://www.instagram.com/hair_auto_lab/"}/*RELEASE_META_END*/;
 
 let toastTimer = null;
 function showToast(msg) {

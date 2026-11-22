@@ -33,5 +33,5 @@ export_error.log
 errorReport.md
 report.md
 *.command
-!1_맥북_최초설치.command
-!2_맥북_프로그램_실행.command
+!2-1. 맥북 최초설치.command
+!2-2. 맥북 프로그램 실행.command
