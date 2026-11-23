@@ -49,6 +49,7 @@ from os_utils import (
     set_test_blackbox_dir,
     get_test_blackbox_dir,
     prune_blackbox_dir,
+    is_blackbox_protected_file,
     logout_platform_session,
     auto_extract_and_save_profile_id,
 )
@@ -83,7 +84,6 @@ SAFE_DAILY_LIMITS = {
     'x': 5,
     'fb': 3,
     'fb_page': 3,
-    'daangn': 2,
 }
 YOUTUBE_POINTS_PER_UPLOAD = 1600
 YOUTUBE_MAX_POINTS = 10000
@@ -156,72 +156,13 @@ ESSENTIAL_ITEMS = {
     'auth_data', 'blackbox', 'upload', 'done', '_old_backup', 'temp_thumbs', '__pycache__'
 }
 
-STYLE_EXPANSION_MAP = {
-    '태슬': ['태슬컷', '태슬펌', '칼단발', '단발컷', '여자단발', '단발스타일'],
-    '단발': ['단발펌', '단발레이어드컷', '보니펌', '모즈펌', '단발머리', '단발C컬펌'],
-    '레이어드': ['레이어드컷', '레이어드펌', '중단발레이어드', '긴머리레이어드', '사이드뱅', 'C컬펌'],
-    '허쉬': ['허쉬컷', '허쉬펌', '중단발허쉬컷', '레이어드컷', '샤기컷'],
-    '빌드': ['빌드펌', '중단발펌', 'S컬펌', '레이어드펌', '여신앞머리'],
-    '엘리자벳': ['엘리자벳펌', '긴머리펌', '굵은웨이브', '여신머리', 'S컬펌'],
-    '구름': ['구름펌', '긴머리웨이브', '물결펌', '볼륨펌'],
-    '히피': ['히피펌', '젤리펌', '단발히피펌', '긴머리히피펌', '웨이브펌'],
-    '볼륨매직': ['볼륨매직', '매직셋팅', '곱슬매직', '복구매직', 'C컬펌'],
-    '매직': ['볼륨매직', '매직셋팅', '곱슬매직', 'C컬펌'],
-    '다운펌': ['다운펌', '옆머리다운펌', '남자다운펌', '아이롱다운펌', '남자커트'],
-    '옆머리': ['다운펌', '옆머리다운펌', '남자다운펌', '남자커트'],
-    '뜨는': ['다운펌', '옆머리다운펌', '남자다운펌', '남자머리'],
-    '가르마': ['가르마펌', '애즈펌', '남자가르마펌', '시스루가르마', '남자펌'],
-    '애즈': ['애즈펌', '가르마펌', '남자애즈펌', '시스루애즈펌', '남자펌'],
-    '댄디': ['댄디컷', '시스루댄디컷', '댄디펌', '남자댄디컷', '다운펌'],
-    '시스루': ['시스루뱅', '시스루댄디컷', '시스루애즈펌', '앞머리컷'],
-    '크롭': ['크롭컷', '남자크롭컷', '스왓컷', '다운펌', '남자짧은머리'],
-    '드롭': ['드롭컷', '남자드롭컷', '드롭펌', '다운펌', '남자짧은머리'],
-    '크리드': ['크리드컷', '남자크리드컷', '다운펌', '남자짧은머리'],
-    '아이비리그': ['아이비리그컷', '남자아이비리그컷', '남자짧은머리', '다운펌', '맨즈헤어'],
-    '가일': ['가일컷', '가일펌', '남자가일펌', '포마드펌', '남자머리'],
-    '리젠트': ['리젠트컷', '리젠트펌', '남자리젠트펌', '다운펌', '남자짧은머리'],
-    '쉐도우': ['쉐도우펌', '남자쉐도우펌', '스핀스왈로펌', '남자볼륨펌', '남자펌'],
-    '상고': ['상고컷', '남자상고컷', '투블럭상고', '다운펌', '남자커트'],
-    '페이드': ['페이드컷', '남자페이드컷', '바버컷', '상고컷', '맨즈헤어'],
-    '보브': ['보브컷', '숏단발', '단발컷', '볼륨매직'],
-    '염색': ['톤다운염색', '애쉬브라운', '밀크브라운', '여자염색', '퍼스널컬러'],
-    '탈색': ['애쉬그레이', '발레아쥬', '솜브레', '탈색염색'],
-}
-
-# 해시태그 3단계 등급제(티어)
-# 1티어: 검색량·트렌드 최상위 메인 시술명 (쓰레드 1개·엑스 2개 등 소수 태그 플랫폼 최우선 배치)
-TIER1_TREND_STYLE_TAGS = {
-    # 남자
-    '드롭컷', '크롭컷', '크리드컷', '애즈펌', '가르마펌', '다운펌',
-    '아이비리그컷', '가일펌', '쉐도우펌', '시스루댄디컷', '댄디컷', '리젠트펌',
-    # 여자
-    '레이어드컷', '레이어드펌', '태슬컷', '허쉬컷', '빌드펌',
-    '엘리자벳펌', '히피펌', '단발펌', '보니펌', '볼륨매직',
-}
-TIER1_TREND_STYLE_TAGS_LOWER = {t.lower() for t in TIER1_TREND_STYLE_TAGS}
-
-# 2티어 포함 전체 검증 시술 사전 (1티어 + 연관·보조 시술명)
-KNOWN_NATURAL_STYLE_TAGS = {
-    t for vals in STYLE_EXPANSION_MAP.values() for t in vals
-} | TIER1_TREND_STYLE_TAGS | {'남자커트', '여자커트'}
-KNOWN_NATURAL_STYLE_TAGS_LOWER = {t.lower() for t in KNOWN_NATURAL_STYLE_TAGS}
-
-AWKWARD_TAG_SUFFIXES = (
-    '해결', '고민해결', '완성', '비법', '꿀팁', '꿀팁공유', '고민', '추천해요',
-    '추천드려요', '정리해요', '관리법', '스타일링팁', '완벽정리', '방법', '후기추천',
-)
-AWKWARD_TAG_SUBSTRINGS = (
-    '뜨는옆머리', '손질편한', '아침손질', '고데기없이', '그냥말려도', '털어말리',
-    '스타일추천', '머리추천', '고민끝', '실패없는', '인생머리',
-)
-
 COOKIE_STALE_DAYS = 20
 PREVIEW_TRANSCODE_LOCK = threading.Lock()
 
 def _check_cookie_status_and_age(cookie_filename, deep=False):
     """auth_data/ 기준 플랫폼별 실제 로그인 인증 쿠키/세션 정밀 판별 및 경과 일수 반환: (state, age_days).
     단순 방문자 쿠키·비로그인 프로필은 반드시 'red'로 판별.
-    deep=True일 때만 보호 URL 리다이렉트 정밀 검사(네이버·당근)를 1회 수행."""
+    deep=True일 때만 보호 URL 리다이렉트 정밀 검사(네이버)를 1회 수행."""
     cpath = get_auth_file(cookie_filename)
     if not is_platform_cookie_authenticated(cookie_filename, cpath, auto_clean=False):
         return 'red', None
@@ -243,20 +184,167 @@ def _check_cookie_status_and_age(cookie_filename, deep=False):
     except Exception:
         return 'green', 0
 
-def get_setup_status(deep=False):
-    """11개 플랫폼 로그인/API 상태 신호등(green/yellow/red) 및 쿠키 경과 일수 반환.
-    deep=True는 로그인 창 닫힘 직후 및 [상태 새로고침] 수동 클릭 시에만 1회 실행."""
+YOUTUBE_SCOPES = [
+    'https://www.googleapis.com/auth/youtube.upload',
+    'https://www.googleapis.com/auth/youtube.readonly',
+]
+
+
+def _is_valid_youtube_client_secret(secret_path):
+    if not secret_path or not os.path.exists(secret_path) or os.path.getsize(secret_path) <= 10:
+        return False
+    try:
+        with open(secret_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return False
+        node = data.get('installed') or data.get('web')
+        return isinstance(node, dict) and bool(str(node.get('client_id') or '').strip())
+    except Exception:
+        return False
+
+
+def validate_youtube_oauth_token(attempt_refresh=False):
+    """auth_data/client_secret.json 및 auth_data/youtube_token.json의 실제 OAuth 유효성 검증.
+    - 토큰이 없거나 손상되었거나, 만료되었는데 refresh_token이 없거나 갱신 실패 시 반드시 미로그인('red') 반환.
+    - attempt_refresh=True(정밀 새로고침·테스트 모드): 만료된 토큰을 실제 creds.refresh(Request())로 갱신 검증 후 저장."""
     migrate_legacy_auth_files()
     secret_path = get_auth_file('client_secret.json')
     token_path = get_auth_file('youtube_token.json')
-    has_secret = os.path.exists(secret_path) and os.path.getsize(secret_path) > 10
-    has_token = os.path.exists(token_path) and os.path.getsize(token_path) > 10
-    if has_secret and has_token:
-        yt_state = 'green'
-    elif has_secret:
-        yt_state = 'yellow'
-    else:
-        yt_state = 'red'
+    has_secret = _is_valid_youtube_client_secret(secret_path)
+
+    if not os.path.exists(token_path) or os.path.getsize(token_path) <= 10:
+        reason = (
+            '미로그인 · 유튜브 OAuth 토큰(auth_data/youtube_token.json)이 없습니다. 구글 계정 인증을 먼저 진행해 주세요.'
+            if has_secret else
+            '미설정 · auth_data/client_secret.json과 유튜브 OAuth 토큰이 모두 없습니다.'
+        )
+        return {
+            'ok': False,
+            'state': 'red',
+            'has_secret': has_secret,
+            'has_token': False,
+            'reason': reason,
+        }
+
+    try:
+        creds = Credentials.from_authorized_user_file(token_path, YOUTUBE_SCOPES)
+    except Exception as e:
+        return {
+            'ok': False,
+            'state': 'red',
+            'has_secret': has_secret,
+            'has_token': False,
+            'reason': f'유튜브 OAuth 토큰 파일이 손상되었거나 형식이 올바르지 않습니다({type(e).__name__}). 재인증해 주세요.',
+        }
+
+    if not creds:
+        return {
+            'ok': False,
+            'state': 'red',
+            'has_secret': has_secret,
+            'has_token': False,
+            'reason': '유튜브 OAuth 토큰을 불러올 수 없습니다. 재인증해 주세요.',
+        }
+
+    if creds.valid:
+        if not has_secret:
+            return {
+                'ok': False,
+                'state': 'red',
+                'has_secret': False,
+                'has_token': True,
+                'reason': '유튜브 OAuth 토큰은 있으나 auth_data/client_secret.json이 없거나 손상되었습니다.',
+            }
+        return {
+            'ok': True,
+            'state': 'green',
+            'has_secret': True,
+            'has_token': True,
+            'reason': '유튜브 OAuth 토큰 유효 확인 완료',
+        }
+
+    # 액세스 토큰 만료 상태: refresh_token 보유 및 갱신 가능 여부 엄격 검증
+    has_refresh = bool(getattr(creds, 'refresh_token', None))
+    if not has_refresh:
+        return {
+            'ok': False,
+            'state': 'red',
+            'has_secret': has_secret,
+            'has_token': False,
+            'reason': '유튜브 OAuth 토큰이 만료되었고 갱신 토큰(refresh_token)이 없어 재인증이 필요합니다.',
+        }
+
+    if not getattr(creds, 'client_id', None) or not getattr(creds, 'client_secret', None):
+        return {
+            'ok': False,
+            'state': 'red',
+            'has_secret': has_secret,
+            'has_token': False,
+            'reason': '유튜브 OAuth 토큰의 클라이언트 정보가 누락되어 갱신할 수 없습니다. 재인증해 주세요.',
+        }
+
+    if attempt_refresh:
+        try:
+            creds.refresh(Request())
+            if not creds.valid:
+                raise RuntimeError('토큰 갱신 후에도 유효 상태가 아닙니다.')
+            try:
+                tmp_path = f"{token_path}.tmp"
+                with open(tmp_path, 'w', encoding='utf-8') as f:
+                    f.write(creds.to_json())
+                os.replace(tmp_path, token_path)
+            except Exception:
+                pass
+        except Exception as e:
+            return {
+                'ok': False,
+                'state': 'red',
+                'has_secret': has_secret,
+                'has_token': False,
+                'reason': f'유튜브 OAuth 토큰 만료·갱신 실패({type(e).__name__}: {str(e)[:80]}) — 구글 계정 재인증이 필요합니다.',
+            }
+        if not has_secret:
+            return {
+                'ok': False,
+                'state': 'red',
+                'has_secret': False,
+                'has_token': True,
+                'reason': '유튜브 OAuth 토큰은 갱신되었으나 auth_data/client_secret.json이 없습니다.',
+            }
+        return {
+            'ok': True,
+            'state': 'green',
+            'has_secret': True,
+            'has_token': True,
+            'reason': '유튜브 OAuth 토큰 자동 갱신 및 유효성 검증 완료',
+        }
+
+    if not has_secret:
+        return {
+            'ok': False,
+            'state': 'red',
+            'has_secret': False,
+            'has_token': False,
+            'reason': 'auth_data/client_secret.json이 없어 유튜브 OAuth 인증을 사용할 수 없습니다.',
+        }
+    return {
+        'ok': True,
+        'state': 'green',
+        'has_secret': True,
+        'has_token': True,
+        'reason': '유튜브 OAuth 토큰 확인됨 (만료 시 자동 갱신 가능)',
+    }
+
+
+def get_setup_status(deep=False):
+    """10개 플랫폼 로그인/API 상태 신호등(green/yellow/red) 및 쿠키 경과 일수 반환.
+    deep=True는 로그인 창 닫힘 직후 및 [상태 새로고침] 수동 클릭 시에만 1회 실행."""
+    migrate_legacy_auth_files()
+    yt_check = validate_youtube_oauth_token(attempt_refresh=bool(deep))
+    yt_state = yt_check['state']
+    has_secret = yt_check['has_secret']
+    has_token = yt_check['has_token']
 
     naver_state, naver_age = _check_cookie_status_and_age('naver_cookies.json', deep=deep)
     tt_state, tt_age = _check_cookie_status_and_age('tiktok_cookies.json', deep=deep)
@@ -265,7 +353,6 @@ def get_setup_status(deep=False):
     th_state, th_age = _check_cookie_status_and_age('threads_cookies.json', deep=deep)
     x_state, x_age = _check_cookie_status_and_age('x_cookies.json', deep=deep)
     fb_state, fb_age = _check_cookie_status_and_age('facebook_cookies.json', deep=deep)
-    dg_state, dg_age = _check_cookie_status_and_age('daangn_cookies.json', deep=deep)
 
     prof = load_profile()
     return {
@@ -279,7 +366,6 @@ def get_setup_status(deep=False):
         'x': x_state,
         'fb': fb_state,
         'fb_page': fb_state,
-        'daangn': dg_state,
         'cookie_ages': {
             'naver': naver_age,
             'clip': naver_age,
@@ -290,16 +376,17 @@ def get_setup_status(deep=False):
             'x': x_age,
             'fb': fb_age,
             'fb_page': fb_age,
-            'daangn': dg_age,
         },
         'profile_ids': {
             'naver_blog_id': prof.get('naver_blog_id', ''),
             'pinterest_id': prof.get('pinterest_id', ''),
             'instagram_id': prof.get('instagram_id', ''),
+            'threads_id': prof.get('threads_id', ''),
             'x_id': prof.get('x_id', ''),
         },
         'has_client_secret': has_secret,
         'has_youtube_token': has_token,
+        'yt_reason': yt_check['reason'],
     }
 
 
@@ -724,12 +811,13 @@ def reset_personal_data(confirm_text):
     }
 
 def _kill_automation_chrome():
-    """Playwright가 띄운 자동화 크롬 창만 타겟팅하여 즉시 종료 (개인 크롬 창은 유지)"""
+    """Playwright가 띄운 전용 영구 프로필(chrome_profile) 자동화 크롬 프로세스만 타겟팅하여 즉시 종료 (개인 크롬 창은 절대 유지)"""
     try:
+        profile_marker = 'chrome_profile'
         if sys.platform == 'win32':
             ps_cmd = (
                 "Get-CimInstance Win32_Process | "
-                "Where-Object { ($_.Name -match 'chrome|chromium') -and ($_.CommandLine -like '*--disable-blink-features=AutomationControlled*') } | "
+                "Where-Object { ($_.Name -match 'chrome|chromium') -and ($_.CommandLine -like '*chrome_profile*') } | "
                 "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
             )
             subprocess.run(
@@ -739,7 +827,34 @@ def _kill_automation_chrome():
                 creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
             )
         else:
-            subprocess.run(['pkill', '-f', '--', '--disable-blink-features=AutomationControlled'], stderr=subprocess.DEVNULL)
+            import signal
+            my_pid = os.getpid()
+            proc = subprocess.run(
+                ['ps', '-ax', '-o', 'pid=,command='],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if proc.returncode == 0 and proc.stdout:
+                for line in proc.stdout.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    parts = line.split(None, 1)
+                    if len(parts) < 2:
+                        continue
+                    try:
+                        pid = int(parts[0])
+                    except Exception:
+                        continue
+                    if pid == my_pid:
+                        continue
+                    cmd_low = parts[1].lower()
+                    if ('chrome' in cmd_low or 'chromium' in cmd_low) and profile_marker in cmd_low:
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except Exception:
+                            pass
     except Exception:
         pass
 
@@ -795,7 +910,7 @@ def _rescue_debug_webms_into_dir(target_dir):
 
 def merge_blackbox_session_to_mp4(session_dir, out_dir=None, start_dt=None, is_test_mode=False):
     """1회 실행(테스트 모드 또는 일반 업로드) 중 수집된 각 플랫폼 .webm 블랙박스 클립을 FFmpeg로 단일 MP4로 합본해
-    통합 blackbox/ 폴더에 upload_(HHMM-MMDD).mp4 또는 test_(HHMM-MMDD).mp4 형식으로 저장."""
+    통합 blackbox/ 폴더에 upload.mp4 또는 test.mp4 고정 파일명으로 덮어쓰기 저장."""
     if not session_dir:
         return ''
     target_dir = out_dir or BLACKBOX_DIR
@@ -873,9 +988,9 @@ def merge_blackbox_session_to_mp4(session_dir, out_dir=None, start_dt=None, is_t
         if saved_ok:
             prune_blackbox_dir(max_keep=3)
             if is_test_mode:
-                log(f"🎬 테스트 블랙박스 합본 영상이 저장되었습니다: blackbox/{out_name} (최신 3개 자동 유지 · 오류 문의 시 [📂 오류 폴더 열기]로 첨부해 주세요)")
+                log(f"🎬 테스트 블랙박스 합본 영상이 저장되었습니다: blackbox/{out_name} (고정 파일 덮어쓰기 · 오류 문의 시 [📂 오류 폴더 열기]로 첨부해 주세요)")
             else:
-                log(f"🎬 업로드 블랙박스 합본 영상이 저장되었습니다: blackbox/{out_name} (최신 3개 자동 유지)")
+                log(f"🎬 업로드 블랙박스 합본 영상이 저장되었습니다: blackbox/{out_name} (고정 파일 덮어쓰기)")
             return out_path
         if is_test_mode:
             log("⚠️ [테스트 모드] 합본할 수 있는 유효한 블랙박스 녹화본이 없어 blackbox 저장을 건너뛰었습니다.")
@@ -978,8 +1093,7 @@ def _md_cell(text):
 
 
 def write_run_report(platform_results, mode_label='실업로드', video_name='', start_dt=None, end_dt=None, stopped_by_user=False, report_kind=None):
-    """성공·실패·건너뜀·강제 중지·테스트 모드·로그인 점검 오류 결과를 blackbox/report_<kind>_(HHMM-MMDD).md에 저장하고
-    리포트 유형 최신 3개만 자동 유지"""
+    """성공·실패·건너뜀·강제 중지·테스트 모드·로그인 점검 오류 결과를 고정 파일명(blackbox/report_test.md, report_upload.md, report_login.md)에 덮어쓰기 저장"""
     end_t = end_dt if isinstance(end_dt, datetime.datetime) else datetime.datetime.now()
     start_t = start_dt if isinstance(start_dt, datetime.datetime) else end_t
     elapsed_sec = max(0.0, (end_t - start_t).total_seconds())
@@ -1544,41 +1658,6 @@ def extract_10_thumbnails(video_path, count=10, prefix='thumb_'):
     return thumbnails
 
 
-def resolve_daangn_images(payload, video_path=''):
-    """당근 비즈프로필 소식 첨부 사진 결정 (0장 방지 3단계 안전장치):
-    1) payload['daangn_selected_images'] 중 실존하는 비-GIF 이미지 (최대 10장)
-    2) 비어 있으면 payload['naver_selected_images'] 중 실존하는 비-GIF 이미지 (최대 4장)
-    3) 그래도 0장이고 video_path가 존재하면 영상 균등 4구간 핵심 사진 자동 추출"""
-    def _filter_imgs(raw_list, limit):
-        out = []
-        seen = set()
-        for p in (raw_list or []):
-            if not p or not isinstance(p, str):
-                continue
-            if p.lower().endswith('.gif') or not os.path.exists(p):
-                continue
-            if p not in seen:
-                seen.add(p)
-                out.append(p)
-            if len(out) >= limit:
-                break
-        return out
-
-    imgs = _filter_imgs((payload or {}).get('daangn_selected_images'), 10)
-    if imgs:
-        return imgs
-
-    imgs = _filter_imgs((payload or {}).get('naver_selected_images'), 4)
-    if imgs:
-        return imgs
-
-    if video_path and os.path.exists(video_path):
-        log('📸 [당근 비즈프로필] 선택된 사진이 없어 첨부 영상에서 핵심 사진 4장을 자동 추출합니다...')
-        extracted = extract_10_thumbnails(video_path, count=4, prefix='daangn_thumb_')
-        imgs = _filter_imgs([t.get('path') for t in (extracted or []) if isinstance(t, dict)], 4)
-    return imgs
-
-
 def capture_frame_at_time(video_path, time_sec):
     """영상의 지정 시점(time_sec)에서 고화질 캡처 JPEG 1장을 추출해 temp_thumbs/에 저장"""
     if not video_path or not os.path.exists(video_path):
@@ -1764,27 +1843,6 @@ def _sanitize_tag_token(raw_tag):
     return s
 
 
-def _is_natural_search_tag(tag, banned_tags, region_tags=None):
-    """어색한 광고형 합성어('뜨는옆머리해결' 등)를 걸러내고 실제 검색·유입용 자연 키워드만 통과"""
-    if not tag or len(tag) < 2:
-        return False
-    low = tag.lower()
-    if low in banned_tags:
-        return False
-    if tag == '손질편한머리' or (region_tags and tag in region_tags):
-        return False
-    if tag in KNOWN_NATURAL_STYLE_TAGS:
-        return True
-    if any(tag.endswith(sfx) for sfx in AWKWARD_TAG_SUFFIXES):
-        return False
-    if any(sub in tag for sub in AWKWARD_TAG_SUBSTRINGS):
-        return False
-    # 지나치게 긴 문장형 한국어 합성어 차단 (예: 10자 초과 미등록 태그)
-    if re.search(r'[가-힣]', tag) and len(tag) > 9:
-        return False
-    return True
-
-
 def format_clean_tags(tags_iter):
     """태그 목록을 쉼표/공백 찌꺼기 없이 깔끔한 ', ' 문자열로 정리"""
     cleaned = []
@@ -1836,72 +1894,31 @@ def smart_trim_text(text, max_len):
     return candidate.rstrip(' ,·|-:/')
 
 
-def build_smart_tags(raw_tags, full_text, cat, profile=None):
-    prof = profile if isinstance(profile, dict) else load_profile()
-    banned_tags = get_effective_banned_tags(prof)
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
-    collected_tags = []
-    seen_low = set()
+def build_smart_tags(main_tags, sub_tags=None):
+    """원고의 [해시태그]와 [대댓글 유도용 텍스트] 서브 해시태그를 임의 추가·재정렬·필터링 없이
+    중복만 제거해 플랫폼별 개수 규격에 맞춰 그대로 반환:
+    - tags_5: [해시태그] 최대 5개 (클립·틱톡·인스타·핀터·페북 개인/매장)
+    - tags_10: [해시태그] + 서브 해시태그 순서대로 합산 최대 10개 (유튜브·네이버 블로그)
+    - threads_tags: [해시태그] 첫 1개
+    - x_tags: [해시태그] 앞 최대 2개"""
+    def _dedupe(items):
+        out = []
+        seen = set()
+        for raw in (items or []):
+            tok = _sanitize_tag_token(raw)
+            if not tok:
+                continue
+            low = tok.lower()
+            if low in seen:
+                continue
+            seen.add(low)
+            out.append(tok)
+        return out
 
-    def _add_tag(candidate):
-        tok = _sanitize_tag_token(candidate)
-        if not tok:
-            return
-        if not _is_natural_search_tag(tok, banned_tags, region_tags=region_set):
-            return
-        low = tok.lower()
-        if low in seen_low:
-            return
-        seen_low.add(low)
-        collected_tags.append(tok)
-
-    # 1) 원문 태그(raw_tags) 수집 (원문 등장 순서 보존)
-    raw_sanitized_for_match = []
-    for t in (raw_tags or []):
-        tok = _sanitize_tag_token(t)
-        if tok:
-            raw_sanitized_for_match.append(tok)
-        _add_tag(t)
-
-    # 2) 원문 본문·태그에서 STYLE_EXPANSION_MAP으로 대표/연관 시술명 매칭
-    men_only_keys = {'다운펌', '옆머리', '뜨는', '가르마', '애즈', '댄디', '크롭', '드롭', '크리드', '아이비리그', '가일', '리젠트', '쉐도우', '상고', '페이드'}
-    women_only_keys = {'태슬', '단발', '허쉬', '빌드', '엘리자벳', '구름', '히피', '보브'}
-    match_src = ' '.join(raw_sanitized_for_match) + ' ' + (full_text or '')
-    for key, exp_list in STYLE_EXPANSION_MAP.items():
-        if cat == 'Men' and key in women_only_keys:
-            continue
-        if cat == 'Women' and key in men_only_keys and key not in ('가르마', '애즈'):
-            continue
-        if key in match_src:
-            for item in exp_list:
-                _add_tag(item)
-
-    # 3) 부족분은 실제 검색량이 검증된 대표 시술명으로 자연스럽게 보충
-    promo_pool = (
-        ['드롭컷', '크롭컷', '크리드컷', '다운펌', '애즈펌', '가르마펌', '댄디컷', '상고컷', '남자커트']
-        if cat == 'Men'
-        else ['레이어드컷', '태슬컷', '단발펌', '빌드펌', '허쉬컷', '볼륨매직', 'C컬펌', '여자커트']
-    )
-    for p in promo_pool:
-        _add_tag(p)
-
-    # 최종 3단계 등급제(티어) 안정 정렬:
-    # 1티어(메인 트렌드 시술명) → 2티어(사전 등록 연관·보조 시술명) → 3티어(사전 미등록 일반 원문 태그)
-    # 파이썬 sort는 안정 정렬이므로 각 티어 내에서는 원문/본문에서 먼저 매칭된 순서를 그대로 유지
-    def _tag_tier(tok):
-        low = tok.lower()
-        if low in TIER1_TREND_STYLE_TAGS_LOWER:
-            return 1
-        if low in KNOWN_NATURAL_STYLE_TAGS_LOWER:
-            return 2
-        return 3
-
-    style_tags = sorted(collected_tags, key=_tag_tier)
-
-    max_5_style = max(1, 5 - len(region_tags))
-    max_10_style = max(1, 10 - len(region_tags))
-    return style_tags, (style_tags[:max_5_style] + region_tags)[:5], (style_tags[:max_10_style] + region_tags)[:10], region_tags
+    clean_main = _dedupe(main_tags)
+    clean_sub = _dedupe(sub_tags)
+    combined = _dedupe(clean_main + clean_sub)
+    return clean_main, clean_main[:5], combined[:10], clean_main[:1], clean_main[:2]
 
 INVISIBLE_SPACE_RE = re.compile(r'[\u3164\uffa0\u2800\u200b\u200c\u200d\ufeff\u00a0]+')
 DIVIDER_LINE_RE = re.compile(r'^[\s\-_=━─┈┄·•*★☆~]+$')
@@ -2214,7 +2231,7 @@ ENG_SENTENCE_RE = re.compile(r'[A-Za-z]{2,}(?:\s+[A-Za-z0-9&\-\'/,]+){1,}')
 
 
 def _is_ig_signature_or_dm_line(line, salon_name='', designer_name=''):
-    """타 플랫폼(유튜브/클립/당근 등)용 핵심 문장 추출 시 인스타 커스텀 서명·DM·@아이디 줄을 제외하기 위한 판별기"""
+    """타 플랫폼(유튜브/클립/쓰레드 등)용 핵심 문장 추출 시 인스타 커스텀 서명·DM·@아이디 줄을 제외하기 위한 판별기"""
     s = _clean_invisible_line(line)
     if not s:
         return True
@@ -2469,16 +2486,12 @@ def _prepare_instagram_preserved_body(raw_text):
 
 
 def convert_master_content(data_text, video_name='', profile_override=None):
-    """순수 파이썬 메인 원고 변환 엔진 (API 키 불필요 · 11개 플랫폼 자동 분배 및 인스타 커스텀 스타일 보호)"""
+    """순수 파이썬 메인 원고 변환 엔진 (API 키 불필요 · 10개 플랫폼 파싱·규격 분배 전용)"""
     nl = chr(10)
     prof = profile_override if isinstance(profile_override, dict) else load_profile()
     salon_name = get_salon_name(prof, fallback='우리 매장')
-    salon_addr = get_salon_address(prof)
     region_kw = get_region_keyword(prof)
     region_title_prefix = f"{region_kw} 미용실 " if region_kw else (f"{salon_name} " if salon_name != '우리 매장' else "")
-    region_near_label = f"{region_kw} 근처에서" if region_kw else "가까운 곳에서"
-    region_neighbor_label = f"{region_kw} 이웃님들께" if region_kw else "우리 동네 이웃님들께"
-    daangn_prefix = f"[{region_kw}] " if region_kw else f"[{salon_name}] "
 
     designer_name = (prof.get('designer_name') or '').strip()
     designer_label = f" {designer_name}" if designer_name else ""
@@ -2487,30 +2500,33 @@ def convert_master_content(data_text, video_name='', profile_override=None):
     data_text = normalize_branch_name(data_text or '')
     sections = parse_multi_block_sections(data_text)
     is_multi_block = ('숏폼전용본문' in sections or '블로그전용본문' in sections)
-    is_bonmun_format = (not is_multi_block) and any(k in sections for k in ('메인본문', 'SEO마케팅파일명', '보충댓글', '제목3종', '해시태그'))
+    is_bonmun_format = (not is_multi_block) and any(k in sections for k in ('메인본문', 'SEO마케팅파일명', '보충댓글', '대댓글유도용텍스트', '제목3종', '해시태그'))
     seo_filename = sections.get('SEO마케팅파일명', '') or sections.get('파일제목', '')
     short_section_raw = sections.get('숏폼전용본문', '')
+    sub_comment_block = sections.get('대댓글유도용텍스트', '') or sections.get('보충댓글', '')
 
     if is_multi_block:
         short_raw = short_section_raw or sections.get('메인본문', '') or sections.get('_unassigned', '') or data_text
         blog_custom_body = sections.get('블로그전용본문', '')
         titles_block = sections.get('제목3종', '')
         tags_block = sections.get('해시태그', '')
-        raw_tags = re.findall(r'#([^\s#]+)', tags_block + ' ' + short_raw)
+        main_tags_raw = re.findall(r'#([^\s#]+)', tags_block) if tags_block else re.findall(r'#([^\s#]+)', short_raw)
         raw_lines = [_clean_invisible_line(l) for l in short_raw.splitlines() if _clean_invisible_line(l)]
     elif is_bonmun_format:
         short_raw = sections.get('메인본문', '') or sections.get('_unassigned', '')
         blog_custom_body = ''
         titles_block = sections.get('제목3종', '')
         tags_block = sections.get('해시태그', '')
-        raw_tags = re.findall(r'#([^\s#]+)', tags_block + ' ' + short_raw)
+        main_tags_raw = re.findall(r'#([^\s#]+)', tags_block) if tags_block else re.findall(r'#([^\s#]+)', short_raw)
         raw_lines = [_clean_invisible_line(l) for l in short_raw.splitlines() if _clean_invisible_line(l)]
     else:
         short_raw = data_text
         blog_custom_body = ''
         titles_block = ''
         raw_lines = [_clean_invisible_line(l) for l in data_text.splitlines() if _clean_invisible_line(l)]
-        raw_tags = re.findall(r'#([^\s#]+)', data_text)
+        main_tags_raw = re.findall(r'#([^\s#]+)', data_text)
+
+    sub_tags_raw = re.findall(r'#([^\s#]+)', sub_comment_block) if sub_comment_block else []
 
     if blog_custom_body:
         blog_custom_body = nl.join([
@@ -2536,11 +2552,10 @@ def convert_master_content(data_text, video_name='', profile_override=None):
 
     seo_hint = re.sub(r'[_\-\.]+', ' ', _clean_invisible_line(seo_filename))
     full_line_text = ' '.join(content_lines)
-    combined_hint = f"{full_line_text} {blog_custom_body} {seo_hint} {' '.join(raw_tags)} {video_name or STATE.get('video_name', '')}"
-    gender_cat = classify_category(combined_hint)
+    combined_hint = f"{full_line_text} {blog_custom_body} {seo_hint} {' '.join(main_tags_raw)} {video_name or STATE.get('video_name', '')}"
     user_blog_cats = get_blog_categories(prof)
     recommended_blog_cat = recommend_blog_category(combined_hint, user_blog_cats) if user_blog_cats else ""
-    style_kws, tags_5, tags_10, region_tags = build_smart_tags(raw_tags, f"{full_line_text} {blog_custom_body} {seo_hint}", gender_cat, profile=prof)
+    style_kws, tags_5, tags_10, threads_tags_list, x_tags_list = build_smart_tags(main_tags_raw, sub_tags_raw)
 
     kr_style_kws = [k for k in style_kws if re.search(r'[가-힣]', k)] or style_kws
     main_kw = ' '.join(kr_style_kws[:2]) if kr_style_kws else '맞춤 헤어'
@@ -2555,15 +2570,12 @@ def convert_master_content(data_text, video_name='', profile_override=None):
     if len(content_lines) >= 3:
         mid_lines = [normalize_branch_name(x) for x in content_lines[1:-1]]
         care_comment = normalize_branch_name(content_lines[-1].strip())
-        design_lines = [normalize_branch_name(x) for x in content_lines[:-1]]
     elif len(content_lines) == 2:
         mid_lines = [normalize_branch_name(content_lines[1].strip())]
         care_comment = normalize_branch_name(content_lines[1].strip())
-        design_lines = [normalize_branch_name(content_lines[0].strip())]
     else:
         mid_lines = []
         care_comment = "샴푸 후 두피부터 털어 말리고 에센스만 소량 바르면 라인이 잡힙니다."
-        design_lines = [normalize_branch_name(content_lines[0].strip())]
 
     parsed_titles = [
         normalize_branch_name(re.sub(r'^[1-3][\.\)]\s*', '', _clean_invisible_line(l)).strip('"').strip("'"))
@@ -2580,394 +2592,14 @@ def convert_master_content(data_text, video_name='', profile_override=None):
         50,
     )
 
-    gender_target = "남성 고객님" if gender_cat == "Men" else "고객님"
     style_core = kr_style_kws[0] if kr_style_kws else main_kw
 
-    if blog_custom_body:
-        naver_body = format_mobile_readable(
-            ensure_blog_media_placeholders(normalize_branch_name(blog_custom_body)),
-            max_line_len=28,
-            preserve_media_markers=True,
-        )
-    else:
-        bullet_design = f"{nl}{nl}".join([f"**✔ {line.rstrip('.')}**" for line in design_lines])
-
-        intro_pool = [
-            (
-                f"안녕하세요.{nl}"
-                f"**{salon_name}{designer_label}**입니다.{nl}{nl}"
-                f"오늘 소개할 시술은 [[『 {main_kw} 』]]입니다.{nl}"
-                f"머리가 조금만 자라도 라인이 쉽게 흐트러져서{nl}"
-                f"아침마다 손질이 번거로웠던 {gender_target} 사례예요.{nl}{nl}"
-                f"과하게 힘주지 않아도 깔끔하게 떨어지는 실루엣,{nl}"
-                f"실제 시술 순서와 관리 포인트까지 한 번에 정리해 드릴게요."
-            ),
-            (
-                f"안녕하세요, **{salon_name}{designer_label}**입니다.{nl}{nl}"
-                f"매장에서 꾸준히 문의가 많은 [[『 {main_kw} 』]] 시술 기록입니다.{nl}"
-                f"기장을 확 줄이지 않으면서도 인상을 또렷하게 바꾸고 싶을 때{nl}"
-                f"가장 만족도가 높은 스타일이기도 해요.{nl}{nl}"
-                f"실제 모질에 맞춰 어떻게 라인을 정리했는지{nl}"
-                f"시술 전후 사진과 함께 차근차근 보여드릴게요."
-            ),
-            (
-                f"반갑습니다. **{salon_name}{designer_label}**입니다.{nl}{nl}"
-                f"오늘은 [[『 {main_kw} 』]] 시술 변화를 가져왔습니다.{nl}"
-                f"같은 스타일이라도 모량과 모류에 따라{nl}"
-                f"결과 차이가 크게 나는 편이에요.{nl}{nl}"
-                f"집에서 말리기만 해도 형태가 유지되도록{nl}"
-                f"어디에 중점을 두고 작업했는지 담백하게 공유해 드릴게요."
-            ),
-            (
-                f"안녕하세요. **{salon_name}{designer_label}**입니다.{nl}{nl}"
-                f"거울 볼 때마다 답답해 보이던 라인을 정리하러 오신{nl}"
-                f"{gender_target}의 [[『 {main_kw} 』]] 시술입니다.{nl}{nl}"
-                f"샵에서 드라이했을 때만 예쁜 머리가 아니라{nl}"
-                f"평소 일상에서도 편하게 유지되는 방향에 집중했어요.{nl}"
-                f"상담부터 마무리까지 핵심 포인트만 짚어드릴게요."
-            ),
-            (
-                f"안녕하세요, **{salon_name}{designer_label}**입니다.{nl}{nl}"
-                f"요즘 [[『 {main_kw} 』]] 상담이 부쩍 늘었습니다.{nl}"
-                f"특히 부스스함이나 애매한 기장감 때문에{nl}"
-                f"정돈된 실루엣을 원하시는 분들이 많아요.{nl}{nl}"
-                f"오늘 시술에서 실제로 손본 디테일과{nl}"
-                f"집에서 바로 따라 할 수 있는 손질 팁까지 함께 적어둘게요."
-            ),
-        ]
-
-        problem_pool = [
-            (
-                f"[[🔎 시술 전 고민 체크]]{nl}{nl}"
-                f"방문 당시 가장 불편하셨던 부분은 크게 두 가지였습니다.{nl}"
-                f"먼저 끝선이 고르게 모이지 않고 자꾸 바깥으로 뻗치는 점,{nl}"
-                f"그리고 시간이 지날수록 무게감이 한쪽으로 몰리는 점이었어요.{nl}{nl}"
-                f"이런 경우 겉 길이만 다듬으면 며칠 지나 다시 부해지기 쉽습니다.{nl}"
-                f"특히 샴푸 후 말렸을 때 옆이 뜨거나 아래가 뭉치는 현상이 반복되죠.{nl}{nl}"
-                f"그래서 이번 시술은 **안쪽 무게 분포와 외곽 라인을 먼저 정리**하는 데 집중했습니다.{nl}"
-                f"바탕이 정돈되어야 전체 실루엣이 깔끔하게 잡힙니다."
-            ),
-            (
-                f"[[🔎 방문 전 모발 상태 진단]]{nl}{nl}"
-                f"처음 상담할 때 모류 방향과 숱 분포부터 꼼꼼히 확인했습니다.{nl}"
-                f"평소 드라이를 오래 해도 원하는 형태가 금방 풀리고,{nl}"
-                f"옆라인이 어정쩡하게 뜨거나 무거워 보이는 고민이 있으셨어요.{nl}{nl}"
-                f"모발 굵기와 곱슬 정도를 함께 체크해 보니{nl}"
-                f"무게가 쌓이는 높이가 얼굴형과 잘 맞지 않는 상태였습니다.{nl}{nl}"
-                f"**불필요한 부피만 덜어내는 베이스 커트**부터 차분하게 잡고 들어가{nl}"
-                f"자연스럽게 떨어지는 흐름을 먼저 만들어 드렸어요."
-            ),
-            (
-                f"[[🔎 왜 손질이 어려웠을까?]]{nl}{nl}"
-                f"머리가 잘 안 잡히는 이유는 대부분 숱보다 '무게 위치' 때문입니다.{nl}"
-                f"무게가 아래나 옆에 과하게 쌓여 있으면{nl}"
-                f"아무리 드라이를 해도 라인이 무겁고 답답해 보이죠.{nl}{nl}"
-                f"반대로 숱을 너무 많이 치면 끝이 날리고 부스스해집니다.{nl}"
-                f"적정 양감을 남기면서 뭉치는 구간만 정확히 빼주는 게 핵심이에요.{nl}{nl}"
-                f"그래서 이번 {style_core} 작업에서는{nl}"
-                f"**두상 굴곡에 맞춰 층과 질감을 새로 배치**하는 데 가장 신경 썼습니다."
-            ),
-            (
-                f"[[🔎 시술 전 체크 포인트]]{nl}{nl}"
-                f"사진으로 보던 느낌을 그대로 내기 어려운 이유는{nl}"
-                f"사람마다 모발 굵기와 가마 방향이 다르기 때문입니다.{nl}{nl}"
-                f"이번 {gender_target}도 평소 가르마 습관과 곱슬 정도를 먼저 체크했어요.{nl}"
-                f"억지로 꺾어 누르는 방식은 며칠만 지나도 금방 원래대로 돌아옵니다.{nl}{nl}"
-                f"그래서 **모류가 흐르는 방향을 살리면서 외곽만 단정하게 정리**하는 쪽으로{nl}"
-                f"부담 없이 유지되는 설계를 잡았습니다."
-            ),
-            (
-                f"[[🔎 상담에서 확인한 핵심 고민]]{nl}{nl}"
-                f"바쁜 아침에 고데기나 롤빗을 오래 쓰기 부담스럽고,{nl}"
-                f"그냥 말렸을 때도 단정한 인상을 원하셨습니다.{nl}{nl}"
-                f"시술 전 모발 끝 손상도와 전체 밸런스를 함께 살펴보니{nl}"
-                f"길이를 많이 자르지 않아도 라인만 정돈하면 분위기가 확 달라질 상태였어요.{nl}{nl}"
-                f"**외곽선 정돈과 결 정리의 균형**을 맞추는 방향으로{nl}"
-                f"깔끔하고 실용적인 {style_core}을 진행했습니다."
-            ),
-        ]
-
-        detail_pool = [
-            (
-                f"[[📐 모질·두상별 디테일 조절]]{nl}{nl}"
-                f"같은 **{main_kw}**라도 모질에 따라 작업 방식이 달라집니다.{nl}{nl}"
-                f"• **모량이 많고 두꺼운 편이라면?**{nl}"
-                f"안쪽 양감을 과하지 않게 덜어내 답답함을 줄이고,{nl}"
-                f"겉면은 매끈하게 남겨 부스스함을 막아줍니다.{nl}{nl}"
-                f"• **모발이 가늘고 볼륨이 쉽게 가라앉는다면?**{nl}"
-                f"끝선 두께감을 살려 날리지 않게 잡아주고,{nl}"
-                f"필요한 지점에만 가벼운 결을 넣어 형태 유지력을 높입니다.{nl}{nl}"
-                f"• **옆머리나 뒷볼륨이 신경 쓰인다면?**{nl}"
-                f"뜨는 구간은 차분히 눌러주고, 꺼지는 구간은 입체감을 살려 비율을 맞춥니다.{nl}{nl}"
-                f"이 과정을 거쳐야 시술 직후뿐 아니라{nl}"
-                f"한 달쯤 지나 머리가 자라면서도 라인이 덜 무너집니다."
-            ),
-            (
-                f"[[📐 얼굴형과 두상에 맞춘 밸런스]]{nl}{nl}"
-                f"**{main_kw}**은 몇 밀리 차이로 분위기가 확 달라집니다.{nl}{nl}"
-                f"• **옆라인과 턱선 커버가 필요하다면?**{nl}"
-                f"얼굴 외곽을 따라 부드럽게 연결되는 길이를 남겨{nl}"
-                f"정면과 측면 모두 자연스럽게 이어지도록 맞춥니다.{nl}{nl}"
-                f"• **볼륨이 꺼지거나 반대로 뜨는 구간이 있다면?**{nl}"
-                f"뜨는 부분은 차분히 눌러주고, 살아야 할 포인트만 살려{nl}"
-                f"전체 비율이 또렷해 보이게 정리합니다.{nl}{nl}"
-                f"• **평소 앞머리·가르마 흐름까지 고려**{nl}"
-                f"억지 고정 없이 손으로 넘겨도 자연스럽게 연결되도록 다듬었습니다.{nl}{nl}"
-                f"눈에 띄는 과장보다 깔끔한 비율에 집중했습니다."
-            ),
-            (
-                f"[[📐 커트 후 질감 정리 포인트]]{nl}{nl}"
-                f"베이스 라인을 잡은 뒤 마른 상태에서 한 번 더 확인합니다.{nl}"
-                f"젖어 있을 때와 말랐을 때 떨어지는 결이 다르기 때문이에요.{nl}{nl}"
-                f"• **뻗치기 쉬운 모발 끝**은 질감을 가볍게 정돈해{nl}"
-                f"자연스럽게 원하는 방향으로 모이게 합니다.{nl}{nl}"
-                f"• **가르마와 앞머리 연결 구간**은 끊겨 보이지 않도록{nl}"
-                f"부드럽게 이어 주어 손빗질만 해도 정리되게 맞췄습니다.{nl}{nl}"
-                f"• **뒤통수 볼륨과 목선 라인**도 거울로 함께 체크하며{nl}"
-                f"어느 각도에서 봐도 깔끔하게 떨어지도록 마무리했어요."
-            ),
-            (
-                f"[[📐 오래가는 형태감을 위한 기준]]{nl}{nl}"
-                f"시술할 때 가장 중요하게 보는 건 '3주 뒤 모습'입니다.{nl}{nl}"
-                f"• **숱이 많은 모발**은 안쪽 공간을 적절히 비워{nl}"
-                f"자라나도 옆이 뭉치지 않게 설계합니다.{nl}{nl}"
-                f"• **힘없는 모발**은 층을 과하게 내지 않고{nl}"
-                f"실루엣이 탄탄하게 유지되는 선에서 무게를 조절합니다.{nl}{nl}"
-                f"• **모류 방향이 강한 부분**은 커트 각도를 세밀하게 맞춰{nl}"
-                f"말리기만 해도 들뜨지 않고 차분히 안착되게 잡았습니다.{nl}{nl}"
-                f"내 모질 조건에 딱 맞춘 덕분에 단정한 느낌이 오래 이어집니다."
-            ),
-            (
-                f"[[📐 1:1 맞춤 디자인 체크]]{nl}{nl}"
-                f"평소 자주 입는 옷 스타일과 출근 준비 시간까지 고려해{nl}"
-                f"**{main_kw}** 기장과 질감을 조율했습니다.{nl}{nl}"
-                f"• **뜨거나 부해 보이는 부분**은 깔끔하게 눌러 정리하고,{nl}"
-                f"• **부족한 입체감**은 자연스러운 결로 채워 넣었습니다.{nl}"
-                f"• **모발 끝선**은 가볍게 흩날리지 않게 밀도를 맞춰 정돈했어요.{nl}{nl}"
-                f"정면은 물론 옆모습, 뒷모습까지 군더더기 없이 떨어져{nl}"
-                f"어느 각도에서 봐도 깔끔하게 정리된 모습입니다."
-            ),
-        ]
-
-        qa_pool = [
-            (
-                f"[[💬 자주 묻는 질문 Q&A]]{nl}{nl}"
-                f"**Q. 시술 후 유지 기간은 보통 어느 정도인가요?**{nl}"
-                f"A. 모발 자라는 속도에 따라 다르지만, 보통 4~6주 정도 깔끔한 형태가 유지됩니다.{nl}"
-                f"그 이후에는 라인만 가볍게 다듬어 주시면 처음 실루엣을 오래 가져갈 수 있어요.{nl}{nl}"
-                f"**Q. 커트만 해도 될까요, 펌을 함께 하는 게 좋을까요?**{nl}"
-                f"A. 직모·반곱슬·모발 굵기에 따라 달라집니다.{nl}"
-                f"방문 시 모질 상태를 직접 확인한 뒤 꼭 필요한 시술만 제안해 드립니다."
-            ),
-            (
-                f"[[💬 방문 전 자주 물어보시는 부분]]{nl}{nl}"
-                f"**Q. 샵에서 한 것처럼 집에서도 손질이 잘 될까요?**{nl}"
-                f"A. 애초에 말리기만 해도 떨어지도록 라인을 잡기 때문에 부담이 적습니다.{nl}"
-                f"마무리할 때 본인 모질에 맞는 드라이 방향도 바로 알려드려요.{nl}{nl}"
-                f"**Q. 손상모나 염색 모발도 진행할 수 있나요?**{nl}"
-                f"A. 현재 손상도에 맞춰 약제와 질감 처리 강도를 조절해 진행합니다.{nl}"
-                f"무리한 시술은 권하지 않으니 편하게 상담부터 받아보셔도 좋습니다."
-            ),
-            (
-                f"[[💬 상담 시 많이 나오는 질문]]{nl}{nl}"
-                f"**Q. 기장이 애매한데 지금 방문해도 될까요?**{nl}"
-                f"A. 오히려 기장이 어정쩡할 때 라인을 한 번 정리해 두면 기르기도 훨씬 편합니다.{nl}"
-                f"목표 길이에 맞춰 불필요한 무게만 덜어내는 방식으로 진행해 드려요.{nl}{nl}"
-                f"**Q. 예약 시 따로 준비할 게 있나요?**{nl}"
-                f"A. 원하는 분위기의 참고 사진 1~2장 정도만 가져오셔도 충분합니다.{nl}"
-                f"두상과 얼굴형에 어울리게 비율을 맞춰 추천해 드립니다."
-            ),
-            (
-                f"[[💬 시술 전 궁금한 점 정리]]{nl}{nl}"
-                f"**Q. 아침 스타일링 시간이 얼마나 걸리나요?**{nl}"
-                f"A. 샴푸 후 타월 드라이를 충분히 하시면 보통 3~5분 안에 정리됩니다.{nl}"
-                f"고데기를 꼭 쓰지 않아도 기본 윤곽이 살아나 출근 준비가 한결 편해요.{nl}{nl}"
-                f"**Q. 다음 방문 주기는 언제가 적당한가요?**{nl}"
-                f"A. 깔끔한 라인을 유지하시려면 한 달~한 달 반 사이 방문을 추천합니다.{nl}"
-                f"자란 부분만 정리해도 전체 완성도가 다시 살아납니다."
-            ),
-            (
-                f"[[💬 고객님들이 자주 묻는 체크포인트]]{nl}{nl}"
-                f"**Q. 숱이 많거나 곱슬이 있어도 깔끔하게 나올까요?**{nl}"
-                f"A. 안쪽 양감 조절과 필요 시 볼륨매직·다운펌을 조합하면 차분하게 정돈됩니다.{nl}"
-                f"부해지는 원인만 정확히 잡아주면 오히려 형태가 잘 유지되는 편이에요.{nl}{nl}"
-                f"**Q. 시술 시간은 대략 얼마나 걸리나요?**{nl}"
-                f"A. 커트 기준 약 40~50분, 펌 병행 시 모질과 기장에 따라 1시간 30분~2시간 30분 정도 소요됩니다."
-            ),
-        ]
-
-        recommend_pool = [
-            (
-                f"[[✅ 이런 분들께 잘 어울려요]]{nl}{nl}"
-                f"1) 아침마다 드라이 시간을 줄이고 싶으신 분{nl}"
-                f"2) 과한 변화보다 깔끔하고 정돈된 인상을 원하시는 분{nl}"
-                f"3) 머리가 자라면서도 라인이 덜 무너지는 {style_core}을 찾으시는 분{nl}{nl}"
-                f"현재 기장이나 손상도에 따라 시술 조합은 유연하게 바뀔 수 있어요.{nl}"
-                f"방문 시 모발 상태를 직접 보고 가장 현실적인 방법을 안내해 드립니다."
-            ),
-            (
-                f"[[✅ 추천드리는 모질 & 고민]]{nl}{nl}"
-                f"1) 끝선이 자꾸 뻗치거나 옆라인이 지저분해 고민이신 분{nl}"
-                f"2) 롤빗이나 고데기 없이 가볍게 말려 손질하고 싶으신 분{nl}"
-                f"3) 얼굴형에 자연스럽게 어울리는 {style_core} 비율을 찾으시는 분{nl}{nl}"
-                f"모질마다 필요한 시술이 다르기 때문에{nl}"
-                f"불필요한 시술은 빼고 꼭 필요한 과정만 추천해 드리고 있습니다."
-            ),
-            (
-                f"[[✅ 상담 전 체크해 보시면 좋아요]]{nl}{nl}"
-                f"1) 평소 가르마 방향이나 자주 묶는 습관이 있는지{nl}"
-                f"2) 최근 6개월 이내 염색·펌·매직 이력이 있는지{nl}"
-                f"3) 아침에 드라이에 쓸 수 있는 시간이 어느 정도인지{nl}{nl}"
-                f"이 세 가지만 편하게 말씀해 주셔도{nl}"
-                f"**{main_kw}** 방향을 훨씬 정확하게 잡아드릴 수 있습니다."
-            ),
-            (
-                f"[[✅ 이런 분께 특히 만족도가 높아요]]{nl}{nl}"
-                f"1) 기장 변화는 크지 않게, 분위기만 산뜻하게 바꾸고 싶은 분{nl}"
-                f"2) 샵에서 한 날만 예쁜 머리 말고 평소 유지력을 중요하게 보시는 분{nl}"
-                f"3) {region_near_label} 꼼꼼하게 1:1 상담받고 싶으신 분{nl}{nl}"
-                f"사진 한두 장만 가져오셔도 모질에 맞게 조율해 진행해 드립니다."
-            ),
-            (
-                f"[[✅ 시술 후 달라지는 일상]]{nl}{nl}"
-                f"1) 샴푸 후 말리는 시간이 확실히 줄어듭니다.{nl}"
-                f"2) 별도 스타일링 없이도 외곽 실루엣이 깔끔하게 잡힙니다.{nl}"
-                f"3) 출근·외출 전 거울 앞에서 손이 덜 가는 편한 머리가 됩니다.{nl}{nl}"
-                f"화려한 연출보다 매일 쓰기 편한 실용적인 {style_core}을 지향합니다."
-            ),
-        ]
-
-        care_closing_pool = [
-            (
-                f"[[💨 집에서 3분 손질법]]{nl}{nl}"
-                f"[[💬 \"{care_comment.rstrip('.')}\"]]{nl}{nl}"
-                f"1️⃣ 타월로 물기를 꼼꼼히 닦아 드라이 시간을 줄여주세요.{nl}"
-                f"2️⃣ 바람을 위에서 아래로 주며 두피부터 가볍게 털어 말립니다.{nl}"
-                f"3️⃣ 80% 이상 마르면 모발 끝 위주로 **에센스나 오일**을 소량만 발라 마무리해요.{nl}{nl}"
-                f"[미디어 자료6]{nl}{nl}"
-                f"[[『 {main_kw} 』]] 스타일이 내 모질에 맞을지 고민되신다면,{nl}"
-                f"**{salon_name}{designer_label}**에서 편하게 상담부터 받아보세요.{nl}"
-                f"읽어주셔서 감사합니다."
-            ),
-            (
-                f"[[💨 데일리 드라이 & 관리 팁]]{nl}{nl}"
-                f"[[💬 \"{care_comment.rstrip('.')}\"]]{nl}{nl}"
-                f"• 젖은 상태에서 굵은 빗이나 손가락으로 결을 한 번 정리해 주세요.{nl}"
-                f"• 두피 뿌리부터 먼저 말린 뒤 모류 방향으로 자연스럽게 넘겨줍니다.{nl}"
-                f"• 마지막에 **가벼운 에센스나 컬 크림**을 소량 터치하면 끝입니다.{nl}{nl}"
-                f"[미디어 자료6]{nl}{nl}"
-                f"나에게 어울리는 [[『 {main_kw} 』]] 기장과 디테일이 궁금하시다면{nl}"
-                f"**{salon_name}{designer_label}**으로 언제든 문의 남겨주세요.{nl}"
-                f"오늘도 깔끔한 하루 보내시길 바랍니다."
-            ),
-            (
-                f"[[💨 아침 준비 줄이는 손질 가이드]]{nl}{nl}"
-                f"[[💬 \"{care_comment.rstrip('.')}\"]]{nl}{nl}"
-                f"① 샴푸 후 물기를 충분히 제거한 상태에서 시작하세요.{nl}"
-                f"② 뜨거운 바람보다 중온 바람으로 두피→모발 끝 순서로 말려줍니다.{nl}"
-                f"③ 건조한 끝부분에만 **헤어 오일 한 방울** 가볍게 발라 정돈해요.{nl}{nl}"
-                f"[미디어 자료6]{nl}{nl}"
-                f"과하지 않고 깔끔한 [[『 {main_kw} 』]] 변화를 원하신다면{nl}"
-                f"**{salon_name}{designer_label}**에서 1:1 맞춤으로 도와드릴게요.{nl}"
-                f"예약 및 문의는 아래 링크를 참고해 주세요."
-            ),
-            (
-                f"[[💨 유지력 높이는 홈케어 포인트]]{nl}{nl}"
-                f"[[💬 \"{care_comment.rstrip('.')}\"]]{nl}{nl}"
-                f"1) 두피부터 완전히 말려야 볼륨이 오래 유지됩니다.{nl}"
-                f"2) 말릴 때 손빗질로 결을 가볍게 쓸어내리면 부스스함이 줄어듭니다.{nl}"
-                f"3) 마무리 단계에 **에센스 또는 가벼운 스타일링 제품**만 살짝 더해 주세요.{nl}{nl}"
-                f"[미디어 자료6]{nl}{nl}"
-                f"지금까지 **{salon_name}{designer_label}**의{nl}"
-                f"[[『 {main_kw} 』]] 시술 기록이었습니다.{nl}"
-                f"궁금한 점은 아래 예약·상담 링크로 편하게 남겨주세요."
-            ),
-            (
-                f"[[💨 간단하게 끝내는 마무리 손질]]{nl}{nl}"
-                f"[[💬 \"{care_comment.rstrip('.')}\"]]{nl}{nl}"
-                f"✔ 물기를 충분히 털어낸 뒤 모근부터 건조해 주세요.{nl}"
-                f"✔ 전체가 거의 마르면 원하는 방향으로 가볍게 손질해 라인을 잡습니다.{nl}"
-                f"✔ 마지막으로 **윤기 에센스**를 소량 바르면 결이 깔끔하게 정리됩니다.{nl}{nl}"
-                f"[미디어 자료6]{nl}{nl}"
-                f"본인의 모질과 두상에 딱 맞는 [[『 {main_kw} 』]] 디자인,{nl}"
-                f"**{salon_name}{designer_label}**에서 부담 없이 상담해 보세요.{nl}"
-                f"감사합니다."
-            ),
-        ]
-
-        aftercare_pool = [
-            (
-                f"[[🗓️ 시술 후 1주차 · 4주차 변화 & 관리 팁]]{nl}{nl}"
-                f"• **1주차**: 갓 정리한 라인이 가장 또렷한 시기입니다.{nl}"
-                f"샴푸 후 젖은 채로 오래 두지 말고 두피부터 가볍게 말려 주세요.{nl}"
-                f"• **3~4주차**: 모발이 1cm가량 자라며 옆·뒷볼륨 위치가 조금씩 내려옵니다.{nl}"
-                f"이때 드라이 바람 방향만 모근 쪽으로 잡아 주면 형태가 오래 유지돼요.{nl}"
-                f"• **추천 리터치**: 깔끔한 윤곽을 유지하려면 4~6주 뒤 라인 정리만 받아도 충분합니다."
-            ),
-            (
-                f"[[🗓️ 집에서도 오래 유지하는 실전 포인트]]{nl}{nl}"
-                f"• **샴푸 직후**: 수건으로 비비지 말고 꾹꾹 눌러 물기를 뺀 뒤 말리세요.{nl}"
-                f"큐티클 손상이 줄어들어 부스스함 없이 결이 매끈하게 떨어집니다.{nl}"
-                f"• **외출 전 1분 체크**: 습한 날에는 에센스를 모발 끝에만 얇게 발라 주면{nl}"
-                f"잔머리가 덜 뜨고 처음 잡은 {style_core} 라인이 저녁까지 유지됩니다.{nl}"
-                f"• **다음 관리**: 한 달 반 전후로 무게감만 가볍게 정리하면 첫 느낌이 살아납니다."
-            ),
-            (
-                f"[[🗓️ 기간별 유지력 & 리터치 안내]]{nl}{nl}"
-                f"• **초반 2주**: 별도 손질 없이 털어 말리기만 해도 실루엣이 바로 잡힙니다.{nl}"
-                f"아침 준비 시간이 눈에 띄게 줄어드는 걸 느끼실 거예요.{nl}"
-                f"• **한 달 이후**: 자라난 모근 무게가 쌓이면 옆라인이 살짝 무거워질 수 있습니다.{nl}"
-                f"가벼운 커트 리터치로 무게 위치만 다시 올려 주면 새 머리처럼 정돈돼요.{nl}"
-                f"• **제품 선택**: 무거운 왁스나 오일보다 산뜻한 로션·에센스 타입을 권해드립니다."
-            ),
-            (
-                f"[[🗓️ 일상 속 손질 난이도 줄이는 법]]{nl}{nl}"
-                f"• **잠들기 전**: 머리가 덜 마른 상태로 자면 아침에 눌림과 뻗침이 심해집니다.{nl}"
-                f"두피와 옆라인만이라도 90% 이상 말리고 주무시면 다음 날 훨씬 편해요.{nl}"
-                f"• **드라이 순서**: 뒤통수 → 옆라인 → 앞머리 순서로 말리면 비율이 잘 잡힙니다.{nl}"
-                f"• **재방문 주기**: 모발 성장 속도에 맞춰 4~6주 간격으로 정리하시면{nl}"
-                f"기르는 과정에서도 지저분한 구간 없이 깔끔하게 넘길 수 있습니다."
-            ),
-            (
-                f"[[🗓️ 계절·습도별 간단 유지 팁]]{nl}{nl}"
-                f"• **건조한 날**: 정전기가 올라오면 끝선이 날려 보이기 쉬우니{nl}"
-                f"손바닥에 에센스를 소량 펴 발라 겉결만 가볍게 쓸어내려 주세요.{nl}"
-                f"• **비 오는 습한 날**: 열기구 온도를 높이기보다 찬바람으로 마지막 10초만 식혀 주면{nl}"
-                f"부해짐이 덜하고 정돈된 라인이 오래갑니다.{nl}"
-                f"• **유지 리터치**: 5주 안팎으로 안쪽 양감만 정리해 주면 만족도가 꾸준히 이어집니다."
-            ),
-        ]
-
-        picked_intro = random.choice(intro_pool)
-        picked_problem = random.choice(problem_pool)
-        picked_detail = random.choice(detail_pool)
-        picked_qa = random.choice(qa_pool)
-        picked_recommend = random.choice(recommend_pool)
-        picked_aftercare = random.choice(aftercare_pool)
-        picked_care = random.choice(care_closing_pool)
-
-        naver_body = format_mobile_readable(
-            normalize_branch_name(
-                f"{picked_intro}{nl}{nl}"
-                f"[미디어 자료1]{nl}{nl}"
-                f"{picked_problem}{nl}{nl}"
-                f"[미디어 자료2]{nl}{nl}"
-                f"[[✂️ 오늘의 시술 포인트]]{nl}{nl}"
-                f"{bullet_design}{nl}{nl}"
-                f"라인과 질감의 균형을 먼저 잡아두면{nl}"
-                f"별도 스타일링 없이도 정돈된 실루엣이 살아납니다.{nl}{nl}"
-                f"[미디어 자료3]{nl}{nl}"
-                f"{picked_detail}{nl}{nl}"
-                f"[미디어 자료4]{nl}{nl}"
-                f"{picked_recommend}{nl}{nl}"
-                f"{picked_qa}{nl}{nl}"
-                f"[미디어 자료5]{nl}{nl}"
-                f"{picked_aftercare}{nl}{nl}"
-                f"{picked_care}"
-            ),
-            max_line_len=28,
-            preserve_media_markers=True,
-        )
+    blog_source_body = blog_custom_body if blog_custom_body else nl.join(content_lines).strip()
+    naver_body = format_mobile_readable(
+        ensure_blog_media_placeholders(normalize_branch_name(blog_source_body)),
+        max_line_len=28,
+        preserve_media_markers=True,
+    )
 
     # 플랫폼별 인기 글쓰기 틀 적용 (숏폼·소통 플랫폼은 문장·문단 호흡 중심 포맷터 적용 · 문장/어절 단위 안전 축약)
     yt_title_cand = normalize_branch_name(f"{hook_line} | {style_core}" if style_core not in hook_line else hook_line)
@@ -3063,56 +2695,25 @@ def convert_master_content(data_text, video_name='', profile_override=None):
         pin_mid_trimmed = smart_trim_text(pin_summary, pin_mid_budget)
         pin_body = smart_trim_text(f"{pin_prefix}{pin_mid_trimmed} {pin_cta}", 220)
 
-    fallback_region_tag = region_tags[0] if region_tags else "헤어스타일"
-    threads_top_tag = _sanitize_tag_token(kr_style_kws[0] if kr_style_kws else fallback_region_tag)
     threads_second = mid_lines[0] if mid_lines else ""
-    threads_q_pool = [
-        f"아침에 머리 손질할 때 제일 신경 쓰이는 부분 있으신가요?",
-        f"비슷한 모질 고민 있으시면 댓글로 편하게 물어보세요!",
-        f"요즘 {style_core} 고민 중이셨다면 참고해 보셔도 좋아요. 궁금한 점 남겨주세요!",
-        f"평소 드라이하는 데 보통 몇 분 정도 걸리시나요?",
-    ]
-    threads_q = random.choice(threads_q_pool)
+    threads_q_lines = []
+    for ql in (sub_comment_block or '').splitlines():
+        ql_clean = _clean_invisible_line(re.sub(r'#[^\s#]+', '', ql))
+        if ql_clean and not _is_noise_label_line(ql_clean):
+            threads_q_lines.append(ql_clean)
+    threads_q = nl.join(threads_q_lines).strip()
     if threads_second and threads_second != care_comment:
         threads_mid_block = f"{threads_second}{nl}{nl}{care_comment}"
     else:
         threads_mid_block = care_comment
+    threads_parts = [hook_line, threads_mid_block]
+    if threads_q:
+        threads_parts.append(threads_q)
+    threads_parts.append(f"📍 {salon_name}{designer_pipe}")
     threads_body = format_shortform_readable(
-        normalize_branch_name(
-            f"{hook_line}{nl}{nl}"
-            f"{threads_mid_block}{nl}{nl}"
-            f"{threads_q}{nl}{nl}"
-            f"📍 {salon_name}{designer_pipe}"
-        )
+        normalize_branch_name(f"{nl}{nl}".join([p for p in threads_parts if p]))
     )
-    threads_tags_str = format_clean_tags([threads_top_tag])
-
-    daangn_full_prefix = daangn_prefix if style_core in hook_line else f"{daangn_prefix.rstrip('] ')} {style_core}] "
-    daangn_title_full = normalize_branch_name(f"{daangn_full_prefix}{hook_line}")
-    if len(daangn_title_full) <= 30:
-        daangn_title = daangn_title_full
-    else:
-        # 30자 초과 시 말머리를 [지역]으로 간결화하고 중복 지역 접두어를 정리해 제목 본문이 잘리지 않게 확보
-        hook_for_daangn = normalize_branch_name(hook_line)
-        if region_kw:
-            hook_for_daangn = re.sub(rf'^{re.escape(region_kw)}\s*(?:미용실|헤어샵|헤어살롱)?\s*', '', hook_for_daangn).strip() or hook_for_daangn
-        if len(daangn_prefix) <= 12:
-            daangn_title_raw = f"{daangn_prefix}{hook_for_daangn}"
-        else:
-            daangn_title_raw = hook_for_daangn
-        daangn_title = smart_trim_text(normalize_branch_name(daangn_title_raw), 30)
-    daangn_bullets = nl.join([f"✔ {l}" for l in design_lines[:2]])
-    daangn_addr_line = f"📍 {salon_addr} ({salon_name})" if salon_addr else f"📍 {salon_name}"
-    daangn_body = format_shortform_readable(
-        normalize_branch_name(
-            f"안녕하세요, {salon_name}{designer_label}입니다.{nl}{nl}"
-            f"{region_neighbor_label} 오늘의 {style_core} 시술 소식 전해드려요.{nl}{nl}"
-            f"{daangn_bullets}{nl}{nl}"
-            f"💡 집에서 손질 팁{nl}{care_comment}{nl}{nl}"
-            f"궁금한 점이나 예약 문의는 당근 채팅으로 편하게 남겨주세요.{nl}"
-            f"{daangn_addr_line}"
-        )
-    )
+    threads_tags_str = format_clean_tags(threads_tags_list)
 
     x_tail = normalize_branch_name(f"📍 {salon_name}")
     x_head_src = normalize_branch_name(parsed_titles[0] if parsed_titles else hook_line)
@@ -3132,8 +2733,7 @@ def convert_master_content(data_text, video_name='', profile_override=None):
     else:
         x_head_trimmed = smart_trim_text(x_head_src, max(16, x_total_limit - len(x_tail) - 1))
         x_body = f"{x_head_trimmed}{nl}{x_tail}"
-    x_tail_tag = region_tags[-1:] if region_tags else []
-    x_tags_str = format_clean_tags((style_kws[: (2 - len(x_tail_tag))] + x_tail_tag)[:2])
+    x_tags_str = format_clean_tags(x_tags_list)
 
     tags_5_str = format_clean_tags(tags_5)
     tags_10_str = format_clean_tags(tags_10)
@@ -3150,7 +2750,6 @@ def convert_master_content(data_text, video_name='', profile_override=None):
         'x_body': x_body, 'x_tags': x_tags_str,
         'fb_body': ig_body, 'fb_tags': tags_5_str,
         'fb_page_body': ig_body, 'fb_page_tags': tags_5_str,
-        'daangn_title': daangn_title, 'daangn_body': daangn_body,
     }
 
 # 기존 내부 호출 호환 별칭 (순수 파이썬 메인 변환 엔진 단일화)
@@ -3188,26 +2787,20 @@ def upload_to_youtube(title, body='', tags=None, video_path=None, privacy='publi
     nl = chr(10)
 
     prof = load_profile()
-    banned_tags = get_effective_banned_tags(prof)
     salon_name = get_salon_name(prof, fallback='미용실')
     salon_addr = get_salon_address(prof)
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
     designer_name = (prof.get('designer_name') or '').strip()
     designer_label = f" {designer_name}" if designer_name else ""
     booking_url = (prof.get('booking_url') or '').strip()
     booking_line = f"👉 예약·상담: {booking_url}{nl}" if booking_url else ""
     addr_line = f"📍 {salon_addr}{nl}" if salon_addr else ""
 
-    clean_tags = [t.replace('#', '').strip() for t in (tags or []) if t.replace('#', '').strip() and t.replace('#', '').strip().lower() not in banned_tags]
-    style_only = [t for t in dict.fromkeys(clean_tags) if t not in region_set]
-    top_style = style_only[0] if style_only else '헤어스타일'
-    region_hash = ' '.join([f'#{rt}' for rt in region_tags])
-    tail_hash = f"#Shorts #{top_style} {region_hash}".strip()
+    clean_tags = [t.replace('#', '').strip() for t in (tags or []) if t.replace('#', '').strip()]
+    yt_tags = list(dict.fromkeys(clean_tags))[:10]
+    tail_hash = ' '.join(['#Shorts'] + [f'#{t}' for t in yt_tags[:3]]).strip()
 
     footer = f"{salon_name}{designer_label} (1:1 우선 예약제){nl}{booking_line}{addr_line}{tail_hash}"
     desc = (normalize_branch_name(body or '').strip() + nl + nl + footer).strip()
-    yt_tags = list(dict.fromkeys(style_only[: max(1, 10 - len(region_tags))] + region_tags))[:10]
 
     req_body = {
         'snippet': {
@@ -3237,8 +2830,6 @@ AUTH_CHECK_TARGETS = [
     # 4) 페이스북 계열 (개인·매장 쿠키 공유 → 선택·미로그인 시에만 열며 동시 요청 시 1탭 통합)
     ('use_fb',      'fb',      'facebook_cookies.json',  '페이스북(개인)', 'https://www.facebook.com/'),
     ('use_fb_page', 'fb_page', 'facebook_cookies.json',  '페이스북(매장)', 'https://business.facebook.com/'),
-    # 5) 매장 전용 채널
-    ('use_daangn',  'daangn',  'daangn_cookies.json',    '당근 비즈',     'https://business.daangn.com/'),
 ]
 
 _SHARED_COOKIE_MERGED_LABELS = {
@@ -3320,17 +2911,15 @@ def worker_auth_check(payload):
         ('threads_cookies.json', ('threads.com/login', 'threads.net/login'), ('threads.com', 'threads.net')),
         ('x_cookies.json', ('x.com/i/flow/login', 'x.com/login', 'twitter.com/i/flow/login'), ('x.com', 'twitter.com')),
         ('facebook_cookies.json', ('facebook.com/login', 'login.php', 'checkpoint', '/recover'), ('facebook.com',)),
-        ('daangn_cookies.json', ('accounts.daangn.com', '/login', '/signin', '/auth'), ('daangn.com', 'karrotmarket.com')),
     )
 
     def _inspect_live_tabs(ctx):
         """열려 있는 브라우저 탭을 정밀 점검:
-        1) 당근 비즈·쓰레드·페이스북 실제 대시보드 진입 여부 확인(단순 열었다 닫기 시 절대 초록불 불가)
+        1) 쓰레드·페이스북 실제 대시보드 진입 여부 확인(단순 열었다 닫기 시 절대 초록불 불가)
         2) 각 플랫폼 탭이 로그인 페이지로 리다이렉트된 채 머물러 있는지 감지해 잔여 쿠키 가짜 초록불 차단"""
         if ctx is None:
             return
         try:
-            from uploaders.daangn_uploader import is_daangn_logged_in
             from uploaders.threads_uploader import is_threads_logged_in
             from uploaders.facebook_uploader import is_facebook_logged_in
             pages = list(ctx.pages)
@@ -3338,8 +2927,6 @@ def worker_auth_check(payload):
             return
         seen_login_page = set()
         seen_non_login_page = set()
-        daangn_logged_in_any = False
-        daangn_seen_any = False
         threads_logged_in_any = False
         threads_seen_any = False
         fb_logged_in_any = False
@@ -3351,15 +2938,13 @@ def worker_auth_check(payload):
                 cur_u = (pg.url or '').lower()
                 if not cur_u or cur_u == 'about:blank':
                     continue
-                if 'daangn.com' in cur_u or 'karrotmarket.com' in cur_u:
-                    daangn_seen_any = True
-                    if is_daangn_logged_in(pg):
-                        daangn_logged_in_any = True
-                    continue
                 if 'threads.com' in cur_u or 'threads.net' in cur_u:
                     threads_seen_any = True
                     if is_threads_logged_in(pg):
                         threads_logged_in_any = True
+                        new_th = auto_extract_and_save_profile_id(pg, 'threads')
+                        if new_th:
+                            log(f'🔗 [프로필 자동 연동] 쓰레드 아이디(@{new_th})를 자동 추출해 바로가기에 연결했습니다.')
                     continue
                 if 'facebook.com' in cur_u:
                     fb_seen_any = True
@@ -3375,20 +2960,13 @@ def worker_auth_check(payload):
                             if cfile == 'instagram_cookies.json':
                                 new_ig = auto_extract_and_save_profile_id(pg, 'ig')
                                 if new_ig:
-                                    log(f'🔗 [프로필 자동 연동] 인스타그램·쓰레드 아이디(@{new_ig})를 자동 추출해 바로가기에 연결했습니다.')
+                                    log(f'🔗 [프로필 자동 연동] 인스타그램 아이디(@{new_ig})를 자동 추출해 바로가기에 연결했습니다.')
                             elif cfile == 'x_cookies.json':
                                 new_x = auto_extract_and_save_profile_id(pg, 'x')
                                 if new_x:
                                     log(f'🔗 [프로필 자동 연동] 엑스(X) 아이디(@{new_x})를 자동 추출해 바로가기에 연결했습니다.')
             except Exception:
                 pass
-        if daangn_seen_any:
-            if daangn_logged_in_any:
-                verified_platforms.add('daangn_cookies.json')
-                seen_non_login_page.add('daangn_cookies.json')
-            else:
-                verified_platforms.discard('daangn_cookies.json')
-                seen_login_page.add('daangn_cookies.json')
         if threads_seen_any:
             if threads_logged_in_any:
                 verified_platforms.add('threads_cookies.json')
@@ -3556,6 +3134,8 @@ def worker_auth_check(payload):
 
             if not _is_stop_requested(my_run_id) and not context_closed[0] and not all_tabs_closed[0]:
                 log('🔑 [통합 로그인] 열린 브라우저 창에서 로그인을 완료한 뒤 창 [X]로 닫아주세요. 닫는 즉시 로그인 상태를 정밀 확인합니다!')
+                if any(k in ('naver', 'clip') for k, _, _, _ in requested_items):
+                    log("💡 [네이버 로그인 안내] 네이버 로그인 시 반드시 '로그인 상태 유지'를 체크해 주세요!")
 
             last_sync_ts = 0.0
             while not context_closed[0] and not all_tabs_closed[0]:
@@ -3602,7 +3182,7 @@ def worker_auth_check(payload):
                 for key, _, label, _ in requested_items
             )
             log(f'✅ [로그인 상태 정밀 확인 완료] {summary}')
-            # 미로그인(🔴)이 남아 있는 경우 정밀 진단 리포트(blackbox/report_login_(HHMM-MMDD).md) 자동 기록
+            # 미로그인(🔴)이 남아 있는 경우 정밀 진단 리포트(blackbox/report_login.md) 자동 덮어쓰기 기록
             login_report_items = []
             has_unlogged = False
             for key, cfile, label, url in requested_items:
@@ -3784,7 +3364,6 @@ def worker_publish(payload):
         ('x', '엑스(X)', '엑스', 'use_x'),
         ('fb', '페이스북(개인)', '페이스북개인', 'use_fb'),
         ('fb_page', '페이스북(매장)', '페이스북매장', 'use_fb_page'),
-        ('daangn', '당근 비즈', '당근', 'use_daangn'),
     ]
     selected_platforms = [(k, lbl, bbn) for k, lbl, bbn, flag in platform_order if payload.get(flag)]
     platform_records = {}
@@ -3901,9 +3480,16 @@ def worker_publish(payload):
                 yt_tb = ''
                 try:
                     if test_mode:
-                        log('🧪 [테스트 모드 - 유튜브 쇼츠] API 테스트 통과 (버튼 조준 대상 아님)')
-                        yt_ok = True
-                        mark_res('yt', True, 'API 테스트 통과 (버튼 조준 대상 아님)')
+                        yt_check = validate_youtube_oauth_token(attempt_refresh=True)
+                        if yt_check['ok']:
+                            yt_pass_msg = f"API 테스트 통과 ({yt_check['reason']} · 버튼 조준 대상 아님)"
+                            log(f'🧪 [테스트 모드 - 유튜브 쇼츠] {yt_pass_msg}')
+                            yt_ok = True
+                            mark_res('yt', True, yt_pass_msg)
+                        else:
+                            yt_fail_msg = f"미로그인/토큰 검증 실패 — {yt_check['reason']}"
+                            log(f'❌ [테스트 모드 - 유튜브 쇼츠] {yt_fail_msg}')
+                            raise RuntimeError(yt_fail_msg)
                     else:
                         log('🔴 [유튜브 쇼츠] 업로드 시작...')
                         yt_url = upload_to_youtube(normalize_branch_name(payload.get('yt_title', '')), normalize_branch_name(payload.get('yt_body', '')), split_tags(payload.get('yt_tags')), video_path, 'public')
@@ -4204,36 +3790,6 @@ def worker_publish(payload):
                         log(f'⚠️ [페이스북(매장)] 오류: {e}')
                 _finish_platform('fb_page', '페이스북(매장)', '페이스북매장', fbp_ok, exc_obj=fbp_exc, err_tb=fbp_tb)
 
-            if _is_stop_requested(my_run_id):
-                break
-            if payload.get('use_daangn'):
-                _begin_platform('daangn', '당근 비즈', '당근')
-                p_stop = lambda: _is_stop_or_skip_requested(my_run_id, 'daangn')
-                d_ok = False
-                d_exc = None
-                d_tb = ''
-                try:
-                    from uploaders.daangn_uploader import upload_to_daangn
-                    daangn_imgs = resolve_daangn_images(payload, video_path=video_path)
-                    log(f'🥕 [당근 비즈프로필] 소식 발행 시작 (첨부 사진 {len(daangn_imgs)}장)...')
-                    d_ok = bool(upload_to_daangn(title=normalize_branch_name(payload.get('daangn_title', '')), body=normalize_branch_name(payload.get('daangn_body', '')), video_path=video_path, selected_images=daangn_imgs, stop_checker=p_stop, test_mode=test_mode))
-                    if d_ok:
-                        if not test_mode:
-                            record_daily_usage('daangn')
-                        mark_res('daangn', True, '테스트 통과' if test_mode else '발행 완료')
-                    elif not _was_platform_skipped(my_run_id, 'daangn'):
-                        mark_res('daangn', False, '발행 실패')
-                    if not p_stop():
-                        log('✅ [당근 비즈프로필] ' + ('테스트 완료!' if test_mode else '발행 완료!') if d_ok else '⚠️ [당근 비즈프로필] 발행 실패')
-                except Exception as e:
-                    d_exc = e
-                    d_tb = traceback.format_exc()
-                    if not _was_platform_skipped(my_run_id, 'daangn'):
-                        mark_res('daangn', False, str(e)[:80])
-                    if not p_stop():
-                        log(f'⚠️ [당근 비즈프로필] 오류: {e}')
-                _finish_platform('daangn', '당근 비즈', '당근', d_ok, exc_obj=d_exc, err_tb=d_tb)
-
         if _is_stop_requested(my_run_id):
             log('🛑 [작업 중지 완료] 사용자 요청으로 남은 업로드를 모두 취소했습니다.')
         else:
@@ -4270,7 +3826,7 @@ def worker_publish(payload):
             if ACTIVE_WORKER_THREAD is threading.current_thread():
                 ACTIVE_WORKER_THREAD = None
 
-        # 매 실행 종료 시(성공·실패·건너뜀·강제 중지·테스트 모드 포함) 항상 blackbox_upload/report.md 최신 리포트 저장
+        # 매 실행 종료 시(성공·실패·건너뜀·강제 중지·테스트 모드 포함) 항상 blackbox/report_test.md 또는 blackbox/report_upload.md에 덮어쓰기 저장
         final_report_items = []
         now_end_dt = datetime.datetime.now()
         now_end_str = now_end_dt.strftime('%Y-%m-%d %H:%M:%S')
@@ -4335,16 +3891,16 @@ def open_blackbox_folder():
             subprocess.Popen(['xdg-open', BLACKBOX_DIR])
     except Exception as e:
         return {'ok': False, 'msg': f'오류 폴더를 열지 못했습니다: {e}'}
-    log('📂 [오류 폴더 열기] 최신 report_*.md와 영상을 소통방에 첨부해 문의해 주세요.')
+    log('📂 [오류 폴더 열기] report_upload.md / report_test.md와 영상(upload.mp4 / test.mp4)을 소통방에 첨부해 문의해 주세요.')
     return {
         'ok': True,
         'path': BLACKBOX_DIR,
-        'msg': '최신 report_*.md와 영상을 소통방에 첨부해 문의해 주세요.',
+        'msg': 'report_upload.md / report_test.md와 영상을 소통방에 첨부해 문의해 주세요.',
     }
 
 
 def get_done_storage_info():
-    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox/ 폴더의 합산 용량 및 파일 개수 계산"""
+    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox/ 폴더(AI_RULES.md·실행 도구 .command 제외)의 합산 용량 및 파일 개수 계산"""
     total_bytes = 0
     file_count = 0
     for target_dir, exclude_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_DIR, set())):
@@ -4353,6 +3909,8 @@ def get_done_storage_info():
         for root, _, files in os.walk(target_dir):
             for fname in files:
                 if root == target_dir and fname in exclude_names:
+                    continue
+                if root == BLACKBOX_DIR and is_blackbox_protected_file(fname):
                     continue
                 fp = os.path.join(root, fname)
                 try:
@@ -4373,7 +3931,7 @@ def get_done_storage_info():
 
 
 def clear_done_and_thumbs():
-    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox/ 폴더 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
+    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox/ 폴더(AI_RULES.md·실행 도구 .command 보존) 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
     with STATE_LOCK:
         is_busy = STATE.get('busy')
     if is_busy:
@@ -4386,6 +3944,8 @@ def clear_done_and_thumbs():
             continue
         for entry in list(os.listdir(target_dir)):
             if entry in keep_names:
+                continue
+            if target_dir == BLACKBOX_DIR and is_blackbox_protected_file(entry):
                 continue
             ep = os.path.join(target_dir, entry)
             try:
@@ -4429,7 +3989,6 @@ HISTORY_FIELDS = (
     'x_body', 'x_tags',
     'fb_body', 'fb_tags',
     'fb_page_body', 'fb_page_tags',
-    'daangn_title', 'daangn_body',
 )
 
 
@@ -4447,7 +4006,6 @@ def _history_dedup_key(rec):
         or rec.get('yt_title')
         or rec.get('youtube_title')
         or rec.get('clip_title')
-        or rec.get('daangn_title')
         or ''
     )
     body = _norm_history_text(
@@ -4462,7 +4020,7 @@ def _history_dedup_key(rec):
     return (title, body)
 
 
-HISTORY_PLATFORM_ORDER = ('yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'x', 'fb', 'fb_page', 'daangn')
+HISTORY_PLATFORM_ORDER = ('yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'x', 'fb', 'fb_page')
 HISTORY_PLATFORM_ALIASES = {
     'yt': 'yt', 'youtube': 'yt', 'youtube_shorts': 'yt',
     'naver': 'naver', 'naver_blog': 'naver', 'blog': 'naver',
@@ -4474,7 +4032,6 @@ HISTORY_PLATFORM_ALIASES = {
     'x': 'x', 'twitter': 'x',
     'fb': 'fb', 'facebook': 'fb', 'fb_personal': 'fb',
     'fb_page': 'fb_page', 'facebook_page': 'fb_page',
-    'daangn': 'daangn', 'karrot': 'daangn',
 }
 
 
@@ -4484,7 +4041,7 @@ def _normalize_platform_key(raw_key):
 
 
 def _normalize_uploaded_platforms(raw_list):
-    """기록의 uploaded_platforms 배열을 표준 11개 플랫폼 키 순서로 중복 제거·정규화 (없는 경우 빈 배열 반환)"""
+    """기록의 uploaded_platforms 배열을 표준 10개 플랫폼 키 순서로 중복 제거·정규화 (없는 경우 빈 배열 반환)"""
     if not isinstance(raw_list, (list, tuple, set)):
         return []
     seen = set()
@@ -4493,6 +4050,159 @@ def _normalize_uploaded_platforms(raw_list):
         if k:
             seen.add(k)
     return [k for k in HISTORY_PLATFORM_ORDER if k in seen]
+
+
+def _get_done_gifs_dir():
+    """생성한 GIF 영구 보관 폴더(done/gifs/) 경로 반환"""
+    return os.path.join(DONE_DIR, 'gifs')
+
+
+def _normalize_saved_gifs(raw_gifs):
+    """done/history.json의 saved_gifs 목록을 표준 구조[{slot_idx, filename, label}]로 정규화"""
+    if not isinstance(raw_gifs, list):
+        return []
+    out = []
+    seen_slots = set()
+    for item in raw_gifs:
+        if not isinstance(item, dict):
+            continue
+        try:
+            slot_idx = int(item.get('slot_idx'))
+        except Exception:
+            continue
+        if slot_idx < 0 or slot_idx > 9 or slot_idx in seen_slots:
+            continue
+        fname = os.path.basename(str(item.get('filename') or '').strip())
+        if not fname or not fname.lower().endswith('.gif'):
+            continue
+        label = str(item.get('label') or 'GIF').strip()[:40] or 'GIF'
+        seen_slots.add(slot_idx)
+        out.append({'slot_idx': slot_idx, 'filename': fname, 'label': label})
+    out.sort(key=lambda x: x['slot_idx'])
+    return out
+
+
+def _collect_referenced_gif_filenames(records):
+    refs = set()
+    for it in (records or []):
+        if not isinstance(it, dict):
+            continue
+        for g in _normalize_saved_gifs(it.get('saved_gifs')):
+            refs.add(g['filename'])
+    return refs
+
+
+def _cleanup_unreferenced_done_gifs(candidate_names, remaining_records):
+    """다른 기록에서 더 이상 참조하지 않는 done/gifs/ 내 고아 GIF 파일만 안전하게 삭제"""
+    if not candidate_names:
+        return 0
+    still_used = _collect_referenced_gif_filenames(remaining_records)
+    gifs_dir = _get_done_gifs_dir()
+    if not os.path.isdir(gifs_dir):
+        return 0
+    removed = 0
+    for fname in set(candidate_names):
+        safe_fn = os.path.basename(str(fname or '').strip())
+        if not safe_fn or safe_fn in still_used:
+            continue
+        fp = os.path.join(gifs_dir, safe_fn)
+        if os.path.isfile(fp):
+            try:
+                os.remove(fp)
+                removed += 1
+            except Exception:
+                pass
+    return removed
+
+
+def backup_selected_gifs_to_done(selected_images, history_id='', gif_meta=None):
+    """실업로드 시 naver_selected_images 배열에 포함된 실존 .gif 파일을 done/gifs/로 복사 보관하고
+    saved_gifs 메타 목록([{slot_idx, filename, label}])을 반환"""
+    if not isinstance(selected_images, list):
+        return []
+    meta_by_slot = {}
+    if isinstance(gif_meta, list):
+        for m in gif_meta:
+            if not isinstance(m, dict):
+                continue
+            try:
+                s_idx = int(m.get('slot_idx'))
+            except Exception:
+                continue
+            if 0 <= s_idx <= 9:
+                meta_by_slot[s_idx] = m
+
+    safe_hid = re.sub(r'[^A-Za-z0-9_-]+', '', str(history_id or '').strip()) or datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    gifs_dir = _get_done_gifs_dir()
+    saved = []
+    ts_ms = int(time.time() * 1000)
+
+    for slot_idx, raw_path in enumerate(selected_images[:10]):
+        p = str(raw_path or '').strip()
+        if not p or not p.lower().endswith('.gif') or not os.path.isfile(p):
+            continue
+        try:
+            src_size = os.path.getsize(p)
+        except Exception:
+            src_size = 0
+        if src_size <= 0:
+            continue
+
+        m_info = meta_by_slot.get(slot_idx) or {}
+        label = str(m_info.get('label') or 'GIF').strip()[:40] or 'GIF'
+        prev_fn = os.path.basename(str(m_info.get('saved_filename') or '').strip())
+
+        os.makedirs(gifs_dir, exist_ok=True)
+        # 복원된 기존 GIF를 그대로 재업로드하는 경우 동일 보관 파일 재사용
+        if prev_fn and prev_fn.lower().endswith('.gif'):
+            prev_fp = os.path.join(gifs_dir, prev_fn)
+            try:
+                if os.path.isfile(prev_fp) and os.path.getsize(prev_fp) == src_size:
+                    saved.append({'slot_idx': slot_idx, 'filename': prev_fn, 'label': label})
+                    continue
+            except Exception:
+                pass
+
+        dst_name = f"gif_{safe_hid}_s{slot_idx}_{ts_ms + slot_idx}.gif"
+        dst_path = os.path.join(gifs_dir, dst_name)
+        try:
+            shutil.copy2(p, dst_path)
+            if os.path.isfile(dst_path) and os.path.getsize(dst_path) > 0:
+                saved.append({'slot_idx': slot_idx, 'filename': dst_name, 'label': label})
+        except Exception:
+            pass
+    return _normalize_saved_gifs(saved)
+
+
+def restore_saved_gifs_to_thumbs(saved_gifs):
+    """기록의 saved_gifs 중 done/gifs/에 실존하는 파일을 temp_thumbs/로 복사해 프론트 복원 목록 반환"""
+    gifs_dir = _get_done_gifs_dir()
+    restored = []
+    ts_ms = int(time.time() * 1000)
+    for g in _normalize_saved_gifs(saved_gifs):
+        fname = g['filename']
+        src_fp = os.path.join(gifs_dir, fname)
+        if not os.path.isfile(src_fp):
+            continue
+        try:
+            if os.path.getsize(src_fp) <= 0:
+                continue
+            os.makedirs(THUMB_DIR, exist_ok=True)
+            dst_name = f"restored_{fname}"
+            dst_fp = os.path.join(THUMB_DIR, dst_name)
+            shutil.copy2(src_fp, dst_fp)
+            if os.path.isfile(dst_fp) and os.path.getsize(dst_fp) > 0:
+                restored.append({
+                    'slot_idx': g['slot_idx'],
+                    'filename': fname,
+                    'path': dst_fp,
+                    'url': f"/thumbs/{quote(dst_name)}?t={ts_ms}",
+                    'label': g['label'],
+                    'kind': 'gif',
+                })
+        except Exception:
+            pass
+    return restored
 
 
 def build_history_record(raw_data, video_name='', source_text=None):
@@ -4515,6 +4225,8 @@ def build_history_record(raw_data, video_name='', source_text=None):
         'video_name': os.path.basename(video_name) if video_name else '',
         'uploaded_platforms': _normalize_uploaded_platforms(src.get('uploaded_platforms')),
     }
+    if 'saved_gifs' in src:
+        rec['saved_gifs'] = _normalize_saved_gifs(src.get('saved_gifs'))
     for k in HISTORY_FIELDS:
         if k == 'source_text' and source_text is not None:
             val = source_text
@@ -4530,13 +4242,20 @@ def build_history_record(raw_data, video_name='', source_text=None):
     return rec
 
 
-def save_history_record(rec):
-    """done/history.json에 기록 저장 (제목+본문 앞뒤 공백 제거 기준 완전 동일 항목이 이미 있으면 중복 저장 건너뜀)"""
+def save_history_record(rec, update_id=''):
+    """done/history.json에 기록 저장 또는 기존 기록 덮어쓰기 갱신.
+    - update_id가 전달되고 해당 id 기록이 존재하면 새 항목을 추가하지 않고 기존 기록을 최종 수정본으로 덮어쓰기
+      (기존 uploaded_platforms 유지, 최신 date 반영 후 목록 최상단 이동)
+    - update_id가 없거나 일치 항목이 없으면 (제목, 본문) 중복 검사 후 신규 추가"""
     new_key = _history_dedup_key(rec)
     if new_key == ('', ''):
-        return {'saved': False, 'duplicate': False, 'empty': True, 'id': ''}
+        return {'saved': False, 'updated': False, 'duplicate': False, 'empty': True, 'id': ''}
 
+    uid = str(update_id or '').strip()
+    has_saved_gifs_key = isinstance(rec, dict) and ('saved_gifs' in rec)
+    incoming_gifs = _normalize_saved_gifs(rec.get('saved_gifs')) if has_saved_gifs_key else None
     hf = os.path.join(DONE_DIR, 'history.json')
+
     with HISTORY_LOCK:
         hl = []
         if os.path.exists(hf):
@@ -4548,14 +4267,96 @@ def save_history_record(rec):
             except Exception:
                 hl = []
 
-        for existing in hl:
+        # 1) update_id 일치 시 기존 기록 덮어쓰기 갱신 (미리보기 저장 → 본문 수정/GIF 추가 → 업로드 중복 방지)
+        if uid:
+            match_idx = next(
+                (i for i, it in enumerate(hl) if isinstance(it, dict) and str(it.get('id', '')) == uid),
+                None,
+            )
+            if match_idx is not None:
+                existing = hl.pop(match_idx)
+                old_gif_names = {g['filename'] for g in _normalize_saved_gifs(existing.get('saved_gifs'))}
+                merged_plats = _normalize_uploaded_platforms(
+                    _normalize_uploaded_platforms(existing.get('uploaded_platforms'))
+                    + _normalize_uploaded_platforms(rec.get('uploaded_platforms'))
+                )
+                updated = dict(existing)
+                updated['id'] = uid
+                updated['date'] = rec.get('date') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                if rec.get('video_name'):
+                    updated['video_name'] = os.path.basename(str(rec.get('video_name')))
+                elif not updated.get('video_name'):
+                    updated['video_name'] = ''
+                updated['uploaded_platforms'] = merged_plats
+                for k in HISTORY_FIELDS:
+                    if k in rec:
+                        updated[k] = rec[k]
+                if has_saved_gifs_key:
+                    updated['saved_gifs'] = incoming_gifs
+                else:
+                    updated['saved_gifs'] = _normalize_saved_gifs(existing.get('saved_gifs'))
+
+                hl.insert(0, updated)
+                trimmed_out = hl[50:]
+                hl_keep = hl[:50]
+                os.makedirs(DONE_DIR, exist_ok=True)
+                tmp_hf = f"{hf}.tmp"
+                with open(tmp_hf, 'w', encoding='utf-8') as f:
+                    json.dump(hl_keep, f, ensure_ascii=False, indent=2)
+                os.replace(tmp_hf, hf)
+
+                orphan_cands = set(old_gif_names) | _collect_referenced_gif_filenames(trimmed_out)
+                _cleanup_unreferenced_done_gifs(orphan_cands, hl_keep)
+                return {
+                    'saved': True,
+                    'updated': True,
+                    'duplicate': False,
+                    'empty': False,
+                    'id': uid,
+                    'uploaded_platforms': list(merged_plats),
+                    'saved_gifs': list(updated.get('saved_gifs', [])),
+                }
+
+        # 2) 동일 제목+본문 중복 판별 (새 GIF나 영상명이 추가된 경우에는 기존 기록에 안전 반영)
+        for idx_ex, existing in enumerate(hl):
             if _history_dedup_key(existing) == new_key:
+                ex_id = str(existing.get('id', ''))
+                ex_plats = _normalize_uploaded_platforms(existing.get('uploaded_platforms'))
+                need_enrich = False
+                old_gif_names = {g['filename'] for g in _normalize_saved_gifs(existing.get('saved_gifs'))}
+                if has_saved_gifs_key and incoming_gifs != _normalize_saved_gifs(existing.get('saved_gifs')):
+                    existing['saved_gifs'] = incoming_gifs
+                    need_enrich = True
+                if rec.get('video_name') and not existing.get('video_name'):
+                    existing['video_name'] = os.path.basename(str(rec.get('video_name')))
+                    need_enrich = True
+                if need_enrich:
+                    existing['date'] = rec.get('date') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+                    hl.pop(idx_ex)
+                    hl.insert(0, existing)
+                    hl_keep = hl[:50]
+                    os.makedirs(DONE_DIR, exist_ok=True)
+                    tmp_hf = f"{hf}.tmp"
+                    with open(tmp_hf, 'w', encoding='utf-8') as f:
+                        json.dump(hl_keep, f, ensure_ascii=False, indent=2)
+                    os.replace(tmp_hf, hf)
+                    _cleanup_unreferenced_done_gifs(old_gif_names, hl_keep)
+                    return {
+                        'saved': True,
+                        'updated': True,
+                        'duplicate': True,
+                        'empty': False,
+                        'id': ex_id,
+                        'uploaded_platforms': ex_plats,
+                        'saved_gifs': list(existing.get('saved_gifs', [])),
+                    }
                 return {
                     'saved': False,
+                    'updated': False,
                     'duplicate': True,
                     'empty': False,
-                    'id': str(existing.get('id', '')),
-                    'uploaded_platforms': _normalize_uploaded_platforms(existing.get('uploaded_platforms')),
+                    'id': ex_id,
+                    'uploaded_platforms': ex_plats,
                 }
 
         existing_ids = {str(it.get('id', '')) for it in hl if isinstance(it, dict)}
@@ -4567,19 +4368,26 @@ def save_history_record(rec):
             suffix += 1
         rec['id'] = cand_id
         rec['uploaded_platforms'] = _normalize_uploaded_platforms(rec.get('uploaded_platforms'))
+        rec['saved_gifs'] = incoming_gifs if has_saved_gifs_key else []
 
         hl.insert(0, rec)
+        trimmed_out = hl[50:]
+        hl_keep = hl[:50]
         os.makedirs(DONE_DIR, exist_ok=True)
         tmp_hf = f"{hf}.tmp"
         with open(tmp_hf, 'w', encoding='utf-8') as f:
-            json.dump(hl[:50], f, ensure_ascii=False, indent=2)
+            json.dump(hl_keep, f, ensure_ascii=False, indent=2)
         os.replace(tmp_hf, hf)
+        if trimmed_out:
+            _cleanup_unreferenced_done_gifs(_collect_referenced_gif_filenames(trimmed_out), hl_keep)
         return {
             'saved': True,
+            'updated': False,
             'duplicate': False,
             'empty': False,
             'id': cand_id,
             'uploaded_platforms': list(rec['uploaded_platforms']),
+            'saved_gifs': list(rec['saved_gifs']),
         }
 
 
@@ -4648,26 +4456,31 @@ def record_history_uploaded_platform(history_id, platform_key, fallback_rec=None
 
 
 def delete_history_records(ids):
-    """done/history.json에서 선택한 ID의 업로드 기록만 안전하게 삭제"""
+    """done/history.json에서 선택한 ID의 업로드 기록 삭제 + 다른 기록에서 미참조된 done/gifs/ 파일 자동 정리"""
     if not isinstance(ids, list) or not ids:
         return {'ok': False, 'msg': '삭제할 기록을 선택해 주세요.'}
     id_set = {str(x) for x in ids if x is not None and str(x).strip()}
     hf = os.path.join(DONE_DIR, 'history.json')
-    if not os.path.exists(hf):
-        return {'ok': True, 'deleted': 0, 'history': []}
-    try:
-        with open(hf, 'r', encoding='utf-8') as f:
-            hist = json.load(f)
-        if not isinstance(hist, list):
+    with HISTORY_LOCK:
+        if not os.path.exists(hf):
+            return {'ok': True, 'deleted': 0, 'deleted_gifs': 0, 'history': []}
+        try:
+            with open(hf, 'r', encoding='utf-8') as f:
+                hist = json.load(f)
+            if not isinstance(hist, list):
+                hist = []
+        except Exception:
             hist = []
-    except Exception:
-        hist = []
-    remaining = [it for it in hist if str(it.get('id', '')) not in id_set]
-    deleted = len(hist) - len(remaining)
-    os.makedirs(DONE_DIR, exist_ok=True)
-    with open(hf, 'w', encoding='utf-8') as f:
-        json.dump(remaining, f, ensure_ascii=False, indent=2)
-    return {'ok': True, 'deleted': deleted, 'history': remaining}
+        removed_recs = [it for it in hist if isinstance(it, dict) and str(it.get('id', '')) in id_set]
+        remaining = [it for it in hist if not (isinstance(it, dict) and str(it.get('id', '')) in id_set)]
+        deleted = len(hist) - len(remaining)
+        os.makedirs(DONE_DIR, exist_ok=True)
+        tmp_hf = f"{hf}.tmp"
+        with open(tmp_hf, 'w', encoding='utf-8') as f:
+            json.dump(remaining, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_hf, hf)
+        deleted_gifs = _cleanup_unreferenced_done_gifs(_collect_referenced_gif_filenames(removed_recs), remaining)
+        return {'ok': True, 'deleted': deleted, 'deleted_gifs': deleted_gifs, 'history': remaining}
 
 
 class AppHandler(BaseHTTPRequestHandler):
@@ -4998,23 +4811,36 @@ class AppHandler(BaseHTTPRequestHandler):
             if not r: return self.send_json({'success': False, 'error': '없음'})
             r = {k: (normalize_branch_name(v) if isinstance(v, str) else v) for k, v in r.items()}
             r['uploaded_platforms'] = _normalize_uploaded_platforms(r.get('uploaded_platforms'))
+            r['saved_gifs'] = _normalize_saved_gifs(r.get('saved_gifs'))
+            restored_gifs = restore_saved_gifs_to_thumbs(r.get('saved_gifs'))
             vn = r.get('video_name')
             video_meta = None
             prev_info = {}
-            if vn and os.path.exists(os.path.join(DONE_DIR, vn)):
-                dst = os.path.join(UPLOAD_DIR, vn)
-                shutil.copy2(os.path.join(DONE_DIR, vn), dst)
+            thumbs = []
+            dst = ''
+            if vn:
+                done_src = os.path.join(DONE_DIR, vn)
+                upload_dst = os.path.join(UPLOAD_DIR, vn)
+                if os.path.exists(done_src):
+                    shutil.copy2(done_src, upload_dst)
+                    dst = upload_dst
+                elif os.path.exists(upload_dst):
+                    dst = upload_dst
+            if dst and os.path.isfile(dst):
                 with STATE_LOCK:
                     STATE['video_path'] = dst
                     STATE['video_name'] = vn
                 video_meta = probe_video_metadata(dst)
                 prev_info = ensure_browser_preview_video(dst)
+                thumbs = extract_10_thumbnails(dst, count=10)
             self.send_json({
                 'success': True,
                 'record': r,
                 'video_meta': video_meta,
                 'preview_url': prev_info.get('preview_url', ''),
                 'preview_transcoded': bool(prev_info.get('transcoded', False)),
+                'thumbnails': thumbs,
+                'restored_gifs': restored_gifs,
             })
         elif self.path == '/api/ensure_preview':
             with STATE_LOCK:
@@ -5030,22 +4856,6 @@ class AppHandler(BaseHTTPRequestHandler):
             vn = req.get('video_name') or state_vn
             vp = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
             self.send_json(capture_frame_at_time(vp, req.get('time_sec', 0.0)))
-        elif self.path == '/api/extract_thumbnails':
-            with STATE_LOCK:
-                state_vn = STATE.get('video_name', '')
-                state_vp = STATE.get('video_path', '')
-            vn = req.get('video_name') or state_vn
-            vp = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
-            try:
-                cnt = max(1, min(10, int(req.get('count', 4) or 4)))
-            except Exception:
-                cnt = 4
-            prefix = str(req.get('prefix') or 'daangn_thumb_').strip() or 'daangn_thumb_'
-            if not vp or not os.path.exists(vp):
-                self.send_json({'ok': False, 'msg': '첨부된 영상 파일을 찾을 수 없습니다.', 'thumbnails': []})
-            else:
-                thumbs = extract_10_thumbnails(vp, count=cnt, prefix=prefix)
-                self.send_json({'ok': bool(thumbs), 'thumbnails': thumbs, 'msg': f'사진 {len(thumbs)}장을 추출했습니다.' if thumbs else '영상에서 사진을 추출하지 못했습니다.'})
         elif self.path == '/api/create_gif':
             with STATE_LOCK:
                 state_vn = STATE.get('video_name', '')
@@ -5118,11 +4928,23 @@ class AppHandler(BaseHTTPRequestHandler):
                 try:
                     vn = req.get('video_name') or state_vn
                     rec = build_history_record(req, video_name=vn)
-                    h_res = save_history_record(rec)
+                    gif_id_seed = resolved_history_id or rec['id']
+                    saved_gifs = backup_selected_gifs_to_done(
+                        req.get('naver_selected_images'),
+                        history_id=gif_id_seed,
+                        gif_meta=req.get('naver_gif_meta'),
+                    )
+                    rec['saved_gifs'] = saved_gifs
+                    h_res = save_history_record(rec, update_id=resolved_history_id)
                     if h_res.get('id'):
                         resolved_history_id = str(h_res.get('id'))
-                    if h_res.get('duplicate'):
+                    if h_res.get('updated'):
+                        gif_note = f" (GIF {len(saved_gifs)}개 보관)" if saved_gifs else ""
+                        log(f'💾 [지난 기록 갱신] 기존 기록을 최종 수정본으로 덮어쓰기 업데이트했습니다.{gif_note}')
+                    elif h_res.get('duplicate'):
                         log('ℹ️ [중복 기록 건너뜀] 동일한 제목·본문이 이미 지난 기록에 있어 중복 저장하지 않았습니다.')
+                    elif h_res.get('saved') and saved_gifs:
+                        log(f'🎞️ [GIF 보관 완료] 생성한 GIF {len(saved_gifs)}개를 done/gifs/에 저장했습니다.')
                 except Exception: pass
             req['_history_id'] = resolved_history_id
             req['_history_rec'] = rec

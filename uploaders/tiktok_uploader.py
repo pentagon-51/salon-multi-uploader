@@ -1,4 +1,4 @@
-import os, re, sys, time, shutil
+import os, re, sys, time, shutil, unicodedata
 _ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT_DIR not in sys.path:
     sys.path.insert(0, _ROOT_DIR)
@@ -26,28 +26,15 @@ from os_utils import (
 
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("tiktok_cookies.json")
-PROMO_TAGS = ["드롭컷", "크롭컷", "아이비리그컷", "댄디컷", "상고컷", "레이어드컷", "태슬컷"]
 
 def extract_hashtags_from_text(text, banned_tags=None):
     banned = banned_tags if banned_tags is not None else get_effective_banned_tags()
     return [t for t in re.findall(r"#([^\s#]+)", text or "") if t.lower() not in banned]
 
 def build_tiktok_5_tags(extracted, base_tags, banned_tags=None, profile=None):
-    prof = profile if isinstance(profile, dict) else load_profile()
-    banned = banned_tags if banned_tags is not None else get_effective_banned_tags(prof)
-    combined = [t.replace("#", "").strip() for t in (extracted + base_tags) if t.replace("#", "").strip()]
-    filtered = [t for t in combined if t.lower() not in banned]
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
-    style_only = []
-    for t in filtered:
-        if t not in region_set and t != "손질편한머리" and t not in style_only:
-            style_only.append(t)
-    max_style = max(1, 5 - len(region_tags))
-    for p in PROMO_TAGS:
-        if len(style_only) >= max_style: break
-        if p not in style_only: style_only.append(p)
-    return (style_only[:max_style] + region_tags)[:5]
+    src = base_tags if base_tags else extracted
+    cleaned = [t.replace("#", "").strip() for t in (src or []) if t.replace("#", "").strip()]
+    return list(dict.fromkeys(cleaned))[:5]
 
 def _has_tiktok_session_cookie(context):
     """틱톡 로그인 세션 쿠키(sessionid/sid_tt/uid_tt 등) 존재 여부 확인"""
@@ -80,6 +67,87 @@ def is_tiktok_logged_in(page, context=None, login_only=False):
     if page.locator('[data-e2e="profile-icon"], [data-e2e="upload-icon"], [data-e2e="nav-profile"]').count() > 0:
         return True
     return False
+
+
+def _dismiss_tiktok_guide_popups(page):
+    """영상 첨부 후 나타나는 '휴대폰에서 동영상 미리 보기' 등 안내 팝업의 [확인]/[OK]/[닫기] 버튼을 안전하게 닫음"""
+    if page is None:
+        return False
+    closed_any = False
+    popup_btn_sels = [
+        'div[role="dialog"] button:text-is("확인")',
+        'div[role="dialog"] button:text-is("OK")',
+        'div[role="dialog"] button:text-is("닫기")',
+        'div[role="dialog"] button:text-is("이해했습니다")',
+        'div[role="dialog"] button:text-is("Got it")',
+        'div[role="dialog"] button[aria-label*="닫기"]',
+        'div[role="dialog"] button[aria-label*="Close" i]',
+        'div[class*="modal" i] button:text-is("확인")',
+        'div[class*="modal" i] button:text-is("OK")',
+        'div[class*="modal" i] button:text-is("닫기")',
+        'div[class*="popover" i] button:text-is("확인")',
+        'div[class*="popover" i] button:text-is("OK")',
+        'div[class*="popover" i] button:text-is("닫기")',
+        'div[class*="tooltip" i] button:text-is("확인")',
+        'div[class*="tooltip" i] button:text-is("OK")',
+        'div[class*="tooltip" i] button:text-is("닫기")',
+        'div[class*="guide" i] button:text-is("확인")',
+        'div[class*="guide" i] button:text-is("OK")',
+        'div[class*="guide" i] button:text-is("닫기")',
+        'button:text-is("확인")',
+        'button:text-is("OK")',
+        'button:text-is("이해했습니다")',
+        'button:text-is("Got it")',
+    ]
+    for _ in range(3):
+        clicked_round = False
+        for sel in popup_btn_sels:
+            try:
+                loc = page.locator(sel)
+                cnt = min(loc.count(), 5)
+                for idx in range(cnt - 1, -1, -1):
+                    btn = loc.nth(idx)
+                    if btn.is_visible(timeout=250):
+                        btn.click(force=True)
+                        closed_any = True
+                        clicked_round = True
+                        print(f"🧹 [틱톡] 안내 팝업 닫기 완료 ({sel})", flush=True)
+                        time.sleep(0.6)
+                        break
+                if clicked_round:
+                    break
+            except Exception:
+                pass
+        if not clicked_round:
+            break
+    return closed_any
+
+
+def _is_tiktok_caption_applied(caption_box, expected_caption, video_path=""):
+    """캡션 입력창에 실제 본문·태그가 정상 반영되었는지 확인 (빈 값 또는 영상 파일명 잔존 시 False)"""
+    try:
+        raw_txt = (caption_box.inner_text(timeout=1500) or "").strip()
+    except Exception:
+        try:
+            raw_txt = (caption_box.text_content(timeout=1500) or "").strip()
+        except Exception:
+            raw_txt = ""
+    norm_actual = unicodedata.normalize("NFC", re.sub(r"\s+", " ", raw_txt)).strip()
+    norm_expected = unicodedata.normalize("NFC", re.sub(r"\s+", " ", expected_caption or "")).strip()
+    if not norm_expected:
+        return True
+    if not norm_actual:
+        return False
+    if video_path:
+        v_base = unicodedata.normalize("NFC", os.path.basename(video_path)).strip()
+        v_stem = unicodedata.normalize("NFC", os.path.splitext(v_base)[0]).strip()
+        if norm_actual == v_base or norm_actual == v_stem:
+            return False
+    probe = re.sub(r"\s+", "", norm_expected)[:12]
+    actual_compact = re.sub(r"\s+", "", norm_actual)
+    if probe and probe not in actual_compact:
+        return False
+    return True
 
 
 def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=None, draft=False, login_only=False, stop_checker=None, test_mode=False):
@@ -166,10 +234,26 @@ def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=N
             caption_box = page.locator('div[contenteditable="true"]').first
             caption_box.wait_for(state="visible", timeout=60000)
             time.sleep(3)
-            caption_box.click(force=True); time.sleep(0.4)
-            page.keyboard.press(f"{MOD_KEY}+a"); page.keyboard.press("Backspace"); time.sleep(0.4)
-            copy_to_clipboard(full_caption); page.keyboard.press(f"{MOD_KEY}+v"); time.sleep(1.0)
-            page.keyboard.press("Escape"); time.sleep(1.0)
+            _dismiss_tiktok_guide_popups(page)
+
+            def _paste_tiktok_caption():
+                caption_box.click(force=True)
+                time.sleep(0.4)
+                page.keyboard.press(f"{MOD_KEY}+a")
+                page.keyboard.press("Backspace")
+                time.sleep(0.4)
+                copy_to_clipboard(full_caption)
+                page.keyboard.press(f"{MOD_KEY}+v")
+                time.sleep(1.0)
+                page.keyboard.press("Escape")
+                time.sleep(0.8)
+
+            _paste_tiktok_caption()
+            if not _is_tiktok_caption_applied(caption_box, full_caption, video_path=video_path):
+                print("⚠️ [틱톡] 캡션이 비어 있거나 파일명 그대로 남아 있어 안내 팝업을 다시 닫고 1회 재입력합니다...", flush=True)
+                _dismiss_tiktok_guide_popups(page)
+                time.sleep(0.6)
+                _paste_tiktok_caption()
 
             try:
                 target_place = (place_name if place_name is not None else get_place_search_keyword(prof)).strip()

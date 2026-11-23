@@ -749,12 +749,8 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
 
     resolved_place = (place_name if place_name is not None else get_place_search_keyword(prof)).strip()
     f_body = build_full_body(clean_body, profile=prof)
-    raw_combined = extract_hashtags_from_text(body, banned_tags) + [t.replace("#", "").strip() for t in (tags or []) if t.replace("#", "").strip()]
-    filtered = [t for t in raw_combined if t.lower() not in banned_tags]
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
-    style_only = [t for t in dict.fromkeys(filtered) if t not in region_set]
-    f_tags = (style_only[: max(1, 10 - len(region_tags))] + region_tags)[:10]
+    raw_tags_clean = [t.replace("#", "").strip() for t in (tags or []) if t.replace("#", "").strip()]
+    f_tags = list(dict.fromkeys(raw_tags_clean))[:10]
 
     record_mode = "login" if login_only else "upload"
     record_dir = create_blackbox_record_dir("네이버블로그", mode=record_mode)

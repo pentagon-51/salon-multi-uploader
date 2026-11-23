@@ -16,7 +16,7 @@ MOD_KEY = "Meta" if sys.platform == "darwin" else "Control"
 BRANCH_NAME = ""
 BRANCH_ADDRESS = ""
 
-ALL_PLATFORM_KEYS = ("yt", "naver", "clip", "tt", "ig", "pin", "threads", "x", "fb", "fb_page", "daangn")
+ALL_PLATFORM_KEYS = ("yt", "naver", "clip", "tt", "ig", "pin", "threads", "x", "fb", "fb_page")
 
 
 def normalize_branch_name(text, profile=None):
@@ -46,6 +46,7 @@ EMPTY_PROFILE_TEMPLATE = {
     "naver_blog_id": "",
     "pinterest_id": "",
     "instagram_id": "",
+    "threads_id": "",
     "x_id": "",
     "place_search_keyword": "",
     "personal_banned_tags": "",
@@ -105,6 +106,22 @@ def cleanup_chrome_profile_locks():
     return removed
 
 
+CHROME_DISALLOWED_SANDBOX_FLAGS = (
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+)
+CHROME_DISALLOWED_BANNER_FLAGS = (
+    "--disable-blink-features=automationcontrolled",
+)
+
+
+def _sanitize_chromium_args(args=None):
+    """크롬 상단 경고 배너를 유발하는 플래그(--no-sandbox, --disable-setuid-sandbox, --disable-blink-features=AutomationControlled) 제거"""
+    raw = list(args) if args is not None else []
+    blocked = set(CHROME_DISALLOWED_SANDBOX_FLAGS) | set(CHROME_DISALLOWED_BANNER_FLAGS)
+    return [a for a in raw if str(a or "").strip().lower() not in blocked]
+
+
 def launch_persistent_chromium(
     playwright_obj,
     headless=False,
@@ -113,17 +130,21 @@ def launch_persistent_chromium(
     record_video_size=None,
     locale="ko-KR",
     args=None,
+    restore_saved_cookies=True,
 ):
-    """전용 영구 크롬 프로필(auth_data/chrome_profile)로 Chrome 채널 우선 실행, 불가 시 기본 Chromium 폴백"""
+    """전용 영구 크롬 프로필(auth_data/chrome_profile)로 Chrome 채널 우선 실행, 불가 시 기본 Chromium 폴백.
+    chromium_sandbox=True 및 ignore_default_args로 크롬 상단 '--no-sandbox' 경고 배너를 원천 제거.
+    restore_saved_cookies=True 시 크롬 종료로 사라진 세션 쿠키(expires=-1, 네이버 '로그인 상태 유지' 미체크 등)를
+    auth_data/*_cookies.json에서 자동 복원해 통합 로그인과 개별 업로더 간 세션을 100% 일치시킴."""
     cleanup_chrome_profile_locks()
-    launch_args = list(args) if args is not None else []
-    if "--disable-blink-features=AutomationControlled" not in launch_args:
-        launch_args.append("--disable-blink-features=AutomationControlled")
+    launch_args = _sanitize_chromium_args(args)
 
     kwargs = {
         "user_data_dir": get_chrome_profile_dir(),
         "headless": headless,
         "args": launch_args,
+        "chromium_sandbox": True,
+        "ignore_default_args": list(CHROME_DISALLOWED_SANDBOX_FLAGS),
     }
     if locale:
         kwargs["locale"] = locale
@@ -141,6 +162,11 @@ def launch_persistent_chromium(
     except Exception as e:
         print(f"ℹ️ [브라우저] Chrome 채널 영구 프로필 실행 불가({e}) → 기본 Chromium으로 자동 전환합니다.", flush=True)
         ctx = playwright_obj.chromium.launch_persistent_context(**kwargs)
+    if restore_saved_cookies:
+        try:
+            restore_missing_cookies_to_context(ctx)
+        except Exception:
+            pass
     try:
         attach_diagnostics_tracker(ctx)
     except Exception:
@@ -154,28 +180,9 @@ PERSISTENT_COOKIE_RULES = (
     ("instagram_cookies.json", ("instagram.com",), {"sessionid", "ds_user_id"}),
     ("pinterest_cookies.json", ("pinterest.com",), {"_pinterest_sess", "_auth"}),
     ("threads_cookies.json", ("threads.com", "threads.net"), {"sessionid", "ds_user_id"}),
-    (
-        "daangn_cookies.json",
-        ("daangn.com", "karrotmarket.com"),
-        {
-            "_daangn_session",
-            "daangn_session",
-            "karrot_session",
-            "biz_session",
-            "biz_access_token",
-            "access_token",
-            "refresh_token",
-            "b_token",
-            "daangn_auth",
-            "karrot_auth",
-        },
-    ),
     ("x_cookies.json", ("x.com", "twitter.com"), {"auth_token", "twid"}),
     ("facebook_cookies.json", ("facebook.com",), {"c_user", "xs"}),
 )
-
-DAANGN_VISITOR_COOKIE_PREFIXES = ("ch-session", "ch-veil", "_ga", "_gcl", "_fbp", "_clck", "_clsk", "_dd_", "_interaction")
-DAANGN_VISITOR_COOKIE_EXACT = {"karrot_user_device_id", "device_id", "accounts_sid", "_kmpid"}
 
 
 def _domain_matches(cookie_domain, target_domains):
@@ -269,29 +276,13 @@ def _has_logged_in_session_cookie(filename, matched_cookies, session_names, auth
         has_sess = any(len(v) >= 16 for v, _ in active_by_name.get("_pinterest_sess", []))
         return has_auth1 and has_sess
 
-    # 6) 당근 비즈: 방문자·로그인화면 임시 쿠키(ch-session-*, karrot_user_device_id, accounts_sid, _interaction* 등) 완전 배제!
-    #    실제 비즈 대시보드 인증 쿠키(>=12자, accounts.daangn.com 제외)가 있거나,
-    #    브라우저에서 실제 대시보드 진입(auth_verified=True)이 확인된 경우만 True
-    if filename == "daangn_cookies.json":
-        if auth_verified:
-            return True
-        for cname, entries in active_by_name.items():
-            if cname in DAANGN_VISITOR_COOKIE_EXACT or any(cname.startswith(px) for px in DAANGN_VISITOR_COOKIE_PREFIXES):
-                continue
-            for cval, cdom in entries:
-                if cdom == "accounts.daangn.com" or cdom.startswith("accounts."):
-                    continue
-                if cname in session_names and len(cval) >= 12:
-                    return True
-        return False
-
-    # 7) 엑스(X): auth_token(>=10) + twid(>=3) 모두 존재 (guest_id/gt/__cf_bm만 있으면 False)
+    # 6) 엑스(X): auth_token(>=10) + twid(>=3) 모두 존재 (guest_id/gt/__cf_bm만 있으면 False)
     if filename == "x_cookies.json":
         has_tok = any(len(v) >= 10 for v, _ in active_by_name.get("auth_token", []))
         has_twid = any(len(v) >= 3 for v, _ in active_by_name.get("twid", []))
         return has_tok and has_twid
 
-    # 8) 페이스북(개인/매장 공용): c_user(숫자 UID) + xs(>=10) 모두 존재해야 실제 로그인 세션
+    # 7) 페이스북(개인/매장 공용): c_user(숫자 UID) + xs(>=10) 모두 존재해야 실제 로그인 세션
     if filename == "facebook_cookies.json":
         has_cuser = any(v.isdigit() and len(v) >= 4 for v, _ in active_by_name.get("c_user", []))
         has_xs = any(len(v) >= 10 for v, _ in active_by_name.get("xs", []))
@@ -305,14 +296,9 @@ def _has_logged_in_session_cookie(filename, matched_cookies, session_names, auth
 
 def check_cookie_login_redirect(filename, path, timeout=3.5):
     """저장된 쿠키로 보호 URL에 HTTP 요청을 보내 로그인 페이지로 리다이렉트되는지 1회 정밀 확인.
-    네트워크 불가·오류 시 None 반환(기존 쿠키 판정 유지), 로그인 페이지 리다이렉트 감지 시 False, 통과 시 True.
-    (당근 비즈는 SPA/브라우저 OAuth 세션 구조 특성상 단순 urllib 요청에서 오판·쿠키 삭제 위험이 있으므로
-    브라우저 실검증 결과(auth_verified)와 쿠키 정밀 검사를 신뢰하고 None 반환)"""
+    네트워크 불가·오류 시 None 반환(기존 쿠키 판정 유지), 로그인 페이지 리다이렉트 감지 시 False, 통과 시 True."""
     import urllib.request
     import urllib.error
-
-    if filename == "daangn_cookies.json":
-        return None
 
     check_specs = {
         "naver_cookies.json": (
@@ -458,6 +444,82 @@ def sync_cookies_from_persistent_context(context, verified_platforms=None, check
     return synced
 
 
+def _sanitize_cookie_for_playwright(c):
+    """auth_data/*_cookies.json 항목을 Playwright context.add_cookies() 호환 dict로 정규화"""
+    if not isinstance(c, dict):
+        return None
+    name = str(c.get("name") or "").strip()
+    value = str(c.get("value") or "")
+    domain = str(c.get("domain") or "").strip()
+    path = str(c.get("path") or "/").strip() or "/"
+    if not name or not value or not domain:
+        return None
+    item = {
+        "name": name,
+        "value": value,
+        "domain": domain,
+        "path": path,
+        "httpOnly": bool(c.get("httpOnly", False)),
+        "secure": bool(c.get("secure", False)),
+    }
+    exp = c.get("expires")
+    if exp is not None:
+        try:
+            exp_f = float(exp)
+            if exp_f > 0:
+                item["expires"] = exp_f
+        except Exception:
+            pass
+    same_site = str(c.get("sameSite") or "").strip()
+    if same_site in ("Strict", "Lax", "None"):
+        item["sameSite"] = same_site
+    return item
+
+
+def restore_missing_cookies_to_context(context):
+    """영구 크롬 프로필(auth_data/chrome_profile)에서 창 종료로 유실된 세션 쿠키(예: 네이버 '로그인 상태 유지'
+    미체크 시 발급되는 expires=-1 쿠키)를 auth_data/*_cookies.json에서 자동 복원.
+    크롬 프로필에 이미 로그인 세션이 살아 있는 플랫폼은 건드리지 않음."""
+    if context is None:
+        return []
+    try:
+        live_cookies = context.cookies() or []
+    except Exception:
+        live_cookies = []
+    now_ts = time.time()
+    restored_files = []
+
+    for filename, domains, session_names in PERSISTENT_COOKIE_RULES:
+        live_matched = [c for c in live_cookies if _domain_matches(c.get("domain"), domains)]
+        if _has_logged_in_session_cookie(filename, live_matched, session_names, auth_verified=False):
+            continue
+        cpath = get_auth_file(filename)
+        if not is_platform_cookie_authenticated(filename, cpath, auto_clean=False):
+            continue
+        try:
+            with open(cpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            saved_cookies = data.get("cookies") if isinstance(data, dict) else None
+            if not isinstance(saved_cookies, list) or not saved_cookies:
+                continue
+            to_add = []
+            for c in saved_cookies:
+                if not _domain_matches(c.get("domain"), domains):
+                    continue
+                if not _is_cookie_active(c, now_ts=now_ts):
+                    continue
+                clean_c = _sanitize_cookie_for_playwright(c)
+                if clean_c:
+                    to_add.append(clean_c)
+            if to_add:
+                context.add_cookies(to_add)
+                restored_files.append(filename)
+                print(f"🔄 [세션 복원] auth_data/{filename}의 저장된 로그인 세션을 브라우저 프로필에 자동 복원했습니다.", flush=True)
+        except Exception:
+            pass
+    return restored_files
+
+
 def get_blackbox_dir(mode="upload"):
     """통합 블랙박스·진단 폴더(blackbox/) 경로 반환 및 자동 생성"""
     path = os.path.join(get_base_dir(), "blackbox")
@@ -476,18 +538,17 @@ def get_blackbox_upload_dir():
 
 
 def format_blackbox_filename(kind="upload", ext="mp4", dt=None, is_report=False):
-    """영문 작업명 + _(HHMM-MMDD) 통일 파일명 생성.
-    - 영상: upload_(0959-1123).mp4 / test_(0959-1123).mp4
-    - 리포트: report_login_(0959-1123).md / report_upload_(0959-1123).md / report_test_(0959-1123).md
-    - 스샷/로그: login_(0959-1123).png / upload_(0959-1123).png / test_(0959-1123).png"""
-    ts = (dt if isinstance(dt, datetime.datetime) else datetime.datetime.now()).strftime("%H%M-%m%d")
+    """고정 파일명 반환 (매 실행 시 최신 파일로 덮어쓰기).
+    - 영상: upload.mp4 / test.mp4
+    - 리포트: report_login.md / report_upload.md / report_test.md
+    - 스샷/로그: login.png / upload.png / test.png"""
     kind_norm = str(kind or "upload").strip().lower()
     if kind_norm not in ("login", "upload", "test"):
         kind_norm = "upload"
     if is_report:
-        return f"report_{kind_norm}_({ts}).md"
+        return f"report_{kind_norm}.md"
     clean_ext = str(ext or "mp4").strip().lstrip(".").lower() or "mp4"
-    return f"{kind_norm}_({ts}).{clean_ext}"
+    return f"{kind_norm}.{clean_ext}"
 
 
 def migrate_legacy_auth_files():
@@ -796,8 +857,9 @@ def wait_for_manual_login(
         raise RuntimeError(f"{platform_label} {msg}")
 
     effective_timeout = float(timeout_sec)
+    naver_keep_tip = " (💡 네이버 로그인 시 반드시 '로그인 상태 유지'를 체크해 주세요!)" if "네이버" in str(platform_label or "") else ""
     print(
-        f"🔑 [{platform_label}] 로그인이 필요합니다. 열린 크롬 창에서 직접 로그인을 완료해 주세요 (최대 {int(effective_timeout)}초 대기)...",
+        f"🔑 [{platform_label}] 로그인이 필요합니다. 열린 크롬 창에서 직접 로그인을 완료해 주세요 (최대 {int(effective_timeout)}초 대기)...{naver_keep_tip}",
         flush=True,
     )
     start_ts = time.time()
@@ -1294,22 +1356,56 @@ def _next_test_blackbox_path(platform_name):
         return os.path.join(_TEST_BLACKBOX_DIR, f"{_TEST_BLACKBOX_SEQ:02d}_{safe_name}.webm")
 
 
+BLACKBOX_PROTECTED_FILES = {
+    "AI_RULES.md",
+    "1-서버재시작.command",
+    "2-코드추출기.command",
+    "3-업데이트배포.command",
+}
+
+
+def is_blackbox_protected_file(filename):
+    """blackbox/ 자동·수동 정리에서 절대 삭제하지 않을 보호 파일 여부 반환 (AI_RULES.md, *.command, code_*.txt)"""
+    fn = str(filename or "").strip()
+    if not fn:
+        return False
+    low = fn.lower()
+    if fn in BLACKBOX_PROTECTED_FILES or low.endswith(".command"):
+        return True
+    if (low.startswith("code_") or low.startswith("total_code")) and low.endswith(".txt"):
+        return True
+    return False
+
+
 def prune_blackbox_dir(max_keep=3):
-    """통합 blackbox/ 폴더 내부 파일을 유형별(영상·리포트·스샷·로그) 최신 max_keep(기본 3개)만 자동 유지하고
-    오래된 파일부터 자동 삭제"""
+    """통합 blackbox/ 폴더 정리:
+    1) 보호 파일(AI_RULES.md 및 실행 도구 .command 파일)은 절대 삭제하지 않음
+    2) 구버전 일시 포함 파일(*(HHMM-MMDD).*)을 자동 정리
+    3) 고정 파일(report_test.md, report_upload.md, report_login.md, test.mp4, upload.mp4) 외 잔여 파일을 유형별 최신 max_keep개만 유지"""
     bb_dir = get_blackbox_dir()
     if not os.path.isdir(bb_dir):
         return []
+    legacy_ts_re = re.compile(r"^(?:report_)?(?:login|upload|test)_\(\d{4}-\d{4}\)\.[A-Za-z0-9]+$", re.IGNORECASE)
     category_exts = {
         "video": (".mp4", ".webm", ".mov"),
         "report": (".md",),
         "image": (".png", ".jpg", ".jpeg"),
         "log": (".log", ".txt"),
     }
+    removed = []
     buckets = {k: [] for k in category_exts}
     for fn in os.listdir(bb_dir):
+        if is_blackbox_protected_file(fn):
+            continue
         fp = os.path.join(bb_dir, fn)
         if not os.path.isfile(fp):
+            continue
+        if legacy_ts_re.match(fn):
+            try:
+                os.remove(fp)
+                removed.append(fn)
+            except Exception:
+                pass
             continue
         low = fn.lower()
         for cat, exts in category_exts.items():
@@ -1319,7 +1415,6 @@ def prune_blackbox_dir(max_keep=3):
                 except Exception:
                     pass
                 break
-    removed = []
     for _, items in buckets.items():
         items.sort(key=lambda x: (x[0], x[1]), reverse=True)
         for _, _, old_fp in items[max_keep:]:
@@ -1504,13 +1599,57 @@ def is_valid_cookie_file(path, auto_clean=True):
         return False
 
 
+def parse_region_tags(raw, max_count=3):
+    """지역 기반 해시태그 입력값(예: '마곡나루미용실, 마곡미용실, 발산역미용실' 또는 구버전 '강남역')을
+    최대 max_count(기본 3)개의 '#' 없는 순수 지역 해시태그 리스트로 파싱 (기존 설정 100% 호환)"""
+    s = str(raw or "").strip()
+    if not s:
+        return []
+    if "," in s or "\n" in s:
+        raw_parts = re.split(r"[,\n]+", s)
+    elif s.count("#") >= 2:
+        raw_parts = re.findall(r"#([^\s#,]+)", s)
+    else:
+        raw_parts = [s]
+
+    tags = []
+    seen = set()
+    for part in raw_parts:
+        tok = re.sub(r"[\s#,·•/]+", "", str(part or "")).strip()
+        if not tok:
+            continue
+        has_suffix = bool(re.search(r"(?:미용실|헤어샵|헤어살롱|헤어)$", tok))
+        if has_suffix:
+            cand = tok
+            if cand.lower() not in seen:
+                seen.add(cand.lower())
+                tags.append(cand)
+        else:
+            # 구버전 단일 지역명(예: '강남역' -> 강남역미용실, 강남미용실 / '강남' -> 강남미용실) 호환
+            if len(raw_parts) == 1 and tok.endswith("역") and len(tok) >= 3:
+                for cand in (f"{tok}미용실", f"{tok[:-1]}미용실"):
+                    if cand.lower() not in seen:
+                        seen.add(cand.lower())
+                        tags.append(cand)
+            else:
+                cand = f"{tok}미용실"
+                if cand.lower() not in seen:
+                    seen.add(cand.lower())
+                    tags.append(cand)
+        if len(tags) >= max_count:
+            break
+    return tags[:max_count]
+
+
 def normalize_region_keyword(raw):
-    """대표 지역/상권 키워드 자동 보정: 앞의 '#'과 뒤의 '미용실' 및 불필요 공백 제거"""
+    """지역 기반 해시태그(최대 3개) 입력값 정규화 (user_profile.json region_keyword 키 호환 유지).
+    - 다중/미용실 접미사 입력(예: '#마곡나루미용실, 마곡미용실, 발산역미용실') -> '마곡나루미용실, 마곡미용실, 발산역미용실'
+    - 구버전 단일 지역명(예: '강남', '#강남역')도 안전하게 보존/정규화"""
     s = str(raw or "").strip()
     if not s:
         return ""
-    s = re.sub(r"^[#\s]+", "", s)
-    s = re.sub(r"\s*미용실\s*$", "", s)
+    if "," in s or "\n" in s or s.count("#") >= 2 or re.search(r"(?:미용실|헤어샵|헤어살롱)$", s):
+        return ", ".join(parse_region_tags(s, max_count=3))
     s = re.sub(r"^[#\s]+", "", s).strip()
     return s
 
@@ -1553,15 +1692,38 @@ def extract_pinterest_id(raw):
 
 
 def extract_instagram_id(raw):
-    """인스타그램/쓰레드 전체 URL 또는 @아이디에서 순수 인스타그램 아이디만 자동 추출"""
+    """인스타그램 전체 URL 또는 @아이디에서 순수 인스타그램 아이디만 자동 추출"""
     s = str(raw or "").strip()
     if not s:
         return ""
-    m_u = re.search(r"(?:instagram\.com|threads\.(?:com|net))/@?([A-Za-z0-9._]+)", s, re.IGNORECASE)
+    m_u = re.search(r"instagram\.com/@?([A-Za-z0-9._]+)", s, re.IGNORECASE)
     if m_u:
         cand = m_u.group(1).strip().lstrip("@")
-        if cand.lower() not in ("accounts", "explore", "direct", "reels", "reel", "p", "stories", "tv", "login"):
-            return cand
+        if cand.lower() in ("accounts", "explore", "direct", "reels", "reel", "p", "stories", "tv", "login"):
+            return ""
+        return cand
+    if re.search(r"instagram\.com", s, re.IGNORECASE):
+        return ""
+    s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
+    s = s.split("/")[0].split("?")[0].strip().lstrip("@")
+    if "@" in s:
+        s = s.split("@", 1)[0].strip()
+    return s
+
+
+def extract_threads_id(raw):
+    """쓰레드(threads.com / threads.net) 전체 URL 또는 @아이디에서 순수 쓰레드 아이디만 자동 추출"""
+    s = str(raw or "").strip()
+    if not s:
+        return ""
+    m_u = re.search(r"threads\.(?:com|net)/@?([A-Za-z0-9._]+)", s, re.IGNORECASE)
+    if m_u:
+        cand = m_u.group(1).strip().lstrip("@")
+        if cand.lower() in ("login", "logout", "search", "activity", "following", "for_you", "settings", "accounts", "post", "t"):
+            return ""
+        return cand
+    if re.search(r"threads\.(?:com|net)", s, re.IGNORECASE):
+        return ""
     s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
     s = s.split("/")[0].split("?")[0].strip().lstrip("@")
     if "@" in s:
@@ -1577,8 +1739,11 @@ def extract_x_id(raw):
     m_u = re.search(r"(?:x\.com|twitter\.com)/@?([A-Za-z0-9_]+)", s, re.IGNORECASE)
     if m_u:
         cand = m_u.group(1).strip().lstrip("@")
-        if cand.lower() not in ("home", "explore", "notifications", "messages", "compose", "i", "search", "settings", "login", "intent"):
-            return cand
+        if cand.lower() in ("home", "explore", "notifications", "messages", "compose", "i", "search", "settings", "login", "intent"):
+            return ""
+        return cand
+    if re.search(r"(?:x\.com|twitter\.com)", s, re.IGNORECASE):
+        return ""
     s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
     s = s.split("/")[0].split("?")[0].strip().lstrip("@")
     if "@" in s:
@@ -1591,6 +1756,12 @@ _IG_RESERVED_PATHS = {
     "login", "logout", "signup", "about", "legal", "developer", "developers",
     "emails", "challenge", "session", "api", "create", "notifications",
     "search", "messages", "home", "web", "lite", "meta", "threads", "nametag",
+}
+_THREADS_RESERVED_PATHS = {
+    "login", "logout", "signup", "search", "activity", "notifications",
+    "following", "for_you", "settings", "accounts", "about", "legal",
+    "privacy", "terms", "help", "create", "insights", "post", "t", "media",
+    "replies", "reposts", "saved", "liked", "home", "web", "meta",
 }
 _X_RESERVED_PATHS = {
     "home", "explore", "notifications", "messages", "i", "compose", "settings",
@@ -1626,12 +1797,10 @@ def extract_instagram_username_from_page(page):
                     const h = (a.getAttribute('href') || '').trim();
                     if (h && h.startsWith('/')) out.push(h);
                 };
-                const scopes = [
-                    ...document.querySelectorAll('nav a[href], div[role="navigation"] a[href], aside a[href]'),
-                    ...document.querySelectorAll('a[href]')
-                ];
+                // 1순위: 좌측/상단 네비게이션 영역 내부의 [프로필] 텍스트 또는 프로필 사진 링크
+                const navLinks = Array.from(document.querySelectorAll('nav a[href], div[role="navigation"] a[href], aside a[href]'));
                 const seen = new Set();
-                for (const a of scopes) {
+                for (const a of navLinks) {
                     if (seen.has(a)) continue;
                     seen.add(a);
                     const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
@@ -1641,6 +1810,19 @@ def extract_instagram_username_from_page(page):
                     const imgAlt = img ? (img.getAttribute('alt') || '').toLowerCase() : '';
                     const hasProfileImg = imgAlt.includes('프로필 사진') || imgAlt.includes('profile picture');
                     if (hasProfileText || hasProfileImg) {
+                        pushHref(a);
+                    }
+                }
+                // 2순위: 네비게이션 태그가 생략된 레이아웃에서는 정확히 '프로필'/'Profile' 라벨을 가진 링크만 허용
+                // (피드·스토리의 타인 프로필 사진 오추출 원천 차단)
+                for (const a of document.querySelectorAll('a[href]')) {
+                    if (seen.has(a)) continue;
+                    seen.add(a);
+                    const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    const aria = (a.getAttribute('aria-label') || '').trim().toLowerCase();
+                    const svg = a.querySelector('svg[aria-label]');
+                    const svgAria = svg ? (svg.getAttribute('aria-label') || '').trim().toLowerCase() : '';
+                    if (txt === '프로필' || txt === 'profile' || aria === '프로필' || aria === 'profile' || svgAria === '프로필' || svgAria === 'profile') {
                         pushHref(a);
                     }
                 }
@@ -1659,6 +1841,86 @@ def extract_instagram_username_from_page(page):
             continue
         cleaned = extract_instagram_id(cand)
         if cleaned and cleaned.lower() not in _IG_RESERVED_PATHS:
+            return cleaned
+    return ""
+
+
+def extract_threads_username_from_page(page):
+    """로그인된 쓰레드(threads.com / threads.net) 화면의 네비게이션 [프로필] 링크(/@username)에서 본인 아이디 자동 추출.
+    타인 피드 글의 /@username 링크와 혼동되지 않도록 '프로필'/'Profile' 네비게이션 링크만 엄격히 인식."""
+    if page is None:
+        return ""
+    try:
+        if page.is_closed():
+            return ""
+        cur_u = (page.url or "").lower()
+    except Exception:
+        return ""
+    if ("threads.com" not in cur_u and "threads.net" not in cur_u) or "/login" in cur_u or "instagram.com" in cur_u:
+        return ""
+    try:
+        if is_any_locator_visible(
+            page,
+            ':text-is("Instagram으로 계속하기"), :text-is("Continue with Instagram"), '
+            'a:text-is("로그인"), button:text-is("로그인"), a:text-is("Log in"), button:text-is("Log in")',
+        ):
+            return ""
+    except Exception:
+        pass
+
+    try:
+        hrefs = page.evaluate(
+            """() => {
+                const out = [];
+                const pushHref = (a) => {
+                    if (!a) return;
+                    const h = (a.getAttribute('href') || '').trim();
+                    if (h) out.push(h);
+                };
+                const isProfileNavLink = (a) => {
+                    const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    const aria = (a.getAttribute('aria-label') || '').trim().toLowerCase();
+                    const title = (a.getAttribute('title') || '').trim().toLowerCase();
+                    if (txt === '프로필' || txt === 'profile' || aria === '프로필' || aria === 'profile' || title === '프로필' || title === 'profile') {
+                        return true;
+                    }
+                    const labelled = a.querySelectorAll('svg[aria-label], [aria-label]');
+                    for (const el of labelled) {
+                        const la = (el.getAttribute('aria-label') || '').trim().toLowerCase();
+                        if (la === '프로필' || la === 'profile') return true;
+                    }
+                    return false;
+                };
+                const seen = new Set();
+                // 1순위: nav / header / navigation 영역 내부의 [프로필] 링크
+                const navLinks = document.querySelectorAll('nav a[href], header a[href], div[role="navigation"] a[href], aside a[href]');
+                for (const a of navLinks) {
+                    if (seen.has(a)) continue;
+                    seen.add(a);
+                    if (isProfileNavLink(a)) pushHref(a);
+                }
+                // 2순위: threads.com 좌측/하단 아이콘 바(div 래퍼)의 [프로필] 링크
+                for (const a of document.querySelectorAll('a[href*="/@"]')) {
+                    if (seen.has(a)) continue;
+                    seen.add(a);
+                    if (isProfileNavLink(a)) pushHref(a);
+                }
+                return out;
+            }"""
+        )
+    except Exception:
+        hrefs = []
+
+    for h in (hrefs or []):
+        raw_h = str(h or "").strip()
+        m = re.match(r"^(?:https?://(?:www\.)?threads\.(?:com|net))?/@([A-Za-z0-9._]{1,30})/?(?:[?#].*)?$", raw_h, re.IGNORECASE)
+        if not m:
+            continue
+        cand = m.group(1).strip()
+        if cand.lower() in _THREADS_RESERVED_PATHS:
+            continue
+        cleaned = extract_threads_id(cand)
+        if cleaned and cleaned.lower() not in _THREADS_RESERVED_PATHS:
             return cleaned
     return ""
 
@@ -1717,12 +1979,15 @@ def extract_x_username_from_page(page):
 
 
 def auto_extract_and_save_profile_id(page, platform):
-    """로그인된 인스타/엑스 페이지에서 좌측 [프로필] 링크 username을 추출해 user_profile.json에 자동 저장.
+    """로그인된 인스타/쓰레드/엑스 페이지에서 좌측 [프로필] 링크 username을 각각 독립 추출해 user_profile.json에 자동 저장.
     새로 저장(또는 갱신)된 경우 추출된 username 문자열 반환, 변동 없으면 '' 반환."""
     plat = str(platform or "").strip().lower()
-    if plat in ("ig", "instagram", "threads"):
+    if plat in ("ig", "instagram"):
         username = extract_instagram_username_from_page(page)
         field_key = "instagram_id"
+    elif plat in ("threads", "thread"):
+        username = extract_threads_username_from_page(page)
+        field_key = "threads_id"
     elif plat in ("x", "twitter"):
         username = extract_x_username_from_page(page)
         field_key = "x_id"
@@ -1799,6 +2064,7 @@ def load_profile():
                 prof["naver_blog_id"] = extract_naver_blog_id(prof.get("naver_blog_id", ""))
                 prof["pinterest_id"] = extract_pinterest_id(prof.get("pinterest_id", ""))
                 prof["instagram_id"] = extract_instagram_id(prof.get("instagram_id", ""))
+                prof["threads_id"] = extract_threads_id(prof.get("threads_id", ""))
                 prof["x_id"] = extract_x_id(prof.get("x_id", ""))
                 pm = str(prof.get("prompt_mode") or "standard").strip().lower()
                 prof["prompt_mode"] = "custom" if pm == "custom" else "standard"
@@ -1807,7 +2073,7 @@ def load_profile():
                 prof["onboarding_checks"] = {str(k): bool(v) for k, v in raw_checks.items()} if isinstance(raw_checks, dict) else {}
                 prof["prompt_copied"] = bool(data.get("prompt_copied", False))
                 try:
-                    prof["onboarding_step"] = max(0, min(4, int(prof.get("onboarding_step") or 0)))
+                    prof["onboarding_step"] = max(0, min(2, int(prof.get("onboarding_step") or 0)))
                 except Exception:
                     prof["onboarding_step"] = 0
                 prof["onboarding_completed"] = bool(data.get("onboarding_completed", False))
@@ -1833,6 +2099,7 @@ def save_profile(data, is_draft=False):
         "naver_blog_id",
         "pinterest_id",
         "instagram_id",
+        "threads_id",
         "x_id",
         "place_search_keyword",
         "personal_banned_tags",
@@ -1854,6 +2121,8 @@ def save_profile(data, is_draft=False):
                 cleaned = extract_pinterest_id(cleaned)
             elif k == "instagram_id":
                 cleaned = extract_instagram_id(cleaned)
+            elif k == "threads_id":
+                cleaned = extract_threads_id(cleaned)
             elif k == "x_id":
                 cleaned = extract_x_id(cleaned)
             prof[k] = cleaned
@@ -1883,7 +2152,7 @@ def save_profile(data, is_draft=False):
 
     if "onboarding_step" in data:
         try:
-            prof["onboarding_step"] = max(0, min(4, int(data.get("onboarding_step") or 0)))
+            prof["onboarding_step"] = max(0, min(2, int(data.get("onboarding_step") or 0)))
         except Exception:
             pass
 
@@ -1892,7 +2161,7 @@ def save_profile(data, is_draft=False):
 
     if not is_draft:
         prof["is_configured"] = bool((prof.get("salon_name") or "").strip())
-        if prof["is_configured"] and prof.get("onboarding_step", 0) >= 4:
+        if prof["is_configured"] and prof.get("onboarding_step", 0) >= 2:
             prof["onboarding_completed"] = True
     else:
         if (prof.get("salon_name") or "").strip() and prof.get("onboarding_completed"):
@@ -1921,28 +2190,19 @@ def get_place_search_keyword(profile=None):
 
 
 def get_region_keyword(profile=None):
+    """첫 번째 대표 지역명 반환 ('미용실' 접미사 제외 — 블로그 제목·인사말 용도)"""
     prof = profile if isinstance(profile, dict) else load_profile()
-    return normalize_region_keyword(prof.get("region_keyword") or "")
+    tags = parse_region_tags(prof.get("region_keyword") or "", max_count=3)
+    if not tags:
+        return ""
+    first = re.sub(r"(?:미용실|헤어샵|헤어살롱|헤어)$", "", tags[0]).strip()
+    return first or tags[0]
 
 
-def get_region_tags(profile=None):
-    """사용자의 대표 지역/상권 키워드에서 자연 검색용 지역 해시태그(1~2개) 동적 생성"""
-    raw = get_region_keyword(profile)
-    if not raw:
-        return []
-    # 공백/특수문자/# 및 중복 '미용실'/'헤어샵' 접미사 제거
-    clean = re.sub(r"[\s#,·•/]+", "", raw)
-    clean = re.sub(r"(?:미용실|헤어샵|헤어살롱|헤어)$", "", clean).strip()
-    if not clean:
-        return []
-    tags = []
-    if clean.endswith("역") and len(clean) >= 3:
-        base = clean[:-1]
-        tags.append(f"{base}미용실")
-        tags.append(f"{clean}미용실")
-    else:
-        tags.append(f"{clean}미용실")
-    return list(dict.fromkeys(tags))
+def get_region_tags(profile=None, max_count=2):
+    """사용자의 지역 기반 해시태그 입력값에서 자연 검색용 지역 해시태그(기본 핵심 2개, 최대 3개) 동적 반환"""
+    prof = profile if isinstance(profile, dict) else load_profile()
+    return parse_region_tags(prof.get("region_keyword") or "", max_count=max_count)
 
 
 def get_blog_categories(profile=None):
@@ -2017,13 +2277,20 @@ def get_effective_banned_tags(profile=None):
 
 
 def launch_chromium(playwright_obj, headless=False, args=None):
-    """Chrome 채널 실행을 우선 시도하고, 크롬 미설치 PC에서는 기본 번들 Chromium으로 자동 폴백."""
-    launch_args = list(args) if args is not None else ["--disable-blink-features=AutomationControlled"]
+    """Chrome 채널 실행을 우선 시도하고, 크롬 미설치 PC에서는 기본 번들 Chromium으로 자동 폴백.
+    --no-sandbox 경고 배너 제거를 위해 chromium_sandbox=True 및 ignore_default_args 적용."""
+    launch_args = _sanitize_chromium_args(args)
+    launch_kwargs = {
+        "headless": headless,
+        "args": launch_args,
+        "chromium_sandbox": True,
+        "ignore_default_args": list(CHROME_DISALLOWED_SANDBOX_FLAGS),
+    }
     try:
-        return playwright_obj.chromium.launch(headless=headless, channel="chrome", args=launch_args)
+        return playwright_obj.chromium.launch(channel="chrome", **launch_kwargs)
     except Exception as e:
         print(f"ℹ️ [브라우저] Chrome 채널 실행 불가({e}) → 기본 Chromium으로 자동 전환합니다.", flush=True)
-        return playwright_obj.chromium.launch(headless=headless, args=launch_args)
+        return playwright_obj.chromium.launch(**launch_kwargs)
 
 
 def copy_to_clipboard(text):
@@ -2191,18 +2458,6 @@ PLATFORM_LOGOUT_CONFIG = {
             "https://threads.com",
         ),
     },
-    "daangn": {
-        "label": "당근 비즈",
-        "cookie_file": "daangn_cookies.json",
-        "domains": ("daangn.com", "karrotmarket.com"),
-        "origins": (
-            "https://business.daangn.com",
-            "https://bizprofile.daangn.com",
-            "https://accounts.daangn.com",
-            "https://www.daangn.com",
-            "https://www.karrotmarket.com",
-        ),
-    },
     "x": {
         "label": "엑스(X)",
         "cookie_file": "x_cookies.json",
@@ -2296,7 +2551,7 @@ def logout_platform_session(platform_key):
                 from playwright.sync_api import sync_playwright
 
                 with sync_playwright() as p:
-                    ctx = launch_persistent_chromium(p, headless=True)
+                    ctx = launch_persistent_chromium(p, headless=True, restore_saved_cookies=False)
                     try:
                         all_cookies = ctx.cookies() or []
                         matched = [c for c in all_cookies if _domain_matches(c.get("domain"), domains)]

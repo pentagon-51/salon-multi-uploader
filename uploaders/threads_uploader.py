@@ -19,6 +19,7 @@ from os_utils import (
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
+    auto_extract_and_save_profile_id,
     load_profile,
     get_region_tags,
     get_effective_banned_tags,
@@ -269,8 +270,8 @@ def _dismiss_threads_topic_dropdown(page):
 
 
 def _find_threads_post_button(page):
-    """작성 모달(div[role='dialog']) 내부에서 정확히 '게시' 또는 'Post' 텍스트만 일치하는 버튼 탐색.
-    has-text('게시')를 완전히 제거하고 '옵션'/'Options' 포함 버튼([게시물 옵션] 등) 오클릭을 원천 차단."""
+    """작성 모달(div[role='dialog']) 내부에서 정확히 '게시' 또는 'Post' 텍스트만 일치하는 버튼을 우선 탐색하고,
+    모달 내부에서 찾지 못한 경우 화면 전체에서 정확히 '게시'/'Post'인 보이는 버튼('옵션'/'Options'/'답글'/'Reply' 제외)을 폴백 탐색."""
     dialog_sels = [
         'div[role="dialog"] div[role="button"]:text-is("게시")',
         'div[role="dialog"] button:text-is("게시")',
@@ -283,22 +284,34 @@ def _find_threads_post_button(page):
         'div[role="button"]:text-is("Post")',
         'button:text-is("Post")',
     ]
-    search_sels = dialog_sels if _is_threads_composer_dialog_visible(page) else (dialog_sels + fallback_sels)
-    for sel in search_sels:
-        try:
-            loc = page.locator(sel)
-            cnt = loc.count()
-            for idx in range(cnt - 1, -1, -1):
-                cand = loc.nth(idx)
-                if not cand.is_visible(timeout=200):
-                    continue
-                if not _is_valid_threads_post_btn_text(cand):
-                    continue
-                return cand
-        except Exception as e:
-            if is_target_closed_error(e):
-                raise
-    return None
+
+    def _search_group(sels):
+        first_valid = None
+        for sel in sels:
+            try:
+                loc = page.locator(sel)
+                cnt = loc.count()
+                for idx in range(cnt - 1, -1, -1):
+                    cand = loc.nth(idx)
+                    if not cand.is_visible(timeout=200):
+                        continue
+                    if not _is_valid_threads_post_btn_text(cand):
+                        continue
+                    if _is_threads_post_btn_enabled(cand):
+                        return cand
+                    if first_valid is None:
+                        first_valid = cand
+            except Exception as e:
+                if is_target_closed_error(e):
+                    raise
+        return first_valid
+
+    # 1순위: div[role="dialog"] 내부 탐색
+    btn = _search_group(dialog_sels)
+    if btn is not None:
+        return btn
+    # 2순위: 모달 내부에서 못 찾은 경우 화면 전체 폴백 탐색 (활성 버튼 우선)
+    return _search_group(fallback_sels)
 
 
 def _is_threads_post_btn_enabled(btn):
@@ -449,14 +462,11 @@ def upload_to_threads(body="", tags=None, video_path=None, login_only=False, sto
         except Exception:
             return False
 
-    prof = load_profile()
-    banned_tags = get_effective_banned_tags(prof)
     clean_body = re.sub(r"#[^\s#]+", "", (body or "")).strip()
     raw_list = [t.replace("#", "").strip() for t in (tags or []) if t.replace("#", "").strip()]
-    filtered = [t for t in raw_list if t.lower() not in banned_tags]
-    region_tags = get_region_tags(prof)
-    top_tag = filtered[0] if filtered else (region_tags[0] if region_tags else "헤어스타일")
-    full_text = f"{clean_body}{nl}{nl}#{top_tag}".strip()
+    deduped = list(dict.fromkeys(raw_list))[:1]
+    top_tag = deduped[0] if deduped else ""
+    full_text = f"{clean_body}{nl}{nl}#{top_tag}".strip() if top_tag else clean_body
 
     record_mode = "login" if login_only else "upload"
     record_dir = create_blackbox_record_dir("쓰레드", mode=record_mode)
@@ -518,6 +528,13 @@ def upload_to_threads(body="", tags=None, video_path=None, login_only=False, sto
                 return False
             if not is_threads_logged_in(page):
                 raise RuntimeError("쓰레드 로그인이 완료되지 않아 중단했습니다.")
+
+            try:
+                new_th = auto_extract_and_save_profile_id(page, "threads")
+                if new_th:
+                    print(f"🔗 [프로필 자동 연동] 쓰레드 아이디(@{new_th}) 자동 저장 완료!", flush=True)
+            except Exception:
+                pass
 
             save_storage_state_safely(context, COOKIES_PATH, "쓰레드", mark_verified=True)
             if login_only:

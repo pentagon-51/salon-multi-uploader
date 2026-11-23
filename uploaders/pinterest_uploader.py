@@ -51,16 +51,11 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
         return None
 
     prof = load_profile()
-    banned_tags = get_effective_banned_tags(prof)
 
     raw_list = [t.replace("#", "").strip() for t in (tags or []) if t.replace("#", "").strip()]
-    filtered = [t for t in raw_list if t.lower() not in banned_tags]
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
-    style_only = [t for t in dict.fromkeys(filtered) if t not in region_set]
-    tag_list = (style_only[: max(1, 5 - len(region_tags))] + region_tags)[:5]
+    tag_list = list(dict.fromkeys(raw_list))[:5]
 
-    hash_str = " ".join([f"#{t}" for t in dict.fromkeys(tag_list)])
+    hash_str = " ".join([f"#{t}" for t in tag_list])
     full_desc = f"{(description or '').strip()}\n\n{hash_str}".strip() if hash_str else (description or "").strip()
     target_link = (link if link is not None else prof.get("booking_url", "") or "").strip()
     target_board_name = (board_name if board_name is not None else prof.get("pinterest_board", "") or "").strip()

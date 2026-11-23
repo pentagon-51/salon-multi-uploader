@@ -205,14 +205,8 @@ def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_na
         print("⚠️ [네이버 클립] 업로드할 영상 파일이 없습니다:", video_path, flush=True)
         return False
 
-    prof = load_profile()
-    banned_tags = get_effective_banned_tags(prof)
     raw_list = [t.replace("#", "").strip() for t in (tags or []) if t.replace("#", "").strip()]
-    filtered = [t for t in raw_list if t.lower() not in banned_tags]
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
-    style_only = [t for t in dict.fromkeys(filtered) if t not in region_set]
-    final_5 = (style_only[: max(1, 5 - len(region_tags))] + region_tags)[:5]
+    final_5 = list(dict.fromkeys(raw_list))[:5]
     tag_str = " ".join([f"#{t}" for t in final_5])
 
     clean_body = re.sub(r"#[^\s#]+", "", (body or "")).strip()

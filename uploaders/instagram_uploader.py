@@ -193,13 +193,9 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
     banned_tags = get_effective_banned_tags(prof)
     clean_body = re.sub(r"#[^\s#]+", "", (body or "")).strip()
     raw_list = [t.replace("#", "").strip() for t in (tags or []) if t.replace("#", "").strip()]
-    filtered = [t for t in raw_list if t.lower() not in banned_tags]
-    region_tags = get_region_tags(prof)
-    region_set = set(region_tags)
-    style_only = [t for t in dict.fromkeys(filtered) if t not in region_set]
-    final_5 = (style_only[: max(1, 5 - len(region_tags))] + region_tags)[:5]
+    final_5 = list(dict.fromkeys(raw_list))[:5]
 
-    tag_str = " ".join(["#" + t for t in dict.fromkeys(final_5)])
+    tag_str = " ".join(["#" + t for t in final_5])
     full_caption = (clean_body + ((nl + nl + tag_str) if tag_str else "")).strip()
     target_place = (place_name if place_name is not None else get_place_search_keyword(prof)).strip()
 
@@ -241,7 +237,7 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
             try:
                 new_ig = auto_extract_and_save_profile_id(page, "ig")
                 if new_ig:
-                    print(f"🔗 [프로필 자동 연동] 인스타그램·쓰레드 아이디(@{new_ig}) 자동 저장 완료!", flush=True)
+                    print(f"🔗 [프로필 자동 연동] 인스타그램 아이디(@{new_ig}) 자동 저장 완료!", flush=True)
             except Exception:
                 pass
 
