@@ -1,4 +1,7 @@
 import os, re, sys, time, shutil
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 from playwright.sync_api import sync_playwright
 from os_utils import (
     MOD_KEY,
@@ -29,7 +32,6 @@ from os_utils import (
 
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("naver_cookies.json")
-DEBUG_DIR = os.path.join(BASE_DIR, "debug_records")
 
 MEN_KEYWORDS = [
     "남자", "남성", "맨즈", "멘즈", "다운펌", "가르마", "애즈펌", "시스루댄디",
@@ -37,7 +39,6 @@ MEN_KEYWORDS = [
     "페이드", "바버", "투블럭", "상고", "슬릭백", "드롭컷", "파일럿컷",
     "men", "mens", "male", "barber", "crop", "fade", "gentleman"
 ]
-os.makedirs(DEBUG_DIR, exist_ok=True)
 
 def classify_category(text):
     t_low = (text or "").lower()

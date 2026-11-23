@@ -6,9 +6,9 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from naver_blog_uploader import upload_to_naver_blog, classify_category
-from tiktok_uploader import upload_to_tiktok
-from instagram_uploader import upload_to_instagram
+from uploaders.naver_blog_uploader import upload_to_naver_blog, classify_category
+from uploaders.tiktok_uploader import upload_to_tiktok
+from uploaders.instagram_uploader import upload_to_instagram
 from auto_updater import (
     load_release_info,
     check_public_update,
@@ -17,8 +17,8 @@ from auto_updater import (
 from os_utils import (
     get_base_dir,
     get_auth_dir,
-    get_blackbox_login_dir,
-    get_blackbox_upload_dir,
+    get_blackbox_dir,
+    format_blackbox_filename,
     get_auth_file,
     migrate_legacy_auth_files,
     cleanup_chrome_profile_locks,
@@ -48,22 +48,25 @@ from os_utils import (
     get_blackbox_session_dir,
     set_test_blackbox_dir,
     get_test_blackbox_dir,
-    prune_blackbox_upload_dir,
+    prune_blackbox_dir,
     logout_platform_session,
+    auto_extract_and_save_profile_id,
 )
 
 BASE_DIR = get_base_dir()
 AUTH_DIR = get_auth_dir()
-BLACKBOX_LOGIN_DIR = get_blackbox_login_dir()
-BLACKBOX_UPLOAD_DIR = get_blackbox_upload_dir()
-LEGACY_BLACKBOX_DIR = os.path.join(BASE_DIR, 'blackbox')
+ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
+BLACKBOX_DIR = get_blackbox_dir()
+BLACKBOX_TMP_DIR = os.path.join(BLACKBOX_DIR, '_tmp')
+LEGACY_BLACKBOX_LOGIN_DIR = os.path.join(BASE_DIR, 'blackbox_login')
+LEGACY_BLACKBOX_UPLOAD_DIR = os.path.join(BASE_DIR, 'blackbox_upload')
+LEGACY_DEBUG_DIR = os.path.join(BASE_DIR, 'debug_records')
 UPLOAD_DIR = os.path.join(BASE_DIR, 'upload')
 DONE_DIR = os.path.join(BASE_DIR, 'done')
 BACKUP_DIR = os.path.join(BASE_DIR, '_old_backup')
 THUMB_DIR = os.path.join(BASE_DIR, 'temp_thumbs')
-DEBUG_DIR = os.path.join(BASE_DIR, 'debug_records')
-REPORT_PATH = os.path.join(BLACKBOX_UPLOAD_DIR, 'report.md')
 UI_FILE = os.path.join(BASE_DIR, 'app_ui.html')
+BUSY_TASK_MSG = '이미 다른 작업이 진행 중입니다. 중지하려면 우측 상단 [🛑 강제 중지] 버튼을 눌러주세요.'
 migrate_legacy_auth_files()
 DAILY_USAGE_PATH = get_auth_file('daily_usage.json')
 USAGE_LOCK = threading.Lock()
@@ -89,7 +92,7 @@ YOUTUBE_MAX_COUNT = 6
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(DONE_DIR, exist_ok=True)
 os.makedirs(THUMB_DIR, exist_ok=True)
-os.makedirs(DEBUG_DIR, exist_ok=True)
+os.makedirs(BLACKBOX_DIR, exist_ok=True)
 STATE_LOCK = threading.Lock()
 ACTIVE_WORKER_THREAD = None
 STATE = {
@@ -144,13 +147,13 @@ def log(msg):
     print(msg, flush=True)
 
 ESSENTIAL_ITEMS = {
-    'app_server.py', 'app_ui.html', 'os_utils.py', 'auto_updater.py', 'AI_RULES.md', 'check_personal_leak.py',
-    'build_release.py', '2-1. 맥북 최초설치.command', '2-2. 맥북 프로그램 실행.command',
-    'version.json', 'LICENSE.txt', '.gitignore', '.gitattributes', 'salon_uploader.ico', 'favicon.png', 'salon_uploader_icon.png',
+    'app_server.py', 'app_ui.html', 'os_utils.py', 'auto_updater.py',
+    '2-1. 맥북 최초설치.command', '2-2. 맥북 프로그램 실행.command',
+    'version.json', 'LICENSE.txt', '.gitignore', '.gitattributes',
     '0. 처음사용자 안내서.html', '1-1. 윈도우 최초설치.bat', '1-2. 윈도우 프로그램 실행.bat', '.installed_done', '_설치완료_보관함',
-    'naver_blog_uploader.py', 'naver_clip_uploader.py', 'tiktok_uploader.py', 'instagram_uploader.py', 'pinterest_uploader.py', 'threads_uploader.py', 'daangn_uploader.py', 'x_uploader.py', 'facebook_uploader.py',
+    'uploaders', 'assets', 'dev_tools',
     'app.log',
-    'auth_data', 'blackbox_login', 'blackbox_upload', 'upload', 'done', 'debug_records', '_old_backup', 'temp_thumbs', '__pycache__'
+    'auth_data', 'blackbox', 'upload', 'done', '_old_backup', 'temp_thumbs', '__pycache__'
 }
 
 STYLE_EXPANSION_MAP = {
@@ -264,6 +267,7 @@ def get_setup_status(deep=False):
     fb_state, fb_age = _check_cookie_status_and_age('facebook_cookies.json', deep=deep)
     dg_state, dg_age = _check_cookie_status_and_age('daangn_cookies.json', deep=deep)
 
+    prof = load_profile()
     return {
         'yt': yt_state,
         'naver': naver_state,
@@ -287,6 +291,12 @@ def get_setup_status(deep=False):
             'fb': fb_age,
             'fb_page': fb_age,
             'daangn': dg_age,
+        },
+        'profile_ids': {
+            'naver_blog_id': prof.get('naver_blog_id', ''),
+            'pinterest_id': prof.get('pinterest_id', ''),
+            'instagram_id': prof.get('instagram_id', ''),
+            'x_id': prof.get('x_id', ''),
         },
         'has_client_secret': has_secret,
         'has_youtube_token': has_token,
@@ -644,12 +654,13 @@ def reset_personal_data(confirm_text):
     with STATE_LOCK:
         is_busy = STATE.get('busy')
     if is_busy:
-        return {'ok': False, 'msg': '업로드/점검 작업이 진행 중입니다. 먼저 작업을 중지해 주세요.'}
+        return {'ok': False, 'msg': BUSY_TASK_MSG}
 
     deleted_files = []
     exact_targets = [
         'youtube_token.json', 'client_secret.json',
         'user_profile.json', 'daily_usage.json', 'login_credentials.json', 'app.log',
+        'report.md', 'errorReport.md',
     ]
     glob_patterns = ['*_cookies.json', '블랙박스_*.webm']
 
@@ -671,7 +682,7 @@ def reset_personal_data(confirm_text):
                 except Exception:
                     pass
 
-    for dpath in [AUTH_DIR, BLACKBOX_LOGIN_DIR, BLACKBOX_UPLOAD_DIR, UPLOAD_DIR, DONE_DIR, DEBUG_DIR, THUMB_DIR]:
+    for dpath in [AUTH_DIR, BLACKBOX_DIR, UPLOAD_DIR, DONE_DIR, THUMB_DIR]:
         if os.path.isdir(dpath):
             for entry in os.listdir(dpath):
                 full_p = os.path.join(dpath, entry)
@@ -684,10 +695,11 @@ def reset_personal_data(confirm_text):
                 except Exception:
                     pass
 
-    # 구버전 통합 blackbox 폴더가 남아 있으면 영구 삭제
-    if os.path.exists(LEGACY_BLACKBOX_DIR):
-        if _force_rmtree(LEGACY_BLACKBOX_DIR):
-            deleted_files.append('blackbox/')
+    # 구버전 분리 폴더(blackbox_login, blackbox_upload, debug_records)가 남아 있으면 영구 삭제
+    for legacy_bb in (LEGACY_BLACKBOX_LOGIN_DIR, LEGACY_BLACKBOX_UPLOAD_DIR, LEGACY_DEBUG_DIR):
+        if os.path.exists(legacy_bb):
+            if _force_rmtree(legacy_bb):
+                deleted_files.append(os.path.basename(legacy_bb) + '/')
 
     # OS 무관하게 _old_backup 폴더 영구 삭제
     if os.path.exists(BACKUP_DIR):
@@ -733,16 +745,16 @@ def _kill_automation_chrome():
 
 
 def _rescue_debug_webms_into_dir(target_dir):
-    """강제 중지 등으로 debug_records/_rec_* 폴더에 남은 비어 있지 않은 .webm 녹화본을 target_dir로 안전 회수"""
-    if not target_dir or not os.path.isdir(DEBUG_DIR):
+    """강제 중지 등으로 blackbox/_tmp/_rec_* 폴더에 남은 비어 있지 않은 .webm 녹화본을 target_dir로 안전 회수"""
+    if not target_dir or not os.path.isdir(BLACKBOX_TMP_DIR):
         return 0
     os.makedirs(target_dir, exist_ok=True)
     rescued = 0
     existing = [f for f in os.listdir(target_dir) if f.lower().endswith('.webm')]
     next_idx = len(existing) + 1
     entries = []
-    for entry in os.listdir(DEBUG_DIR):
-        sub_p = os.path.join(DEBUG_DIR, entry)
+    for entry in os.listdir(BLACKBOX_TMP_DIR):
+        sub_p = os.path.join(BLACKBOX_TMP_DIR, entry)
         if os.path.isdir(sub_p) and entry.startswith('_rec_') and '_login_' not in entry and not entry.endswith('_login'):
             try:
                 entries.append((os.path.getmtime(sub_p), entry, sub_p))
@@ -781,11 +793,12 @@ def _rescue_debug_webms_into_dir(target_dir):
     return rescued
 
 
-def merge_blackbox_session_to_mp4(session_dir, out_dir, start_dt=None, is_test_mode=False):
+def merge_blackbox_session_to_mp4(session_dir, out_dir=None, start_dt=None, is_test_mode=False):
     """1회 실행(테스트 모드 또는 일반 업로드) 중 수집된 각 플랫폼 .webm 블랙박스 클립을 FFmpeg로 단일 MP4로 합본해
-    지정된 out_dir에 (HH-MM_YYMMDD).mp4 형식으로 저장하고 최종 로그를 출력."""
+    통합 blackbox/ 폴더에 upload_(HHMM-MMDD).mp4 또는 test_(HHMM-MMDD).mp4 형식으로 저장."""
     if not session_dir:
         return ''
+    target_dir = out_dir or BLACKBOX_DIR
     with TEST_MERGE_LOCK:
         _rescue_debug_webms_into_dir(session_dir)
         if not os.path.isdir(session_dir):
@@ -804,9 +817,10 @@ def merge_blackbox_session_to_mp4(session_dir, out_dir, start_dt=None, is_test_m
             return ''
 
         dt = start_dt if isinstance(start_dt, datetime.datetime) else datetime.datetime.now()
-        out_name = f"({dt.strftime('%H-%M_%y%m%d')}).mp4"
-        os.makedirs(out_dir, exist_ok=True)
-        out_path = os.path.join(out_dir, out_name)
+        kind = 'test' if is_test_mode else 'upload'
+        out_name = format_blackbox_filename(kind, 'mp4', dt=dt, is_report=False)
+        os.makedirs(target_dir, exist_ok=True)
+        out_path = os.path.join(target_dir, out_name)
 
         norm_dir = os.path.join(session_dir, '_norm')
         os.makedirs(norm_dir, exist_ok=True)
@@ -857,26 +871,21 @@ def merge_blackbox_session_to_mp4(session_dir, out_dir, start_dt=None, is_test_m
 
         _force_rmtree(session_dir)
         if saved_ok:
-            prune_blackbox_upload_dir(max_keep=3)
+            prune_blackbox_dir(max_keep=3)
             if is_test_mode:
-                log(f"🎬 테스트 블랙박스 합본 영상이 저장되었습니다: blackbox_upload/{out_name} (최신 3개 자동 유지 · 오류 문의 시 첨부해 주세요)")
+                log(f"🎬 테스트 블랙박스 합본 영상이 저장되었습니다: blackbox/{out_name} (최신 3개 자동 유지 · 오류 문의 시 [📂 오류 폴더 열기]로 첨부해 주세요)")
             else:
-                log(f"🎬 업로드 블랙박스 합본 영상이 저장되었습니다: blackbox_upload/{out_name} (최신 3개 자동 유지)")
+                log(f"🎬 업로드 블랙박스 합본 영상이 저장되었습니다: blackbox/{out_name} (최신 3개 자동 유지)")
             return out_path
         if is_test_mode:
-            log("⚠️ [테스트 모드] 합본할 수 있는 유효한 블랙박스 녹화본이 없어 blackbox_upload 저장을 건너뛰었습니다.")
+            log("⚠️ [테스트 모드] 합본할 수 있는 유효한 블랙박스 녹화본이 없어 blackbox 저장을 건너뛰었습니다.")
         else:
             log("⚠️ [업로드 블랙박스] 합본할 수 있는 유효한 녹화본이 없어 MP4 저장을 건너뛰었습니다.")
         return ''
 
 
-def merge_test_blackbox_to_desktop(session_dir, start_dt=None):
-    """기존 호환 래퍼: 테스트 모드 블랙박스 세션을 blackbox_upload/ 단일 MP4로 합본 저장"""
-    return merge_blackbox_session_to_mp4(session_dir, BLACKBOX_UPLOAD_DIR, start_dt=start_dt, is_test_mode=True)
-
-
 def _finalize_blackbox_session_merge_once():
-    """실행(테스트 모드 또는 일반 업로드) 세션당 정확히 1회만 FFmpeg 단일 MP4 합본을 blackbox_upload/에 저장"""
+    """실행(테스트 모드 또는 일반 업로드) 세션당 정확히 1회만 FFmpeg 단일 MP4 합본을 blackbox/에 저장"""
     with STATE_LOCK:
         if STATE.get('test_merged_done'):
             return ''
@@ -890,7 +899,7 @@ def _finalize_blackbox_session_merge_once():
     set_blackbox_session_dir('')
     if not sdir:
         return ''
-    return merge_blackbox_session_to_mp4(sdir, BLACKBOX_UPLOAD_DIR, start_dt=sdt, is_test_mode=is_test)
+    return merge_blackbox_session_to_mp4(sdir, BLACKBOX_DIR, start_dt=sdt, is_test_mode=is_test)
 
 
 def _finalize_test_mode_merge_once():
@@ -968,12 +977,24 @@ def _md_cell(text):
     return str(text or '').replace('\r', ' ').replace('\n', ' ').replace('|', '\\|').strip()
 
 
-def write_run_report(platform_results, mode_label='실업로드', video_name='', start_dt=None, end_dt=None, stopped_by_user=False):
-    """성공·실패·건너뜀·강제 중지·테스트 모드 여부와 관계없이 매 실행 종료 시 blackbox_upload/report.md에 최신 실행 리포트를 저장"""
+def write_run_report(platform_results, mode_label='실업로드', video_name='', start_dt=None, end_dt=None, stopped_by_user=False, report_kind=None):
+    """성공·실패·건너뜀·강제 중지·테스트 모드·로그인 점검 오류 결과를 blackbox/report_<kind>_(HHMM-MMDD).md에 저장하고
+    리포트 유형 최신 3개만 자동 유지"""
     end_t = end_dt if isinstance(end_dt, datetime.datetime) else datetime.datetime.now()
     start_t = start_dt if isinstance(start_dt, datetime.datetime) else end_t
     elapsed_sec = max(0.0, (end_t - start_t).total_seconds())
     now_str = end_t.strftime('%Y-%m-%d %H:%M:%S')
+
+    if report_kind in ('login', 'upload', 'test'):
+        kind = report_kind
+    elif '테스트' in str(mode_label or ''):
+        kind = 'test'
+    elif '로그인' in str(mode_label or ''):
+        kind = 'login'
+    else:
+        kind = 'upload'
+    report_fname = format_blackbox_filename(kind, 'md', dt=end_t, is_report=True)
+    report_path = os.path.join(BLACKBOX_DIR, report_fname)
 
     items = list(platform_results or [])
     ok_cnt = sum(1 for x in items if x.get('status') == '성공')
@@ -994,7 +1015,7 @@ def write_run_report(platform_results, mode_label='실업로드', video_name='',
         result_summary += f' / 중단 {stop_cnt}건'
 
     lines = [
-        '# 실행 결과 리포트 (`blackbox_upload/report.md`)',
+        f'# 실행 결과 리포트 (`blackbox/{report_fname}`)',
         '',
         '## 1. 실행 요약',
         f'- **기록 시각**: {now_str}',
@@ -1085,10 +1106,11 @@ def write_run_report(platform_results, mode_label='실업로드', video_name='',
             lines.append('')
 
     try:
-        os.makedirs(os.path.dirname(REPORT_PATH), exist_ok=True)
-        with open(REPORT_PATH, 'w', encoding='utf-8') as f:
+        os.makedirs(BLACKBOX_DIR, exist_ok=True)
+        with open(report_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines).rstrip() + '\n')
-        return REPORT_PATH
+        prune_blackbox_dir(max_keep=3)
+        return report_path
     except Exception:
         return ''
 
@@ -1164,139 +1186,26 @@ def force_stop_active_task():
     return {'ok': True, 'msg': '진행 중인 업로드 작업을 강제 중지했습니다.'}
 
 def clean_and_unify_blackbox_files(clear_thumbs=False):
-    """1) 구버전 auth/블랙박스 파일 전용 폴더 이관 2) 불필요한 .png 삭제
-    3) 로그인용(blackbox_login/)과 업로드용(blackbox_upload/)으로 녹화본 분리 통합
-    4) 구버전 blackbox/ 폴더 이관 후 제거 및 debug_records/temp_thumbs 임시 찌꺼기 정리"""
-    platforms = ['네이버블로그', '네이버클립', '틱톡', '인스타그램', '핀터레스트', '쓰레드', '엑스', '페이스북개인', '페이스북매장', '당근']
+    """1) 구버전 auth 파일 전용 폴더 이관 및 불필요한 루트 .png/구 리포트 삭제
+    2) 통합 blackbox/ 폴더 생성 및 구버전 blackbox_login/·blackbox_upload/ 안전 정리
+    3) debug_records/temp_thumbs 임시 찌꺼기 정리 및 blackbox/ 유형별 최신 3개 자동 유지"""
     try:
         migrate_legacy_auth_files()
-        os.makedirs(BLACKBOX_LOGIN_DIR, exist_ok=True)
-        os.makedirs(BLACKBOX_UPLOAD_DIR, exist_ok=True)
+        os.makedirs(BLACKBOX_DIR, exist_ok=True)
 
         for fn in os.listdir(BASE_DIR):
-            if fn.lower().endswith('.png') and not _is_protected_root_file(fn):
+            if fn in ('errorReport.md', 'report.md') or (fn.lower().endswith('.png') and not _is_protected_root_file(fn)):
                 try: os.remove(os.path.join(BASE_DIR, fn))
                 except Exception: pass
 
         with STATE_LOCK:
             is_busy = STATE.get('busy')
 
-        def _move_if_newer(src_path, dst_path):
-            if not os.path.isfile(src_path):
-                return
-            try:
-                if os.path.abspath(src_path) == os.path.abspath(dst_path):
-                    return
-                if os.path.getsize(src_path) > 0 and (not os.path.exists(dst_path) or os.path.getmtime(src_path) >= os.path.getmtime(dst_path)):
-                    shutil.move(src_path, dst_path)
-                else:
-                    os.remove(src_path)
-            except Exception:
-                pass
-
-        # 1) 강제종료/중단으로 debug_records/_rec_<플랫폼>_<login|upload>_* 하위 폴더에 남은 .webm 회수
-        if not is_busy and os.path.isdir(DEBUG_DIR):
-            for entry in list(os.listdir(DEBUG_DIR)):
-                sub_p = os.path.join(DEBUG_DIR, entry)
-                if not os.path.isdir(sub_p):
-                    continue
-                matched_p = None
-                is_login_rec = ('_login_' in entry) or entry.endswith('_login') or ('로그인' in entry)
-                for p in platforms:
-                    if f'_{p}_' in entry or p in entry:
-                        matched_p = p
-                        break
-                webms = [
-                    os.path.join(sub_p, f)
-                    for f in os.listdir(sub_p)
-                    if f.lower().endswith('.webm') and os.path.isfile(os.path.join(sub_p, f))
-                ]
-                non_empty = []
-                for w in webms:
-                    try:
-                        if os.path.getsize(w) > 0:
-                            non_empty.append(w)
-                    except Exception:
-                        pass
-                if non_empty and matched_p:
-                    newest_w = max(non_empty, key=lambda x: os.path.getmtime(x))
-                    if is_login_rec:
-                        dst_w = os.path.join(BLACKBOX_LOGIN_DIR, f"블랙박스_{matched_p}_로그인.webm")
-                    else:
-                        dst_w = os.path.join(BLACKBOX_UPLOAD_DIR, f"블랙박스_{matched_p}.webm")
-                    _move_if_newer(newest_w, dst_w)
-                _force_rmtree(sub_p)
-
-        # 2) 플랫폼별 업로드용(blackbox_upload/블랙박스_<플랫폼>.webm) 및 로그인용(blackbox_login/블랙박스_<플랫폼>_로그인.webm) 통합
-        for p in platforms:
-            upload_dst = os.path.join(BLACKBOX_UPLOAD_DIR, f"블랙박스_{p}.webm")
-            upload_candidates = [
-                os.path.join(BASE_DIR, f"블랙박스_{p}.webm"),
-                os.path.join(BASE_DIR, f"블랙박스_{p}_최신.webm"),
-                os.path.join(BASE_DIR, f"에러녹화_{p}.webm"),
-                os.path.join(LEGACY_BLACKBOX_DIR, f"블랙박스_{p}.webm"),
-                os.path.join(LEGACY_BLACKBOX_DIR, f"블랙박스_{p}_최신.webm"),
-                os.path.join(LEGACY_BLACKBOX_DIR, f"에러녹화_{p}.webm"),
-                os.path.join(BLACKBOX_UPLOAD_DIR, f"블랙박스_{p}_최신.webm"),
-                os.path.join(BLACKBOX_UPLOAD_DIR, f"에러녹화_{p}.webm"),
-                os.path.join(DEBUG_DIR, f"블랙박스_{p}.webm"),
-                os.path.join(DEBUG_DIR, f"블랙박스_{p}_최신.webm"),
-                os.path.join(DEBUG_DIR, f"에러녹화_{p}.webm"),
-            ]
-            existing = [c for c in upload_candidates if os.path.isfile(c)]
-            if existing:
-                valid_existing = [c for c in existing if os.path.getsize(c) > 0]
-                if valid_existing:
-                    newest = max(valid_existing, key=lambda x: os.path.getmtime(x))
-                    _move_if_newer(newest, upload_dst)
-                for c in existing:
-                    if os.path.exists(c):
-                        try: os.remove(c)
-                        except Exception: pass
-
-            login_dst = os.path.join(BLACKBOX_LOGIN_DIR, f"블랙박스_{p}_로그인.webm")
-            login_candidates = [
-                os.path.join(BASE_DIR, f"블랙박스_{p}_로그인.webm"),
-                os.path.join(LEGACY_BLACKBOX_DIR, f"블랙박스_{p}_로그인.webm"),
-                os.path.join(BLACKBOX_UPLOAD_DIR, f"블랙박스_{p}_로그인.webm"),
-                os.path.join(DEBUG_DIR, f"블랙박스_{p}_로그인.webm"),
-            ]
-            login_existing = [c for c in login_candidates if os.path.isfile(c)]
-            if login_existing:
-                valid_login = [c for c in login_existing if os.path.getsize(c) > 0]
-                if valid_login:
-                    newest_l = max(valid_login, key=lambda x: os.path.getmtime(x))
-                    _move_if_newer(newest_l, login_dst)
-                for c in login_existing:
-                    if os.path.exists(c):
-                        try: os.remove(c)
-                        except Exception: pass
-
-        # 3) 루트 및 구버전 blackbox/에 남아 있는 기타 블랙박스_*.webm 파일도 성격에 맞게 이관
-        for scan_dir in (BASE_DIR, LEGACY_BLACKBOX_DIR):
-            if not os.path.isdir(scan_dir):
-                continue
-            for fn in list(os.listdir(scan_dir)):
-                if fn.startswith('블랙박스_') and fn.endswith('.webm'):
-                    src = os.path.join(scan_dir, fn)
-                    target_dir = BLACKBOX_LOGIN_DIR if ('로그인' in fn or 'login' in fn.lower()) else BLACKBOX_UPLOAD_DIR
-                    _move_if_newer(src, os.path.join(target_dir, fn))
-
-        # 4) 이관 완료된 구버전 blackbox/ 폴더 제거
-        if not is_busy and os.path.isdir(LEGACY_BLACKBOX_DIR):
-            _force_rmtree(LEGACY_BLACKBOX_DIR)
-
-        # 5) 작업 미진행 시 debug_records 잔여 임시 파일 정리 (블랙박스_*.webm은 보존 이관)
-        if not is_busy and os.path.exists(DEBUG_DIR):
-            for df in list(os.listdir(DEBUG_DIR)):
-                fp = os.path.join(DEBUG_DIR, df)
-                if os.path.isfile(fp):
-                    if df.startswith('블랙박스_') and df.endswith('.webm'):
-                        target_dir = BLACKBOX_LOGIN_DIR if ('로그인' in df or 'login' in df.lower()) else BLACKBOX_UPLOAD_DIR
-                        _move_if_newer(fp, os.path.join(target_dir, df))
-                        continue
-                    try: os.remove(fp)
-                    except Exception: pass
+        # 구버전 분리 폴더(blackbox_login/, blackbox_upload/, debug_records/) 및 임시 폴더(blackbox/_tmp) 정리 (작업 미진행 시)
+        if not is_busy:
+            for legacy_dir in (LEGACY_BLACKBOX_LOGIN_DIR, LEGACY_BLACKBOX_UPLOAD_DIR, LEGACY_DEBUG_DIR, BLACKBOX_TMP_DIR):
+                if os.path.isdir(legacy_dir):
+                    _force_rmtree(legacy_dir)
 
         if clear_thumbs and not is_busy and os.path.exists(THUMB_DIR):
             for tf in os.listdir(THUMB_DIR):
@@ -1305,9 +1214,9 @@ def clean_and_unify_blackbox_files(clear_thumbs=False):
                     try: os.remove(fp)
                     except Exception: pass
 
-        # 내부 blackbox_upload/ 폴더는 최신 3개만 자동 유지 (4개 이상 시 가장 오래된 파일부터 삭제)
+        # 통합 blackbox/ 폴더는 유형별(영상·리포트·스샷·로그) 최신 3개만 자동 유지
         if not is_busy:
-            prune_blackbox_upload_dir(max_keep=3)
+            prune_blackbox_dir(max_keep=3)
     except Exception:
         pass
 
@@ -1336,14 +1245,138 @@ def _is_protected_root_file(fn):
         return True
     return False
 
+CHROME_CACHE_TARGET_DIRS = {
+    'Cache',
+    'Code Cache',
+    'GPUCache',
+    'GrShaderCache',
+    'ShaderCache',
+    'DawnCache',
+    'Media Cache',
+    'CacheStorage',
+    'ScriptCache',
+    'blob_storage',
+    'Crashpad',
+}
+
+CHROME_PROTECTED_SESSION_NAMES = {
+    'Cookies',
+    'Cookies-journal',
+    'Local Storage',
+    'Session Storage',
+    'IndexedDB',
+    'Preferences',
+    'Secure Preferences',
+    'Login Data',
+    'Login Data For Account',
+    'Web Data',
+    'Network',
+}
+
+
+def cleanup_chrome_profile_caches(auth_root=None, check_busy=True):
+    """auth_data/ 하위를 순회하며 로그인 세션·쿠키·설정은 100% 보호하고
+    오직 크롬 캐시·임시 폴더(CHROME_CACHE_TARGET_DIRS)만 안전하게 삭제해 확보 용량(MB) 반환"""
+    if check_busy:
+        with STATE_LOCK:
+            if STATE.get('busy'):
+                return {
+                    'skipped_busy': True,
+                    'freed_bytes': 0,
+                    'freed_mb': 0.0,
+                    'removed_dirs': 0,
+                    'removed_files': 0,
+                    'skipped_locked': 0,
+                }
+
+    base_auth = auth_root or AUTH_DIR
+    if not base_auth or not os.path.isdir(base_auth):
+        return {
+            'skipped_busy': False,
+            'freed_bytes': 0,
+            'freed_mb': 0.0,
+            'removed_dirs': 0,
+            'removed_files': 0,
+            'skipped_locked': 0,
+        }
+
+    freed_bytes = 0
+    removed_dirs = 0
+    removed_files = 0
+    skipped_locked = 0
+
+    for root, dirs, _ in os.walk(base_auth, topdown=True, followlinks=False):
+        # 보호 대상 세션 폴더 내부로는 절대 진입하지 않음
+        kept_dirs = []
+        target_dirs = []
+        for d in list(dirs):
+            if d in CHROME_PROTECTED_SESSION_NAMES:
+                continue
+            if d in CHROME_CACHE_TARGET_DIRS:
+                target_dirs.append(d)
+            else:
+                kept_dirs.append(d)
+        dirs[:] = kept_dirs
+
+        for td in target_dirs:
+            full_td = os.path.join(root, td)
+            if os.path.islink(full_td) or not os.path.isdir(full_td):
+                continue
+            had_locked = False
+            for sub_r, sub_ds, sub_fs in os.walk(full_td, topdown=False, followlinks=False):
+                for sf in sub_fs:
+                    sfp = os.path.join(sub_r, sf)
+                    try:
+                        fsize = os.path.getsize(sfp) if (not os.path.islink(sfp) and os.path.isfile(sfp)) else 0
+                    except Exception:
+                        fsize = 0
+                    try:
+                        os.chmod(sfp, stat.S_IWRITE | stat.S_IREAD)
+                    except Exception:
+                        pass
+                    try:
+                        os.remove(sfp)
+                        freed_bytes += fsize
+                        removed_files += 1
+                    except Exception:
+                        had_locked = True
+                        skipped_locked += 1
+                for sd in sub_ds:
+                    sdp = os.path.join(sub_r, sd)
+                    try:
+                        os.rmdir(sdp)
+                    except Exception:
+                        had_locked = True
+            try:
+                os.rmdir(full_td)
+                removed_dirs += 1
+            except Exception:
+                if not had_locked:
+                    try:
+                        shutil.rmtree(full_td)
+                        removed_dirs += 1
+                    except Exception:
+                        skipped_locked += 1
+
+    freed_mb = round(freed_bytes / (1024.0 * 1024.0), 1)
+    return {
+        'skipped_busy': False,
+        'freed_bytes': freed_bytes,
+        'freed_mb': freed_mb,
+        'removed_dirs': removed_dirs,
+        'removed_files': removed_files,
+        'skipped_locked': skipped_locked,
+    }
+
+
 def handle_cleanup(action='clean_all'):
     """단일 통합 파일 정리 (clean_all 및 기존 quarantine/purge 호환).
-    핵심 코드·설정·개발도구·auth_data·blackbox_login·blackbox_upload·upload·done은 철저히 보호하고
-    .png 스냅샷, debug_records, temp_thumbs, _old_backup, 루트 임시 산출물만 안전 정리."""
+    핵심 코드·설정·로그인 세션(Cookies/Local Storage 등)·blackbox·upload·done은 철저히 보호하고
+    .png 스냅샷, blackbox/_tmp, temp_thumbs, _old_backup, auth_data 크롬 캐시 찌꺼기만 안전 정리."""
     with STATE_LOCK:
         is_busy = STATE.get('busy')
     if is_busy:
-        msg = '작업이 진행 중입니다. 업로드나 로그인 점검이 끝난 뒤 파일 정리를 실행해 주세요.'
+        msg = BUSY_TASK_MSG
         log(f'⚠️ [파일 정리 보류] {msg}')
         return {'ok': False, 'msg': msg, 'has_backup': has_backup_files()}
 
@@ -1382,20 +1415,17 @@ def handle_cleanup(action='clean_all'):
             except Exception:
                 pass
 
-    # debug_records / temp_thumbs 내 잔여 파일 수 먼저 집계 후 블랙박스 이관 + 임시 폴더 정리
-    if os.path.isdir(DEBUG_DIR):
-        removed_debug = sum(
-            1 for entry in os.listdir(DEBUG_DIR)
-            if not (entry.startswith('블랙박스_') and entry.endswith('.webm'))
-        )
+    # blackbox/_tmp 및 temp_thumbs 내 잔여 파일 수 먼저 집계 후 정리
+    if os.path.isdir(BLACKBOX_TMP_DIR):
+        removed_debug = len(os.listdir(BLACKBOX_TMP_DIR))
     if os.path.isdir(THUMB_DIR):
         removed_thumbs = len(os.listdir(THUMB_DIR))
 
-    # 블랙박스 영상 blackbox_login/·blackbox_upload/ 분리 이관 + debug_records / temp_thumbs 정리
+    # 블랙박스 임시 폴더 및 temp_thumbs 정리
     clean_and_unify_blackbox_files(clear_thumbs=True)
 
     # 하위 디렉터리가 남아 있는 경우까지 안전 정리
-    for target_dir in (DEBUG_DIR, THUMB_DIR):
+    for target_dir in (BLACKBOX_TMP_DIR, THUMB_DIR):
         if os.path.isdir(target_dir):
             for entry in list(os.listdir(target_dir)):
                 fp = os.path.join(target_dir, entry)
@@ -1415,26 +1445,39 @@ def handle_cleanup(action='clean_all'):
             removed_backup = 1
         _force_rmtree(BACKUP_DIR)
 
+    # auth_data/ 내부 크롬 캐시 찌꺼기만 안전 다이어트 (로그인 세션 100% 유지)
+    cache_res = cleanup_chrome_profile_caches()
+    cache_freed_mb = cache_res.get('freed_mb', 0.0)
+    if cache_res.get('freed_bytes', 0) > 0 or cache_res.get('removed_dirs', 0) > 0:
+        log(f"🧹 크롬 캐시 정리 완료: {cache_freed_mb} MB 확보 (로그인 세션 유지)")
+
     parts = []
     if removed_png:
         parts.append(f"스냅샷(.png) {removed_png}개")
     if removed_temp_root:
         parts.append(f"임시 파일 {len(removed_temp_root)}개({', '.join(removed_temp_root[:5])}{' 등' if len(removed_temp_root) > 5 else ''})")
     if removed_debug:
-        parts.append(f"debug_records {removed_debug}개")
+        parts.append(f"임시 녹화 {removed_debug}개")
     if removed_thumbs:
         parts.append(f"temp_thumbs {removed_thumbs}개")
     if removed_backup:
         parts.append(f"_old_backup 구버전 백업 {removed_backup}개")
+    if cache_res.get('freed_bytes', 0) > 0 or cache_res.get('removed_dirs', 0) > 0:
+        parts.append(f"크롬 캐시 {cache_freed_mb} MB 확보")
 
     if parts:
         summary = " · ".join(parts)
-        msg = f"🧹 파일 정리 완료! ({summary}) — 핵심 코드·auth_data·blackbox_login·blackbox_upload·upload·done은 안전하게 보호되었습니다."
+        msg = f"🧹 파일 정리 완료! ({summary}) — 로그인 세션·핵심 코드·upload·done은 안전하게 보호되었습니다."
     else:
-        msg = "🧹 이미 깨끗한 상태입니다! (정리할 임시/백업 파일 없음 · 핵심 파일 모두 보호됨)"
+        msg = "🧹 이미 깨끗한 상태입니다! (정리할 임시/캐시 파일 없음 · 로그인 세션 및 핵심 파일 보호됨)"
 
     log(msg)
-    return {'ok': True, 'msg': msg, 'has_backup': has_backup_files()}
+    return {
+        'ok': True,
+        'msg': msg,
+        'has_backup': has_backup_files(),
+        'cache_freed_mb': cache_freed_mb,
+    }
 
 def extract_10_thumbnails(video_path, count=10, prefix='thumb_'):
     if not video_path or not os.path.exists(video_path):
@@ -3180,6 +3223,81 @@ def upload_to_youtube(title, body='', tags=None, video_path=None, privacy='publi
     res = yt.videos().insert(part='snippet,status', body=req_body, media_body=MediaFileUpload(video_path, chunksize=-1, resumable=True)).execute()
     return 'https://youtube.com/shorts/' + res['id']
 
+AUTH_CHECK_TARGETS = [
+    # 1) 네이버 계열 (블로그·클립 쿠키 공유 → 동시 미로그인 시 1탭 통합)
+    ('use_naver',   'naver',   'naver_cookies.json',     '네이버 블로그', 'https://blog.naver.com/GoBlogWrite.naver'),
+    ('use_clip',    'clip',    'naver_cookies.json',     '네이버 클립',   'https://clipcreators.naver.com/web'),
+    # 2) 인스타그램 → 쓰레드 인접 순서 보장 (인스타 로그인 후 쓰레드 'Instagram으로 계속' 연동)
+    ('use_ig',      'ig',      'instagram_cookies.json', '인스타그램',    'https://www.instagram.com/'),
+    ('use_threads', 'threads', 'threads_cookies.json',   '쓰레드',        'https://www.threads.com/'),
+    # 3) 기타 개인 SNS
+    ('use_tt',      'tt',      'tiktok_cookies.json',    '틱톡',          'https://www.tiktok.com/tiktokstudio'),
+    ('use_pin',     'pin',     'pinterest_cookies.json', '핀터레스트',    'https://kr.pinterest.com/pin-creation-tool/'),
+    ('use_x',       'x',       'x_cookies.json',         '엑스(X)',       'https://x.com/compose/post'),
+    # 4) 페이스북 계열 (개인·매장 쿠키 공유 → 선택·미로그인 시에만 열며 동시 요청 시 1탭 통합)
+    ('use_fb',      'fb',      'facebook_cookies.json',  '페이스북(개인)', 'https://www.facebook.com/'),
+    ('use_fb_page', 'fb_page', 'facebook_cookies.json',  '페이스북(매장)', 'https://business.facebook.com/'),
+    # 5) 매장 전용 채널
+    ('use_daangn',  'daangn',  'daangn_cookies.json',    '당근 비즈',     'https://business.daangn.com/'),
+]
+
+_SHARED_COOKIE_MERGED_LABELS = {
+    'naver_cookies.json': '네이버 (블로그·클립)',
+    'facebook_cookies.json': '페이스북 (개인·매장)',
+}
+
+
+def resolve_auth_check_targets(payload, current_status=None, enabled_platforms=None):
+    """통합 로그인 창에서 열 탭 목록(tabs_to_open)과 점검 대상 플랫폼 목록(requested_items)을 계산.
+    - missing_only=True 시 사용자가 선택한 플랫폼(enabled_platforms) 중 미로그인('red')만 엄격 필터링
+    - 쿠키 공유 계열(네이버 블로그+클립, 페이스북 개인+매장)은 단 1개 탭으로 중복 제거
+    - 탭 순서는 항상 AUTH_CHECK_TARGETS 기준(인스타그램 → 쓰레드 순서 보장)"""
+    req = payload if isinstance(payload, dict) else {}
+    is_single = bool(req.get('single_platform'))
+    missing_only = bool(req.get('missing_only')) and not is_single
+
+    enabled_set = None
+    if missing_only:
+        raw_enabled = req.get('enabled_platforms') if enabled_platforms is None else enabled_platforms
+        if isinstance(raw_enabled, (list, tuple, set)):
+            enabled_set = {str(k).strip() for k in raw_enabled if str(k).strip()}
+        else:
+            prof = load_profile()
+            prof_enabled = prof.get('enabled_platforms')
+            if isinstance(prof_enabled, list):
+                enabled_set = {str(k).strip() for k in prof_enabled if str(k).strip()}
+        status_map = current_status if isinstance(current_status, dict) else get_setup_status(deep=False)
+    else:
+        status_map = {}
+
+    requested_items = []
+    for flag, key, cfile, label, url in AUTH_CHECK_TARGETS:
+        if not req.get(flag):
+            continue
+        if missing_only:
+            if enabled_set is not None and key not in enabled_set:
+                continue
+            if (status_map.get(key) or 'red') != 'red':
+                continue
+        requested_items.append((key, cfile, label, url))
+
+    # 쿠키 공유 계열 중복 탭 제거 (네이버 블로그+클립 → 1탭, 페이스북 개인+매장 → 1탭)
+    tabs_to_open = []
+    seen_cfile_idx = {}
+    for item in requested_items:
+        key, cfile, label, url = item
+        if cfile in seen_cfile_idx:
+            prev_idx = seen_cfile_idx[cfile]
+            prev_key, prev_cfile, prev_label, prev_url = tabs_to_open[prev_idx]
+            merged_label = _SHARED_COOKIE_MERGED_LABELS.get(cfile, prev_label)
+            tabs_to_open[prev_idx] = (prev_key, prev_cfile, merged_label, prev_url)
+            continue
+        seen_cfile_idx[cfile] = len(tabs_to_open)
+        tabs_to_open.append(item)
+
+    return tabs_to_open, requested_items
+
+
 def worker_auth_check(payload):
     global ACTIVE_WORKER_THREAD
     with STATE_LOCK:
@@ -3189,20 +3307,8 @@ def worker_auth_check(payload):
         my_run_id = STATE['active_run_id']
         ACTIVE_WORKER_THREAD = threading.current_thread()
 
-    login_targets = [
-        (payload.get('use_naver'), 'naver', 'naver_cookies.json', '네이버 블로그', 'https://blog.naver.com/GoBlogWrite.naver'),
-        (payload.get('use_clip'), 'clip', 'naver_cookies.json', '네이버 클립', 'https://clipcreators.naver.com/web'),
-        (payload.get('use_tt'), 'tt', 'tiktok_cookies.json', '틱톡', 'https://www.tiktok.com/tiktokstudio'),
-        (payload.get('use_ig'), 'ig', 'instagram_cookies.json', '인스타그램', 'https://www.instagram.com/'),
-        (payload.get('use_pin'), 'pin', 'pinterest_cookies.json', '핀터레스트', 'https://kr.pinterest.com/pin-creation-tool/'),
-        (payload.get('use_threads'), 'threads', 'threads_cookies.json', '쓰레드', 'https://www.threads.com/'),
-        (payload.get('use_x'), 'x', 'x_cookies.json', '엑스(X)', 'https://x.com/compose/post'),
-        (payload.get('use_fb'), 'fb', 'facebook_cookies.json', '페이스북(개인)', 'https://www.facebook.com/'),
-        (payload.get('use_fb_page'), 'fb_page', 'facebook_cookies.json', '페이스북(매장)', 'https://business.facebook.com/'),
-        (payload.get('use_daangn'), 'daangn', 'daangn_cookies.json', '당근 비즈', 'https://business.daangn.com/'),
-    ]
-    selected = [(key, cfile, label, url) for enabled, key, cfile, label, url in login_targets if enabled]
-    checked_cookie_files = {cfile for _, cfile, _, _ in selected}
+    selected, requested_items = resolve_auth_check_targets(payload)
+    checked_cookie_files = {cfile for _, cfile, _, _ in requested_items}
     verified_platforms = set()
     active_login_page_cfiles = set()
 
@@ -3224,9 +3330,9 @@ def worker_auth_check(payload):
         if ctx is None:
             return
         try:
-            from daangn_uploader import is_daangn_logged_in
-            from threads_uploader import is_threads_logged_in
-            from facebook_uploader import is_facebook_logged_in
+            from uploaders.daangn_uploader import is_daangn_logged_in
+            from uploaders.threads_uploader import is_threads_logged_in
+            from uploaders.facebook_uploader import is_facebook_logged_in
             pages = list(ctx.pages)
         except Exception:
             return
@@ -3266,6 +3372,14 @@ def worker_auth_check(payload):
                             seen_login_page.add(cfile)
                         else:
                             seen_non_login_page.add(cfile)
+                            if cfile == 'instagram_cookies.json':
+                                new_ig = auto_extract_and_save_profile_id(pg, 'ig')
+                                if new_ig:
+                                    log(f'🔗 [프로필 자동 연동] 인스타그램·쓰레드 아이디(@{new_ig})를 자동 추출해 바로가기에 연결했습니다.')
+                            elif cfile == 'x_cookies.json':
+                                new_x = auto_extract_and_save_profile_id(pg, 'x')
+                                if new_x:
+                                    log(f'🔗 [프로필 자동 연동] 엑스(X) 아이디(@{new_x})를 자동 추출해 바로가기에 연결했습니다.')
             except Exception:
                 pass
         if daangn_seen_any:
@@ -3322,6 +3436,71 @@ def worker_auth_check(payload):
         return
 
     context = None
+    login_start_dt = datetime.datetime.now()
+    login_exc = None
+    login_tb = ''
+    tab_diag_snapshots = {}
+
+    def _get_open_pages(ctx):
+        if ctx is None:
+            return []
+        try:
+            return [pg for pg in list(ctx.pages) if not pg.is_closed()]
+        except Exception:
+            return []
+
+    def _capture_open_tabs_diag(ctx):
+        for pg in _get_open_pages(ctx):
+            try:
+                cur_u = (pg.url or '').strip()
+                if not cur_u or cur_u == 'about:blank':
+                    continue
+                low_u = cur_u.lower()
+                for cfile, _, dom_markers in LOGIN_PAGE_REDIRECT_RULES:
+                    if any(dm in low_u for dm in dom_markers):
+                        btns = []
+                        try:
+                            raw_btns = pg.evaluate(
+                                """() => Array.from(document.querySelectorAll('button, [role="button"], a[href], input[type="submit"]'))
+                                    .filter(el => el.offsetParent !== null)
+                                    .map(el => (el.innerText || el.getAttribute('aria-label') || el.value || '').replace(/\\s+/g, ' ').trim())
+                                    .filter(Boolean).slice(0, 30)"""
+                            )
+                            if isinstance(raw_btns, list):
+                                btns = [str(b).strip() for b in raw_btns if str(b or '').strip()][:30]
+                        except Exception:
+                            btns = []
+                        tab_diag_snapshots[cfile] = {
+                            'url': cur_u,
+                            'buttons': btns,
+                            'captured_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        }
+                        break
+            except Exception:
+                pass
+
+    def _close_login_context_cleanly(ctx):
+        """로그인 전용 Playwright 브라우저만 완전 종료 (macOS 빨간 X 닫힘 후 프로세스 잔류 방지 · 대시보드 브라우저는 무영향)"""
+        if ctx is None:
+            return
+        done_evt = threading.Event()
+
+        def _watchdog():
+            if not done_evt.wait(3.5):
+                _kill_automation_chrome()
+
+        wd = threading.Thread(target=_watchdog, daemon=True)
+        wd.start()
+        try:
+            ctx.close()
+        except Exception:
+            pass
+        finally:
+            done_evt.set()
+        if sys.platform == 'darwin':
+            # macOS에서 창 X 버튼으로 탭 0개가 된 뒤에도 Dock에 잔류할 수 있는 로그인 전용 크로미움 프로세스만 정리
+            _kill_automation_chrome()
+
     try:
         from playwright.sync_api import sync_playwright
 
@@ -3332,20 +3511,36 @@ def worker_auth_check(payload):
             # 로그인 점검 시 비밀번호 노출 방지를 위해 record_video_dir 없이 영구 크롬 프로필로 실행
             context = launch_persistent_chromium(p, headless=False, viewport=None, record_video_dir=None)
             context_closed = [False]
+            all_tabs_closed = [False]
+
+            def _check_zero_tabs(*_):
+                if not _get_open_pages(context):
+                    all_tabs_closed[0] = True
+
+            def _watch_page_close(pg):
+                try:
+                    pg.on('close', _check_zero_tabs)
+                except Exception:
+                    pass
+
             try:
                 context.on('close', lambda *_: context_closed.__setitem__(0, True))
+                context.on('page', _watch_page_close)
+                for init_pg in list(context.pages):
+                    _watch_page_close(init_pg)
             except Exception:
                 pass
 
             first_page = None
             for idx, (key, cfile, label, url) in enumerate(selected):
-                if _is_stop_requested(my_run_id) or context_closed[0]:
+                if _is_stop_requested(my_run_id) or context_closed[0] or (idx > 0 and all_tabs_closed[0]):
                     break
                 try:
                     if idx == 0 and context.pages:
                         pg = context.pages[0]
                     else:
                         pg = context.new_page()
+                    _watch_page_close(pg)
                     if first_page is None:
                         first_page = pg
                     pg.goto(url, wait_until='domcontentloaded', timeout=25000)
@@ -3359,66 +3554,118 @@ def worker_auth_check(payload):
                 except Exception:
                     pass
 
-            if not _is_stop_requested(my_run_id) and not context_closed[0]:
-                log('🔑 [통합 로그인] 열린 브라우저 창에서 로그인을 완료한 뒤 창 우측 상단 [X]로 닫아주세요. 닫는 즉시 로그인 상태를 정밀 확인합니다!')
+            if not _is_stop_requested(my_run_id) and not context_closed[0] and not all_tabs_closed[0]:
+                log('🔑 [통합 로그인] 열린 브라우저 창에서 로그인을 완료한 뒤 창 [X]로 닫아주세요. 닫는 즉시 로그인 상태를 정밀 확인합니다!')
 
             last_sync_ts = 0.0
-            while not context_closed[0]:
+            while not context_closed[0] and not all_tabs_closed[0]:
                 if _is_stop_requested(my_run_id):
                     log('🛑 [작업 중지됨] 사용자 요청으로 통합 로그인 창을 종료합니다.')
                     break
 
-                try:
-                    open_pages = [pg for pg in context.pages if not pg.is_closed()]
-                except Exception:
-                    break
-                if not open_pages:
+                open_pages = _get_open_pages(context)
+                if len(open_pages) == 0:
+                    all_tabs_closed[0] = True
+                    log('🔒 [통합 로그인] 로그인 창 닫힘 감지(열린 탭 0개) — 로그인 전용 브라우저를 종료하고 신호등을 정밀 확인합니다.')
                     break
 
                 now_ts = time.time()
                 if now_ts - last_sync_ts >= 2.0:
                     try:
+                        _capture_open_tabs_diag(context)
                         _sync_and_enforce_checked(context)
                     except Exception:
                         pass
                     last_sync_ts = now_ts
 
-                # 1초 간격 대기 (Playwright 이벤트 펌핑 포함)
+                # 250ms 간격으로 빠르게 이벤트 펌핑 (macOS 창 X 닫힘 즉시 감지)
                 try:
-                    open_pages[0].wait_for_timeout(1000)
+                    open_pages[0].wait_for_timeout(250)
                 except Exception:
-                    time.sleep(1.0)
+                    if len(_get_open_pages(context)) == 0:
+                        all_tabs_closed[0] = True
+                        break
+                    time.sleep(0.25)
 
             try:
+                _capture_open_tabs_diag(context)
                 _sync_and_enforce_checked(context)
             except Exception:
                 pass
-            try:
-                context.close()
-            except Exception:
-                pass
+            _close_login_context_cleanly(context)
             context = None
 
         if not _is_stop_requested(my_run_id):
             st_after = get_setup_status(deep=True)
             summary = ', '.join(
                 f"{label} {'🟢' if st_after.get(key) in ('green', 'yellow') else '🔴'}"
-                for key, _, label, _ in selected
+                for key, _, label, _ in requested_items
             )
             log(f'✅ [로그인 상태 정밀 확인 완료] {summary}')
+            # 미로그인(🔴)이 남아 있는 경우 정밀 진단 리포트(blackbox/report_login_(HHMM-MMDD).md) 자동 기록
+            login_report_items = []
+            has_unlogged = False
+            for key, cfile, label, url in requested_items:
+                is_ok = st_after.get(key) in ('green', 'yellow')
+                snap = tab_diag_snapshots.get(cfile) or {}
+                if not is_ok:
+                    has_unlogged = True
+                login_report_items.append({
+                    'key': key,
+                    'label': label,
+                    'status': '성공' if is_ok else '실패',
+                    'msg': '로그인 확인 완료' if is_ok else '미로그인 상태 (창 종료 후 인증 쿠키 미감지)',
+                    'url': snap.get('url') or url,
+                    'error': '' if is_ok else f'{label} 로그인 미완료 또는 세션 인증 실패',
+                    'traceback': '' if is_ok else f'Login verification returned red for {key} ({cfile})',
+                    'buttons': [] if is_ok else (snap.get('buttons') or []),
+                    'captured_at': snap.get('captured_at') or datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                })
+            if has_unlogged:
+                rp = write_run_report(
+                    login_report_items,
+                    mode_label='통합 로그인 점검',
+                    video_name='',
+                    start_dt=login_start_dt,
+                    end_dt=datetime.datetime.now(),
+                    stopped_by_user=False,
+                    report_kind='login',
+                )
+                if rp:
+                    log(f'📝 [로그인 진단 리포트 저장] blackbox/{os.path.basename(rp)}')
     except Exception as e:
+        login_exc = e
+        login_tb = traceback.format_exc()
         if not _is_stop_requested(my_run_id):
             log(f'⚠️ 통합 로그인 중 오류: {e}')
+            rp = write_run_report(
+                [{
+                    'key': 'login',
+                    'label': '통합 로그인',
+                    'status': '실패',
+                    'msg': str(e)[:80],
+                    'url': '',
+                    'error': f'{type(e).__name__}: {e}',
+                    'traceback': login_tb,
+                    'buttons': [],
+                    'captured_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                }],
+                mode_label='통합 로그인 점검',
+                video_name='',
+                start_dt=login_start_dt,
+                end_dt=datetime.datetime.now(),
+                stopped_by_user=False,
+                report_kind='login',
+            )
+            if rp:
+                log(f'📝 [로그인 오류 리포트 저장] blackbox/{os.path.basename(rp)}')
     finally:
         if context is not None:
             try:
                 _sync_and_enforce_checked(context)
             except Exception:
                 pass
-            try:
-                context.close()
-            except Exception:
-                pass
+            _close_login_context_cleanly(context)
         cleanup_chrome_profile_locks()
         with STATE_LOCK:
             STATE['auth_check_seq'] = int(STATE.get('auth_check_seq', 0)) + 1
@@ -3503,9 +3750,9 @@ def worker_publish(payload):
         STATE['test_merged_done'] = False
         STATE['force_stop_merging'] = False
         if test_mode:
-            bb_session_dir = os.path.join(DEBUG_DIR, f'_test_session_{my_run_id}_{int(time.time())}')
+            bb_session_dir = os.path.join(BLACKBOX_TMP_DIR, f'_test_session_{my_run_id}_{int(time.time())}')
         else:
-            bb_session_dir = os.path.join(DEBUG_DIR, f'_upload_session_{my_run_id}_{int(time.time())}')
+            bb_session_dir = os.path.join(BLACKBOX_TMP_DIR, f'_upload_session_{my_run_id}_{int(time.time())}')
         STATE['test_session_dir'] = bb_session_dir
         STATE['test_start_dt'] = run_start_dt
         ACTIVE_WORKER_THREAD = threading.current_thread()
@@ -3731,7 +3978,7 @@ def worker_publish(payload):
                 c_exc = None
                 c_tb = ''
                 try:
-                    from naver_clip_uploader import upload_to_naver_clip
+                    from uploaders.naver_clip_uploader import upload_to_naver_clip
                     log('🟢 [네이버 클립] 게시 시작...')
                     c_ok = bool(upload_to_naver_clip(normalize_branch_name(payload.get('clip_title', '')), normalize_branch_name(payload.get('clip_body', '')), split_tags(payload.get('clip_tags')), video_path, normalize_branch_name(payload.get('clip_place') or default_place), stop_checker=p_stop, test_mode=test_mode))
                     if c_ok:
@@ -3818,7 +4065,7 @@ def worker_publish(payload):
                 pin_exc = None
                 pin_tb = ''
                 try:
-                    from pinterest_uploader import upload_to_pinterest
+                    from uploaders.pinterest_uploader import upload_to_pinterest
                     log('🔴 [핀터레스트] 게시 시작...')
                     pin_link = payload.get('pin_dest_url') if payload.get('pin_dest_url') is not None else prof.get('booking_url', '')
                     pin_board = payload.get('pin_board') if payload.get('pin_board') is not None else prof.get('pinterest_board', '')
@@ -3849,7 +4096,7 @@ def worker_publish(payload):
                 th_exc = None
                 th_tb = ''
                 try:
-                    from threads_uploader import upload_to_threads
+                    from uploaders.threads_uploader import upload_to_threads
                     log('🧵 [쓰레드] 게시 시작...')
                     th_ok = bool(upload_to_threads(body=normalize_branch_name(payload.get('threads_body', '')), tags=split_tags(payload.get('threads_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
                     if th_ok:
@@ -3878,7 +4125,7 @@ def worker_publish(payload):
                 x_exc = None
                 x_tb = ''
                 try:
-                    from x_uploader import upload_to_x
+                    from uploaders.x_uploader import upload_to_x
                     log('𝕏 [엑스(X)] 게시 시작...')
                     x_ok = bool(upload_to_x(body=normalize_branch_name(payload.get('x_body', '')), tags=split_tags(payload.get('x_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
                     if x_ok:
@@ -3907,7 +4154,7 @@ def worker_publish(payload):
                 fb_exc = None
                 fb_tb = ''
                 try:
-                    from facebook_uploader import upload_to_facebook_personal
+                    from uploaders.facebook_uploader import upload_to_facebook_personal
                     log('📘 [페이스북(개인)] 릴스 게시 시작...')
                     fb_ok = bool(upload_to_facebook_personal(body=normalize_branch_name(payload.get('fb_body', '')), tags=split_tags(payload.get('fb_tags')), video_path=video_path, stop_checker=p_stop, test_mode=test_mode))
                     if fb_ok:
@@ -3936,7 +4183,7 @@ def worker_publish(payload):
                 fbp_exc = None
                 fbp_tb = ''
                 try:
-                    from facebook_uploader import upload_to_facebook_page
+                    from uploaders.facebook_uploader import upload_to_facebook_page
                     fb_page_name = normalize_branch_name(payload.get('fb_page_name') or get_salon_name(prof, fallback=''))
                     log(f'🏪 [페이스북(매장)] 메타 비즈니스 스위트 릴스 게시 시작 ({fb_page_name or "기본 페이지"})...')
                     fbp_ok = bool(upload_to_facebook_page(body=normalize_branch_name(payload.get('fb_page_body', '')), tags=split_tags(payload.get('fb_page_tags')), video_path=video_path, page_name=fb_page_name, stop_checker=p_stop, test_mode=test_mode))
@@ -3966,7 +4213,7 @@ def worker_publish(payload):
                 d_exc = None
                 d_tb = ''
                 try:
-                    from daangn_uploader import upload_to_daangn
+                    from uploaders.daangn_uploader import upload_to_daangn
                     daangn_imgs = resolve_daangn_images(payload, video_path=video_path)
                     log(f'🥕 [당근 비즈프로필] 소식 발행 시작 (첨부 사진 {len(daangn_imgs)}장)...')
                     d_ok = bool(upload_to_daangn(title=normalize_branch_name(payload.get('daangn_title', '')), body=normalize_branch_name(payload.get('daangn_body', '')), video_path=video_path, selected_images=daangn_imgs, stop_checker=p_stop, test_mode=test_mode))
@@ -4055,15 +4302,17 @@ def worker_publish(payload):
                 'buttons': [],
                 'captured_at': now_end_str,
             })
-        if write_run_report(
+        saved_report_path = write_run_report(
             final_report_items,
             mode_label=mode_label,
             video_name=vn,
             start_dt=run_start_dt,
             end_dt=now_end_dt,
             stopped_by_user=was_stopped,
-        ):
-            log('📝 [실행 리포트 저장] blackbox_upload/report.md에 이번 작업 결과를 기록했습니다.')
+            report_kind=('test' if test_mode else 'upload'),
+        )
+        if saved_report_path:
+            log(f'📝 [실행 리포트 저장] blackbox/{os.path.basename(saved_report_path)}에 이번 작업 결과를 기록했습니다.')
 
         # 강제 중지 경로가 아닌 일반 완료 시 여기서 FFmpeg 단일 MP4 합본 저장
         # (강제 중지 시에는 force_stop_active_task가 완료 로그 직후 합본 저장)
@@ -4071,11 +4320,34 @@ def worker_publish(payload):
             _finalize_blackbox_session_merge_once()
             clean_and_unify_blackbox_files(clear_thumbs=(False if test_mode else naver_completed))
 
+def open_blackbox_folder():
+    """blackbox/ 폴더가 없으면 생성한 뒤 OS 기본 탐색기(macOS open, Windows explorer)로 열기"""
+    os.makedirs(BLACKBOX_DIR, exist_ok=True)
+    try:
+        if sys.platform == 'darwin':
+            subprocess.Popen(['open', BLACKBOX_DIR])
+        elif sys.platform == 'win32':
+            try:
+                os.startfile(BLACKBOX_DIR)
+            except Exception:
+                subprocess.Popen(['explorer', BLACKBOX_DIR])
+        else:
+            subprocess.Popen(['xdg-open', BLACKBOX_DIR])
+    except Exception as e:
+        return {'ok': False, 'msg': f'오류 폴더를 열지 못했습니다: {e}'}
+    log('📂 [오류 폴더 열기] 최신 report_*.md와 영상을 소통방에 첨부해 문의해 주세요.')
+    return {
+        'ok': True,
+        'path': BLACKBOX_DIR,
+        'msg': '최신 report_*.md와 영상을 소통방에 첨부해 문의해 주세요.',
+    }
+
+
 def get_done_storage_info():
-    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox_upload/(report.md 제외) 폴더의 합산 용량 및 파일 개수 계산"""
+    """done/ 폴더(history.json 제외), temp_thumbs/, blackbox/ 폴더의 합산 용량 및 파일 개수 계산"""
     total_bytes = 0
     file_count = 0
-    for target_dir, exclude_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, {'report.md'})):
+    for target_dir, exclude_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_DIR, set())):
         if not os.path.isdir(target_dir):
             continue
         for root, _, files in os.walk(target_dir):
@@ -4101,15 +4373,15 @@ def get_done_storage_info():
 
 
 def clear_done_and_thumbs():
-    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox_upload/ 폴더(report.md 보존) 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
+    """done/ 폴더(history.json 보존), temp_thumbs/, blackbox/ 폴더 내부 파일 수동 비우기 (auth_data/·upload/ 절대 보호)"""
     with STATE_LOCK:
         is_busy = STATE.get('busy')
     if is_busy:
-        return {'ok': False, 'msg': '업로드/점검 작업이 진행 중입니다. 작업이 끝난 뒤 파일 비우기를 실행해 주세요.'}
+        return {'ok': False, 'msg': BUSY_TASK_MSG}
 
     before = get_done_storage_info()
     removed_count = 0
-    for target_dir, keep_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_UPLOAD_DIR, {'report.md'})):
+    for target_dir, keep_names in ((DONE_DIR, {'history.json'}), (THUMB_DIR, set()), (BLACKBOX_DIR, set())):
         if not os.path.isdir(target_dir):
             continue
         for entry in list(os.listdir(target_dir)):
@@ -4128,14 +4400,20 @@ def clear_done_and_thumbs():
                 pass
 
     after = get_done_storage_info()
-    freed_mb = round(max(0.0, (before['total_bytes'] - after['total_bytes']) / (1024.0 * 1024.0)), 1)
-    log(f"🗑️ [완료 파일 비우기] done/temp_thumbs/blackbox_upload 파일 {removed_count}개 삭제 ({freed_mb}MB 확보) — 로그인·대기 파일 안전 보호됨")
+    media_freed_mb = round(max(0.0, (before['total_bytes'] - after['total_bytes']) / (1024.0 * 1024.0)), 1)
+    cache_res = cleanup_chrome_profile_caches()
+    cache_freed_mb = cache_res.get('freed_mb', 0.0)
+    total_freed_mb = round(media_freed_mb + cache_freed_mb, 1)
+    if cache_res.get('freed_bytes', 0) > 0 or cache_res.get('removed_dirs', 0) > 0:
+        log(f"🧹 크롬 캐시 정리 완료: {cache_freed_mb} MB 확보 (로그인 세션 유지)")
+    log(f"🗑️ [완료 파일 비우기] done/temp_thumbs/blackbox 파일 {removed_count}개 삭제 ({media_freed_mb}MB) + 크롬 캐시 {cache_freed_mb}MB 확보 — 로그인 세션·대기 파일 안전 보호됨")
     return {
         'ok': True,
         'removed_count': removed_count,
-        'freed_mb': freed_mb,
+        'freed_mb': total_freed_mb,
+        'cache_freed_mb': cache_freed_mb,
         'storage': after,
-        'msg': f"완료·임시·블랙박스 파일 {removed_count}개({freed_mb}MB)를 깔끔하게 비웠습니다! (로그인 정보·대기 파일 안전 유지)",
+        'msg': f"완료·블랙박스 파일 {removed_count}개({media_freed_mb}MB) 및 크롬 캐시 {cache_freed_mb}MB를 비웠습니다! (총 {total_freed_mb}MB 확보 · 로그인 세션 안전 유지)",
     }
 
 
@@ -4484,8 +4762,10 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(html)))
             self.end_headers()
             self.wfile.write(html)
-        elif clean_path == '/favicon.ico':
-            ico_path = os.path.join(BASE_DIR, 'salon_uploader.ico')
+        elif clean_path in ('/favicon.ico', '/assets/salon_uploader.ico'):
+            ico_path = os.path.join(ASSETS_DIR, 'salon_uploader.ico')
+            if not os.path.isfile(ico_path):
+                ico_path = os.path.join(BASE_DIR, 'salon_uploader.ico')
             if os.path.isfile(ico_path):
                 with open(ico_path, 'rb') as f:
                     ico_data = f.read()
@@ -4497,15 +4777,17 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.wfile.write(ico_data)
             else:
                 self.send_error(404, 'Icon Not Found')
-        elif clean_path == '/favicon.png':
-            fav_path = os.path.join(BASE_DIR, 'favicon.png')
+        elif clean_path in ('/favicon.png', '/assets/favicon.png'):
+            fav_path = os.path.join(ASSETS_DIR, 'favicon.png')
             fav_data = b''
             if os.path.isfile(fav_path) and os.path.getsize(fav_path) > 100:
                 with open(fav_path, 'rb') as f:
                     fav_data = f.read()
             else:
-                # favicon.png 누락 시 salon_uploader.ico 내부 PNG 프레임에서 자동 복구
-                ico_path = os.path.join(BASE_DIR, 'salon_uploader.ico')
+                # assets/favicon.png 누락 시 assets/salon_uploader.ico 내부 PNG 프레임에서 자동 복구
+                ico_path = os.path.join(ASSETS_DIR, 'salon_uploader.ico')
+                if not os.path.isfile(ico_path):
+                    ico_path = os.path.join(BASE_DIR, 'salon_uploader.ico')
                 if os.path.isfile(ico_path):
                     try:
                         with open(ico_path, 'rb') as f:
@@ -4524,6 +4806,7 @@ class AppHandler(BaseHTTPRequestHandler):
                                     best_area = rw * rh
                                     fav_data = chunk
                         if fav_data:
+                            os.makedirs(ASSETS_DIR, exist_ok=True)
                             with open(fav_path, 'wb') as out_f:
                                 out_f.write(fav_data)
                     except Exception:
@@ -4659,7 +4942,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if is_busy:
                 return self.send_json({
                     'ok': False,
-                    'msg': '업로드 또는 로그인 점검 작업이 진행 중입니다. 작업이 끝난 뒤 로그아웃해 주세요.',
+                    'msg': BUSY_TASK_MSG,
                 })
             plat_key = str(req.get('platform') or '').strip().lower()
             res = logout_platform_session(plat_key)
@@ -4689,13 +4972,15 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(handle_cleanup(req.get('action')))
         elif self.path == '/api/clear_done':
             self.send_json(clear_done_and_thumbs())
+        elif self.path == '/api/open_blackbox_folder':
+            self.send_json(open_blackbox_folder())
         elif self.path == '/api/history/delete':
             self.send_json(delete_history_records(req.get('ids', [])))
         elif self.path == '/api/apply_update':
             with STATE_LOCK:
                 is_busy = STATE['busy']
             if is_busy:
-                return self.send_json({'ok': False, 'msg': '업로드/점검 작업이 진행 중입니다. 작업이 끝난 뒤 업데이트해 주세요.'})
+                return self.send_json({'ok': False, 'msg': BUSY_TASK_MSG})
             log('🚀 [원클릭 업데이트] GitHub 최신 버전 다운로드 및 안전 검증을 시작합니다...')
             res = apply_public_update(report=lambda pct, msg: log(f'🔄 [업데이트 {pct}%] {msg}'))
             if res.get('ok'):
@@ -4812,7 +5097,7 @@ class AppHandler(BaseHTTPRequestHandler):
         elif self.path == '/api/auth_check':
             with STATE_LOCK:
                 is_busy = STATE['busy']
-            if is_busy: return self.send_json({'ok': False, 'msg': '이미 작업 진행 중입니다. 중지하려면 우측 상단 [🛑 강제 중지] 버튼을 눌러주세요.'})
+            if is_busy: return self.send_json({'ok': False, 'msg': BUSY_TASK_MSG})
             threading.Thread(target=worker_auth_check, args=(req,), daemon=True).start()
             self.send_json({'ok': True})
         elif self.path in ('/api/publish', '/api/upload'):
@@ -4825,7 +5110,7 @@ class AppHandler(BaseHTTPRequestHandler):
             with STATE_LOCK:
                 is_busy = STATE['busy']
                 state_vn = STATE['video_name']
-            if is_busy: return self.send_json({'ok': False, 'msg': '이미 업로드가 진행 중입니다. 중지하려면 우측 상단 [🛑 강제 중지] 버튼을 눌러주세요.'})
+            if is_busy: return self.send_json({'ok': False, 'msg': BUSY_TASK_MSG})
             is_test = bool(req.get('test_mode', False))
             resolved_history_id = '' if is_test else str(req.get('history_id') or '').strip()
             rec = None

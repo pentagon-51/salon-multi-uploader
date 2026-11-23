@@ -1,4 +1,7 @@
-import os, re, json, time, shutil, difflib
+import os, re, sys, json, time, shutil, difflib
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 from playwright.sync_api import sync_playwright
 from os_utils import (
     MOD_KEY,
@@ -21,8 +24,6 @@ from os_utils import (
 
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("daangn_cookies.json")
-DEBUG_DIR = os.path.join(BASE_DIR, "debug_records")
-os.makedirs(DEBUG_DIR, exist_ok=True)
 
 
 def _is_daangn_manager_page(page):

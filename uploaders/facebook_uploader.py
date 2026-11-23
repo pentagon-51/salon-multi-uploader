@@ -1,6 +1,10 @@
 import os
 import re
+import sys
 import time
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 from difflib import SequenceMatcher
 from playwright.sync_api import sync_playwright
 from os_utils import (
@@ -25,8 +29,6 @@ from os_utils import (
 
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("facebook_cookies.json")
-DEBUG_DIR = os.path.join(BASE_DIR, "debug_records")
-os.makedirs(DEBUG_DIR, exist_ok=True)
 nl = chr(10)
 
 

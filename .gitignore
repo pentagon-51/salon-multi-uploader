@@ -1,4 +1,5 @@
 auth_data/
+dev_tools/
 blackbox_login/
 blackbox_upload/
 blackbox/
@@ -19,6 +20,7 @@ _old_backup/
 *.log
 *.png
 !favicon.png
+!assets/favicon.png
 salon_uploader_icon.png
 __pycache__/
 .DS_Store

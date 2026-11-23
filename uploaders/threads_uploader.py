@@ -1,4 +1,7 @@
-import os, re, json, time, shutil
+import os, re, sys, json, time, shutil
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 from playwright.sync_api import sync_playwright
 from os_utils import (
     MOD_KEY,
@@ -23,8 +26,6 @@ from os_utils import (
 
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("threads_cookies.json")
-DEBUG_DIR = os.path.join(BASE_DIR, "debug_records")
-os.makedirs(DEBUG_DIR, exist_ok=True)
 nl = chr(10)
 
 def is_threads_logged_in(page):

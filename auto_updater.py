@@ -70,6 +70,7 @@ PROTECTED_EXACT_NAMES = {
 }
 PROTECTED_DIRS = {
     "auth_data",
+    "dev_tools",
     "chrome_profile",
     "browser_profile",
     "user_data",
@@ -243,7 +244,8 @@ def refresh_windows_desktop_shortcut(dest_base):
         "$s.TargetPath = Join-Path $d '1-2. 윈도우 프로그램 실행.bat'; "
         "$s.WorkingDirectory = $d; "
         "$s.Description = '미용실 멀티업로더'; "
-        "$ico = Join-Path $d 'salon_uploader.ico'; "
+        "$ico = Join-Path $d 'assets\\salon_uploader.ico'; "
+        "if (-not (Test-Path $ico)) { $ico = Join-Path $d 'salon_uploader.ico' }; "
         "if (Test-Path $ico) { $s.IconLocation = $ico + ',0' }; "
         "$s.Save() "
         "}"
@@ -382,6 +384,26 @@ def apply_public_update(branch="main", report=None, target_dir=None, timeout=30)
                     updated_count += 1
             except PermissionError:
                 continue
+
+        # 하위 폴더(uploaders/, assets/)로 이관된 구 루트 파일 자동 정리 (동일 파일이 새 폴더에 존재할 때만)
+        for rel_path, _ in extracted_files:
+            norm_rel = rel_path.replace("\\", "/")
+            if norm_rel.startswith("uploaders/") and norm_rel.endswith("_uploader.py"):
+                legacy_root = os.path.join(dest_base, os.path.basename(norm_rel))
+                new_sub = os.path.join(dest_base, *norm_rel.split("/"))
+                if os.path.isfile(new_sub) and os.path.isfile(legacy_root):
+                    try:
+                        os.remove(legacy_root)
+                    except Exception:
+                        pass
+            elif norm_rel in ("assets/favicon.png", "assets/salon_uploader.ico"):
+                legacy_root = os.path.join(dest_base, os.path.basename(norm_rel))
+                new_sub = os.path.join(dest_base, *norm_rel.split("/"))
+                if os.path.isfile(new_sub) and os.path.isfile(legacy_root):
+                    try:
+                        os.remove(legacy_root)
+                    except Exception:
+                        pass
 
         refresh_windows_desktop_shortcut(dest_base)
 

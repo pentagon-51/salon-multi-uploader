@@ -1,4 +1,7 @@
-import os, re, time, shutil
+import os, re, sys, time, shutil
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 from playwright.sync_api import sync_playwright
 from os_utils import (
     MOD_KEY,
@@ -15,14 +18,13 @@ from os_utils import (
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
+    auto_extract_and_save_profile_id,
     load_profile,
     get_region_tags,
     get_effective_banned_tags,
 )
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("x_cookies.json")
-DEBUG_DIR = os.path.join(BASE_DIR, "debug_records")
-os.makedirs(DEBUG_DIR, exist_ok=True)
 nl = chr(10)
 
 def truncate_clean_text(text, max_len):
@@ -129,6 +131,13 @@ def upload_to_x(body="", tags=None, video_path=None, login_only=False, stop_chec
                     stop_checker=stop_checker,
                 )
                 save_storage_state_safely(context, COOKIES_PATH, "엑스(X)")
+
+            try:
+                new_x = auto_extract_and_save_profile_id(page, "x")
+                if new_x:
+                    print(f"🔗 [프로필 자동 연동] 엑스(X) 아이디(@{new_x}) 자동 저장 완료!", flush=True)
+            except Exception:
+                pass
 
             if login_only:
                 save_storage_state_safely(context, COOKIES_PATH, "엑스(X)")

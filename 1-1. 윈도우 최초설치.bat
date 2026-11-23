@@ -32,14 +32,16 @@ if not exist "%~dp0.installed_done" (
     del /f /q "%~dp0check_personal_leak.py" >nul 2>&1
     del /f /q "%~dp0total_code*.txt" >nul 2>&1
     del /f /q "%~dp0export_error.log" >nul 2>&1
-    for %%D in (auth_data blackbox_login blackbox_upload upload done debug_records temp_thumbs) do (
+    for %%D in (auth_data blackbox upload done temp_thumbs) do (
         if exist "%~dp0%%D" (
             rmdir /s /q "%~dp0%%D" >nul 2>&1
             mkdir "%~dp0%%D" >nul 2>&1
         )
     )
-    if exist "%~dp0blackbox" (
-        rmdir /s /q "%~dp0blackbox" >nul 2>&1
+    for %%D in (blackbox_login blackbox_upload debug_records dev_tools) do (
+        if exist "%~dp0%%D" (
+            rmdir /s /q "%~dp0%%D" >nul 2>&1
+        )
     )
     if exist "%~dp0_old_backup" (
         attrib -h -r -s /s /d "%~dp0_old_backup\*.*" >nul 2>&1
@@ -122,7 +124,7 @@ if errorlevel 1 goto :INSTALL_FAIL
 echo.
 echo [5/5] 바탕화면 바로가기 생성 및 폴더 정리 중...
 set "SNS_DIR=%~dp0"
-powershell -NoProfile -Command "$d = $env:SNS_DIR.TrimEnd('\'); $desk = [Environment]::GetFolderPath('Desktop'); foreach($old in @('플랜에이치 업로더.lnk','플랜에이치 마곡나루역점 업로더.lnk','헤어살롱 SNS 업로더.lnk')) { $p = Join-Path $desk $old; if (Test-Path $p) { Remove-Item -Force $p -ErrorAction SilentlyContinue } }; $ws = New-Object -ComObject WScript.Shell; $lnk = Join-Path $desk '미용실 멀티업로더.lnk'; $s = $ws.CreateShortcut($lnk); $s.TargetPath = Join-Path $d '1-2. 윈도우 프로그램 실행.bat'; $s.WorkingDirectory = $d; $s.Description = '미용실 멀티업로더'; $ico = Join-Path $d 'salon_uploader.ico'; if (Test-Path $ico) { $s.IconLocation = $ico + ',0' } else { $s.IconLocation = (Join-Path $env:SystemRoot 'System32\shell32.dll') + ',220' }; $s.Save()" >nul 2>&1
+powershell -NoProfile -Command "$d = $env:SNS_DIR.TrimEnd('\'); $desk = [Environment]::GetFolderPath('Desktop'); foreach($old in @('플랜에이치 업로더.lnk','플랜에이치 마곡나루역점 업로더.lnk','헤어살롱 SNS 업로더.lnk')) { $p = Join-Path $desk $old; if (Test-Path $p) { Remove-Item -Force $p -ErrorAction SilentlyContinue } }; $ws = New-Object -ComObject WScript.Shell; $lnk = Join-Path $desk '미용실 멀티업로더.lnk'; $s = $ws.CreateShortcut($lnk); $s.TargetPath = Join-Path $d '1-2. 윈도우 프로그램 실행.bat'; $s.WorkingDirectory = $d; $s.Description = '미용실 멀티업로더'; $ico = Join-Path $d 'assets\salon_uploader.ico'; if (-not (Test-Path $ico)) { $ico = Join-Path $d 'salon_uploader.ico' }; if (Test-Path $ico) { $s.IconLocation = $ico + ',0' } else { $s.IconLocation = (Join-Path $env:SystemRoot 'System32\shell32.dll') + ',220' }; $s.Save()" >nul 2>&1
 
 echo installed > "%~dp0.installed_done"
 if not exist "%~dp0_설치완료_보관함" mkdir "%~dp0_설치완료_보관함"

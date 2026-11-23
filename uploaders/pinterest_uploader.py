@@ -1,4 +1,7 @@
-import os, time, shutil
+import os, sys, time, shutil
+_ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT_DIR not in sys.path:
+    sys.path.insert(0, _ROOT_DIR)
 from playwright.sync_api import sync_playwright
 from os_utils import (
     MOD_KEY,
@@ -24,8 +27,6 @@ from os_utils import (
 
 BASE_DIR = get_base_dir()
 COOKIES_PATH = get_auth_file("pinterest_cookies.json")
-DEBUG_DIR = os.path.join(BASE_DIR, "debug_records")
-os.makedirs(DEBUG_DIR, exist_ok=True)
 
 def is_pinterest_logged_in(page):
     """핀터레스트 로그인 폼·모달·로그인 버튼이 없고 실제 로그인된 상태인지 엄격히 판별"""

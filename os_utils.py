@@ -458,25 +458,36 @@ def sync_cookies_from_persistent_context(context, verified_platforms=None, check
     return synced
 
 
-def get_blackbox_login_dir():
-    """로그인 점검·수동 로그인 전용 블랙박스 폴더(blackbox_login/) 경로 반환 및 자동 생성"""
-    path = os.path.join(get_base_dir(), "blackbox_login")
+def get_blackbox_dir(mode="upload"):
+    """통합 블랙박스·진단 폴더(blackbox/) 경로 반환 및 자동 생성"""
+    path = os.path.join(get_base_dir(), "blackbox")
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def get_blackbox_login_dir():
+    """기존 호환 래퍼: 통합 blackbox/ 폴더 경로 반환 (로그인 창은 보안상 녹화 제외)"""
+    return get_blackbox_dir("login")
 
 
 def get_blackbox_upload_dir():
-    """실제 업로드 전용 블랙박스 폴더(blackbox_upload/) 경로 반환 및 자동 생성"""
-    path = os.path.join(get_base_dir(), "blackbox_upload")
-    os.makedirs(path, exist_ok=True)
-    return path
+    """기존 호환 래퍼: 통합 blackbox/ 폴더 경로 반환"""
+    return get_blackbox_dir("upload")
 
 
-def get_blackbox_dir(mode="upload"):
-    """mode('login' | 'upload')에 따른 블랙박스 폴더 경로 반환 및 자동 생성"""
-    if str(mode or "upload").strip().lower() == "login":
-        return get_blackbox_login_dir()
-    return get_blackbox_upload_dir()
+def format_blackbox_filename(kind="upload", ext="mp4", dt=None, is_report=False):
+    """영문 작업명 + _(HHMM-MMDD) 통일 파일명 생성.
+    - 영상: upload_(0959-1123).mp4 / test_(0959-1123).mp4
+    - 리포트: report_login_(0959-1123).md / report_upload_(0959-1123).md / report_test_(0959-1123).md
+    - 스샷/로그: login_(0959-1123).png / upload_(0959-1123).png / test_(0959-1123).png"""
+    ts = (dt if isinstance(dt, datetime.datetime) else datetime.datetime.now()).strftime("%H%M-%m%d")
+    kind_norm = str(kind or "upload").strip().lower()
+    if kind_norm not in ("login", "upload", "test"):
+        kind_norm = "upload"
+    if is_report:
+        return f"report_{kind_norm}_({ts}).md"
+    clean_ext = str(ext or "mp4").strip().lstrip(".").lower() or "mp4"
+    return f"{kind_norm}_({ts}).{clean_ext}"
 
 
 def migrate_legacy_auth_files():
@@ -538,19 +549,22 @@ def _resolve_blackbox_mode(mode=None, login_only=False):
 
 
 def get_blackbox_path(platform_name, mode=None, login_only=False):
-    """mode('login' | 'upload')에 따라 blackbox_login/ 또는 blackbox_upload/ 저장 경로 반환"""
+    """통합 blackbox/ 저장 경로 반환 (보안상 로그인 모드는 녹화 제외)"""
     resolved_mode = _resolve_blackbox_mode(mode=mode, login_only=login_only)
     if resolved_mode == "login":
-        return os.path.join(get_blackbox_login_dir(), f"블랙박스_{platform_name}_로그인.webm")
-    return os.path.join(get_blackbox_upload_dir(), f"블랙박스_{platform_name}.webm")
+        return ""
+    return os.path.join(get_blackbox_dir(), format_blackbox_filename("upload", "webm"))
 
 
 def create_blackbox_record_dir(platform_name, mode=None, login_only=False):
-    """실행 단위 블랙박스 임시 녹화 폴더(debug_records/_rec_<플랫폼>_<login|upload>_<ts>) 생성"""
-    debug_dir = os.path.join(get_base_dir(), "debug_records")
-    os.makedirs(debug_dir, exist_ok=True)
+    """실행 단위 블랙박스 임시 녹화 폴더(blackbox/_tmp/_rec_<플랫폼>_upload_<ts>) 생성.
+    보안상 로그인 모드(login_only=True / mode='login')는 녹화하지 않고 None 반환."""
     resolved_mode = _resolve_blackbox_mode(mode=mode, login_only=login_only)
-    rec_dir = os.path.join(debug_dir, f"_rec_{platform_name}_{resolved_mode}_{int(time.time() * 1000)}")
+    if resolved_mode == "login":
+        return None
+    tmp_root = os.path.join(get_blackbox_dir(), "_tmp")
+    os.makedirs(tmp_root, exist_ok=True)
+    rec_dir = os.path.join(tmp_root, f"_rec_{platform_name}_{resolved_mode}_{int(time.time() * 1000)}")
     os.makedirs(rec_dir, exist_ok=True)
     return rec_dir
 
@@ -961,7 +975,7 @@ def capture_page_diagnostics(page):
 
 def attach_diagnostics_tracker(context, platform_name=""):
     """컨텍스트의 페이지 이동/로드 시점에 최신 URL과 표시 버튼 목록을 스레드 안전하게 캐시
-    (강제 건너뛰기·브라우저 급종료 시에도 직전 페이지 URL/버튼 정보를 blackbox_upload/report.md에 보존)"""
+    (강제 건너뛰기·브라우저 급종료 시에도 직전 페이지 URL/버튼 정보를 blackbox/report_*.md에 보존)"""
     if context is None:
         return
 
@@ -1280,30 +1294,46 @@ def _next_test_blackbox_path(platform_name):
         return os.path.join(_TEST_BLACKBOX_DIR, f"{_TEST_BLACKBOX_SEQ:02d}_{safe_name}.webm")
 
 
-def prune_blackbox_upload_dir(max_keep=3):
-    """내부 blackbox_upload/ 폴더의 영상 파일(.mp4, .webm, .mov)만 최신 max_keep(기본 3개) 유지하고
-    오래된 영상부터 자동 삭제 (report.md 등 리포트 파일은 절대 삭제하지 않음)"""
-    upload_bb_dir = get_blackbox_upload_dir()
-    if not os.path.isdir(upload_bb_dir):
+def prune_blackbox_dir(max_keep=3):
+    """통합 blackbox/ 폴더 내부 파일을 유형별(영상·리포트·스샷·로그) 최신 max_keep(기본 3개)만 자동 유지하고
+    오래된 파일부터 자동 삭제"""
+    bb_dir = get_blackbox_dir()
+    if not os.path.isdir(bb_dir):
         return []
-    video_exts = (".mp4", ".webm", ".mov")
-    vids = []
-    for fn in os.listdir(upload_bb_dir):
-        fp = os.path.join(upload_bb_dir, fn)
-        if os.path.isfile(fp) and fn.lower().endswith(video_exts):
+    category_exts = {
+        "video": (".mp4", ".webm", ".mov"),
+        "report": (".md",),
+        "image": (".png", ".jpg", ".jpeg"),
+        "log": (".log", ".txt"),
+    }
+    buckets = {k: [] for k in category_exts}
+    for fn in os.listdir(bb_dir):
+        fp = os.path.join(bb_dir, fn)
+        if not os.path.isfile(fp):
+            continue
+        low = fn.lower()
+        for cat, exts in category_exts.items():
+            if low.endswith(exts):
+                try:
+                    buckets[cat].append((os.path.getmtime(fp), fn, fp))
+                except Exception:
+                    pass
+                break
+    removed = []
+    for _, items in buckets.items():
+        items.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        for _, _, old_fp in items[max_keep:]:
             try:
-                vids.append((os.path.getmtime(fp), fn, fp))
+                os.remove(old_fp)
+                removed.append(os.path.basename(old_fp))
             except Exception:
                 pass
-    vids.sort(key=lambda x: (x[0], x[1]), reverse=True)
-    removed = []
-    for _, _, old_fp in vids[max_keep:]:
-        try:
-            os.remove(old_fp)
-            removed.append(os.path.basename(old_fp))
-        except Exception:
-            pass
     return removed
+
+
+def prune_blackbox_upload_dir(max_keep=3):
+    """기존 호환 래퍼: 통합 blackbox/ 폴더 유형별 최신 max_keep개 자동 유지"""
+    return prune_blackbox_dir(max_keep=max_keep)
 
 
 def finalize_playwright_session(
@@ -1319,14 +1349,15 @@ def finalize_playwright_session(
 ):
     """finally 블록 공용 정리기:
     1) 종료 직전 진단 스냅샷(URL/버튼) 확보 및 최신 영구 프로필 쿠키를 auth_data/로 동기화
-    2) video 경로 선확보
+    2) 보안상 로그인 모드는 녹화 저장 제외
     3) page -> context -> browser(선택) 안전 종료(녹화 파일 flush)
-    4) 테스트 모드면 임시 세션 폴더로, 일반 업로드면 blackbox_upload/(최신 3개 유지)로 안전 이동"""
+    4) 업로드·테스트 녹화 클립을 임시 세션 폴더 또는 blackbox/(유형별 최신 3개 유지)로 안전 이동"""
     label = platform_label or platform_name
     resolved_mode = _resolve_blackbox_mode(mode=mode, login_only=login_only)
-    test_target = _next_test_blackbox_path(platform_name) if resolved_mode == "upload" and get_test_blackbox_dir() else ""
-    target_path = test_target or get_blackbox_path(platform_name, mode=resolved_mode)
-    rel_target = os.path.relpath(target_path, get_base_dir()).replace("\\", "/")
+    is_login_mode = resolved_mode == "login"
+    test_target = _next_test_blackbox_path(platform_name) if (not is_login_mode and get_test_blackbox_dir()) else ""
+    target_path = "" if is_login_mode else (test_target or get_blackbox_path(platform_name, mode=resolved_mode))
+    rel_target = os.path.relpath(target_path, get_base_dir()).replace("\\", "/") if target_path else ""
 
     # 페이지가 아직 열려 있다면 닫기 직전 URL·버튼 진단 스냅샷 최신화
     try:
@@ -1343,14 +1374,15 @@ def finalize_playwright_session(
         pass
 
     vp = None
-    try:
-        v_ref = video_obj
-        if v_ref is None and page is not None:
-            v_ref = page.video
-        if v_ref is not None:
-            vp = v_ref.path()
-    except Exception:
-        vp = None
+    if not is_login_mode:
+        try:
+            v_ref = video_obj
+            if v_ref is None and page is not None:
+                v_ref = page.video
+            if v_ref is not None:
+                vp = v_ref.path()
+        except Exception:
+            vp = None
 
     # page -> context 순서로 닫아야 Playwright가 .webm 트레일러를 정상 기록하고 파일을 닫음
     try:
@@ -1368,6 +1400,14 @@ def finalize_playwright_session(
             browser.close()
     except Exception:
         pass
+
+    if is_login_mode:
+        if record_dir and os.path.isdir(record_dir):
+            try:
+                shutil.rmtree(record_dir, ignore_errors=True)
+            except Exception:
+                pass
+        return None
 
     # 녹화 파일 flush 및 OS 파일 잠금 해제 대기 (최대 약 1.8초)
     src_video = None
@@ -1397,7 +1437,7 @@ def finalize_playwright_session(
         time.sleep(0.15)
 
     saved_path = None
-    if src_video and os.path.isfile(src_video) and os.path.getsize(src_video) > 0:
+    if target_path and src_video and os.path.isfile(src_video) and os.path.getsize(src_video) > 0:
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
         for _ in range(4):
             try:
@@ -1427,8 +1467,7 @@ def finalize_playwright_session(
             kind_label = "테스트 모드" if get_blackbox_session_kind() == "test" else "업로드 세션"
             print(f"🎥 [{label}] {kind_label} 녹화 클립 확보 완료", flush=True)
         else:
-            if resolved_mode == "upload":
-                prune_blackbox_upload_dir(max_keep=3)
+            prune_blackbox_dir(max_keep=3)
             print(f"🎥 [{label}] 블랙박스 녹화 저장 완료: {rel_target}", flush=True)
     else:
         print(f"ℹ️ [{label}] 블랙박스 녹화 파일 미생성 (예정 경로: {rel_target})", flush=True)
@@ -1545,6 +1584,160 @@ def extract_x_id(raw):
     if "@" in s:
         s = s.split("@", 1)[0].strip()
     return s
+
+
+_IG_RESERVED_PATHS = {
+    "accounts", "explore", "direct", "reels", "reel", "p", "stories", "tv",
+    "login", "logout", "signup", "about", "legal", "developer", "developers",
+    "emails", "challenge", "session", "api", "create", "notifications",
+    "search", "messages", "home", "web", "lite", "meta", "threads", "nametag",
+}
+_X_RESERVED_PATHS = {
+    "home", "explore", "notifications", "messages", "i", "compose", "settings",
+    "search", "login", "logout", "signup", "tos", "privacy", "bookmarks",
+    "lists", "communities", "premium", "jobs", "grok", "verified-choose", "intent",
+}
+
+
+def extract_instagram_username_from_page(page):
+    """로그인된 인스타그램 화면의 좌측 [프로필] 링크(href)에서 username 자동 추출"""
+    if page is None:
+        return ""
+    try:
+        if page.is_closed():
+            return ""
+        cur_u = (page.url or "").lower()
+    except Exception:
+        return ""
+    if "instagram.com" not in cur_u or any(k in cur_u for k in ("/accounts/login", "two_factor", "/challenge/")):
+        return ""
+    try:
+        if is_any_locator_visible(page, 'input[name="username"], input[name="password"]'):
+            return ""
+    except Exception:
+        pass
+
+    try:
+        hrefs = page.evaluate(
+            """() => {
+                const out = [];
+                const pushHref = (a) => {
+                    if (!a) return;
+                    const h = (a.getAttribute('href') || '').trim();
+                    if (h && h.startsWith('/')) out.push(h);
+                };
+                const scopes = [
+                    ...document.querySelectorAll('nav a[href], div[role="navigation"] a[href], aside a[href]'),
+                    ...document.querySelectorAll('a[href]')
+                ];
+                const seen = new Set();
+                for (const a of scopes) {
+                    if (seen.has(a)) continue;
+                    seen.add(a);
+                    const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    const aria = (a.getAttribute('aria-label') || '').trim().toLowerCase();
+                    const hasProfileText = (txt === '프로필' || txt === 'profile' || aria === '프로필' || aria === 'profile');
+                    const img = a.querySelector('img[alt]');
+                    const imgAlt = img ? (img.getAttribute('alt') || '').toLowerCase() : '';
+                    const hasProfileImg = imgAlt.includes('프로필 사진') || imgAlt.includes('profile picture');
+                    if (hasProfileText || hasProfileImg) {
+                        pushHref(a);
+                    }
+                }
+                return out;
+            }"""
+        )
+    except Exception:
+        hrefs = []
+
+    for h in (hrefs or []):
+        m = re.match(r"^/([A-Za-z0-9._]{1,30})/?(?:[?#].*)?$", str(h or "").strip())
+        if not m:
+            continue
+        cand = m.group(1).strip()
+        if cand.lower() in _IG_RESERVED_PATHS:
+            continue
+        cleaned = extract_instagram_id(cand)
+        if cleaned and cleaned.lower() not in _IG_RESERVED_PATHS:
+            return cleaned
+    return ""
+
+
+def extract_x_username_from_page(page):
+    """로그인된 엑스(X) 화면의 좌측 [프로필] 링크(href)에서 username 자동 추출"""
+    if page is None:
+        return ""
+    try:
+        if page.is_closed():
+            return ""
+        cur_u = (page.url or "").lower()
+    except Exception:
+        return ""
+    if ("x.com" not in cur_u and "twitter.com" not in cur_u) or any(k in cur_u for k in ("/i/flow", "/login", "/logout", "/signup")):
+        return ""
+
+    try:
+        hrefs = page.evaluate(
+            """() => {
+                const out = [];
+                const pushHref = (a) => {
+                    if (!a) return;
+                    const h = (a.getAttribute('href') || '').trim();
+                    if (h && h.startsWith('/')) out.push(h);
+                };
+                // 1순위: X 공식 좌측 네비게이션 프로필 링크
+                const primary = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
+                pushHref(primary);
+                // 2순위: aria-label 또는 텍스트가 '프로필' / 'Profile'인 nav/header 링크
+                const cands = document.querySelectorAll('nav a[href], header a[href]');
+                for (const a of cands) {
+                    const aria = (a.getAttribute('aria-label') || '').trim().toLowerCase();
+                    const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+                    if (aria === '프로필' || aria === 'profile' || txt === '프로필' || txt === 'profile') {
+                        pushHref(a);
+                    }
+                }
+                return out;
+            }"""
+        )
+    except Exception:
+        hrefs = []
+
+    for h in (hrefs or []):
+        m = re.match(r"^/([A-Za-z0-9_]{1,20})/?(?:[?#].*)?$", str(h or "").strip())
+        if not m:
+            continue
+        cand = m.group(1).strip()
+        if cand.lower() in _X_RESERVED_PATHS:
+            continue
+        cleaned = extract_x_id(cand)
+        if cleaned and cleaned.lower() not in _X_RESERVED_PATHS:
+            return cleaned
+    return ""
+
+
+def auto_extract_and_save_profile_id(page, platform):
+    """로그인된 인스타/엑스 페이지에서 좌측 [프로필] 링크 username을 추출해 user_profile.json에 자동 저장.
+    새로 저장(또는 갱신)된 경우 추출된 username 문자열 반환, 변동 없으면 '' 반환."""
+    plat = str(platform or "").strip().lower()
+    if plat in ("ig", "instagram", "threads"):
+        username = extract_instagram_username_from_page(page)
+        field_key = "instagram_id"
+    elif plat in ("x", "twitter"):
+        username = extract_x_username_from_page(page)
+        field_key = "x_id"
+    else:
+        return ""
+    if not username:
+        return ""
+    try:
+        prof = load_profile()
+        if str(prof.get(field_key) or "").strip() == username:
+            return ""
+        save_profile({field_key: username}, is_draft=True)
+        return username
+    except Exception:
+        return ""
 
 
 def _clean_blog_categories(raw_cats):
