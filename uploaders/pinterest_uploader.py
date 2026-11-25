@@ -15,6 +15,7 @@ from os_utils import (
     wait_for_manual_login,
     wait_for_test_mode_close,
     finalize_playwright_session,
+    open_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
@@ -45,6 +46,122 @@ def is_pinterest_logged_in(page):
     return "pin-creation-tool" in url or "pin-builder" in url
 
 
+def _select_pinterest_tagged_topics(page, tag_list, max_topics=5):
+    """핀터레스트 하단 [태그된 주제](태그 검색) 입력창에서 스타일 키워드·범용 헤어 주제를 자동 선택 (최대 3~5개)"""
+    try:
+        page.evaluate("window.scrollBy(0, 450)")
+        time.sleep(0.7)
+
+        input_sels = [
+            'input[placeholder*="태그 검색"]',
+            'input[placeholder*="Search for a tag" i]',
+            '[data-test-id*="tag"] input',
+            'input[aria-label*="태그"]',
+            'input[aria-label*="tag" i]',
+        ]
+        tag_input = None
+        for isel in input_sels:
+            try:
+                cand = page.locator(isel).first
+                if cand.count() > 0 and cand.is_visible(timeout=1200):
+                    tag_input = cand
+                    break
+            except Exception:
+                pass
+
+        if tag_input is None:
+            print("ℹ️ [핀터레스트] [태그된 주제] 입력창을 찾지 못해 주제 선택을 건너뜁니다.", flush=True)
+            return 0
+
+        region_suffixes = ("미용실", "헤어샵", "헤어살롱")
+        primary_kws = []
+        seen_kw = set()
+        for raw in (tag_list or []):
+            kw = str(raw or "").replace("#", "").strip()
+            if not kw or kw.endswith(region_suffixes):
+                continue
+            low = kw.lower()
+            if low not in seen_kw:
+                seen_kw.add(low)
+                primary_kws.append(kw)
+
+        fallback_kws = []
+        for fb in ("헤어스타일", "단발", "헤어", "미용실"):
+            if fb.lower() not in seen_kw:
+                seen_kw.add(fb.lower())
+                fallback_kws.append(fb)
+
+        option_sels = [
+            '[role="listbox"] [role="option"]',
+            'div[role="option"]',
+            'li[role="option"]',
+            '[data-test-id*="tag"] [role="button"]',
+        ]
+        selected_count = 0
+        picked_texts = set()
+
+        def _try_pick_keyword(kw):
+            nonlocal selected_count
+            try:
+                tag_input.scroll_into_view_if_needed()
+                tag_input.click(force=True)
+                time.sleep(0.25)
+                page.keyboard.press(f"{MOD_KEY}+a")
+                page.keyboard.press("Backspace")
+                tag_input.fill(kw)
+                time.sleep(1.1)
+
+                for osel in option_sels:
+                    loc = page.locator(osel)
+                    cnt = min(loc.count(), 8)
+                    for i in range(cnt):
+                        opt = loc.nth(i)
+                        if not opt.is_visible(timeout=350):
+                            continue
+                        txt = (opt.inner_text() or "").strip()
+                        if not txt or len(txt) > 50:
+                            continue
+                        if txt.lower() in picked_texts:
+                            continue
+                        if any(skip in txt for skip in ("닫기", "삭제", "지우기", "Close", "Remove", "Clear")):
+                            continue
+                        opt.scroll_into_view_if_needed()
+                        opt.click(force=True)
+                        picked_texts.add(txt.lower())
+                        selected_count += 1
+                        time.sleep(0.55)
+                        return True
+            except Exception:
+                pass
+            return False
+
+        for kw in primary_kws:
+            if selected_count >= max_topics:
+                break
+            _try_pick_keyword(kw)
+
+        if selected_count < 3:
+            for kw in fallback_kws:
+                if selected_count >= max_topics:
+                    break
+                _try_pick_keyword(kw)
+
+        try:
+            tag_input.fill("")
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+
+        if selected_count > 0:
+            print(f"🏷️ [핀터레스트] 태그된 주제 {selected_count}개 자동 선택 완료!", flush=True)
+        else:
+            print("ℹ️ [핀터레스트] 태그된 주제 자동완성 후보가 없어 건너뛰고 발행 단계로 진행합니다.", flush=True)
+        return selected_count
+    except Exception as e:
+        print(f"ℹ️ [핀터레스트] 태그된 주제 선택 건너뜀({e}) — 발행 단계를 계속 진행합니다.", flush=True)
+        return 0
+
+
 def upload_to_pinterest(title="", description="", tags=None, video_path=None, link=None, board_name=None, board_id="", login_only=False, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [핀터레스트] 업로드할 영상 파일을 찾을 수 없습니다:", video_path, flush=True)
@@ -67,7 +184,7 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
     page = None
     video_obj = None
 
-    with sync_playwright() as p:
+    with open_playwright_session() as p:
         try:
             context = launch_persistent_chromium(
                 p,
@@ -166,6 +283,8 @@ def upload_to_pinterest(title="", description="", tags=None, video_path=None, li
                         if first_board.count() > 0: first_board.click()
                     time.sleep(1.0)
             except Exception: pass
+
+            _select_pinterest_tagged_topics(page, tag_list)
 
             publish_btn = page.locator('[data-test-id="board-dropdown-save-button"], button:has-text("발행"), button:has-text("게시"), button:has-text("Publish")').last
             if publish_btn.count() > 0:

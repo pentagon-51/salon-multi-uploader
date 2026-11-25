@@ -53,24 +53,25 @@
   .btn-tool-primary:hover { background: #dbeafe; border-color: #93c5fd; color: var(--accent-blue-hover); }
 
   .section-title { font-size: 14px; font-weight: 700; color: var(--ink-strong); margin-bottom: 8px; margin-top: 0; display: flex; align-items: center; justify-content: space-between; letter-spacing: -0.01em; }
-  .top-workspace { display: grid; grid-template-columns: minmax(560px, 1.55fr) minmax(300px, 1fr); gap: 14px; align-items: stretch; }
+  .top-workspace { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr); gap: 14px; align-items: stretch; }
   .left-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-  .right-col { display: flex; flex-direction: column; min-width: 0; }
+  .right-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 
   .drop-zone { border: 1.5px dashed #9ca3af; border-radius: 10px; padding: 14px 12px; text-align: center; background: #fff; cursor: pointer; position: relative; transition: all 0.18s; }
   .drop-zone:hover { border-color: var(--accent-blue); background: var(--accent-blue-soft); }
   .drop-zone input[type="file"] { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; cursor: pointer; z-index: 10; }
 
-  .platforms-container { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-  .platform-box { border: 1px solid var(--border-soft); border-radius: 8px; padding: 7px 8px; background: #fff; display: flex; justify-content: space-between; align-items: center; gap: 5px; min-width: 0; box-sizing: border-box; transition: background 0.15s, border-color 0.15s; }
+  .platforms-container { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .platform-box { border: 1px solid var(--border-soft); border-radius: 8px; padding: 7px 9px; background: #fff; display: flex; justify-content: space-between; align-items: center; gap: 4px; min-width: 0; box-sizing: border-box; transition: background 0.15s, border-color 0.15s; }
   .platform-box.is-uploaded { background: var(--surface-info); border-color: #d1d5db; }
   .platform-label { display: flex; align-items: center; gap: 5px; font-weight: 600; font-size: 12.5px; color: var(--ink-strong); cursor: pointer; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .platform-label input[type="checkbox"] { margin: 0; flex-shrink: 0; accent-color: var(--accent-blue); }
   .platform-name { overflow: hidden; text-overflow: ellipsis; }
   .platform-box.is-uploaded .platform-name { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--ink-subtle); }
-  .platform-done-badge { display: none; align-items: center; padding: 1px 6px; border-radius: 99px; background: var(--accent-blue-soft); color: var(--accent-blue); border: 1px solid #bfdbfe; font-size: 10px; font-weight: 700; line-height: 1.25; flex-shrink: 0; }
+  .platform-done-badge { display: none; align-items: center; padding: 1px 4px; border-radius: 99px; background: var(--accent-blue-soft); color: var(--accent-blue); border: 1px solid #bfdbfe; font-size: 9.5px; font-weight: 700; line-height: 1.25; flex-shrink: 0; }
   .platform-box.is-uploaded .platform-done-badge { display: inline-flex; }
-  .btn-shortcut { font-size: 11px; padding: 3px 7px; color: var(--ink-muted); background: #f3f4f6; border: 1px solid var(--border-soft); border-radius: 5px; font-weight: 600; text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+  .btn-shortcut { font-size: 10.5px; padding: 2.5px 6px; color: var(--ink-muted); background: #f3f4f6; border: 1px solid var(--border-soft); border-radius: 5px; font-weight: 600; text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: all 0.15s; }
+  .platform-box .btn-shortcut { padding: 2px 5px; font-size: 11px; line-height: 1.2; min-width: 20px; text-align: center; }
   .btn-shortcut:hover { background: var(--accent-blue-soft); color: var(--accent-blue); border-color: #bfdbfe; }
   @media (max-width: 1180px) {
     .top-workspace { grid-template-columns: 1fr; }
@@ -80,7 +81,32 @@
   textarea::placeholder, input[type="text"]::placeholder { color: #9ca3af; }
   textarea:focus, input[type="text"]:focus, select:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12); }
   textarea { resize: vertical; }
-  #sourceText { flex: 1; min-height: 175px; font-size: 13px; line-height: 1.6; }
+  #sourceText { width: 100%; min-height: 185px; font-size: 13px; line-height: 1.6; }
+  .ai-extract-box { background: var(--surface-info); border: 1px solid var(--border-soft); border-radius: 8px; padding: 8px 9px; }
+  .ai-extract-header { font-size: 11.5px; font-weight: 700; color: var(--ink-muted); display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .ai-extract-summary-right { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .ai-extract-summary-hint { font-size: 10.5px; font-weight: 500; color: var(--ink-subtle); }
+  .btn-ai-tip { padding: 1.5px 6px; font-size: 10.5px; font-weight: 700; color: var(--accent-blue); background: var(--accent-blue-soft); border: 1px solid #bfdbfe; border-radius: 5px; cursor: pointer; line-height: 1.35; transition: background 0.15s, border-color 0.15s; }
+  .btn-ai-tip:hover { background: #dbeafe; border-color: #93c5fd; }
+  .ai-tip-card { display: none; margin-top: 6px; padding: 7px 9px; background: #fff; border: 1px solid #bfdbfe; border-left: 3px solid var(--accent-blue); border-radius: 6px; font-size: 11px; line-height: 1.5; color: var(--ink-muted); }
+  .ai-tip-card .tip-line { margin: 0 0 2px 0; }
+  .ai-tip-card .tip-line:last-child { margin-bottom: 0; }
+  .ai-tip-card strong { color: var(--ink-strong); }
+  .ai-tip-card .tip-divider { border-top: 1px dashed var(--border-soft); margin: 4px 0; }
+  .ai-tip-card .tip-highlight { color: var(--accent-blue); font-weight: 700; }
+  .ai-video-type-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; padding: 4px 8px; background: #fff; border: 1px solid var(--border-soft); border-radius: 6px; font-size: 11px; }
+  .ai-video-type-title { font-weight: 700; color: var(--ink-strong); }
+  .ai-video-type-opt { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--ink-muted); cursor: pointer; }
+  .ai-video-type-opt input[type="radio"] { margin: 0; accent-color: var(--accent-blue); cursor: pointer; }
+  .ai-memo-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .ai-memo-field { display: flex; flex-direction: column; gap: 2px; }
+  .ai-memo-label { font-size: 11px; font-weight: 700; color: var(--ink-strong); line-height: 1.3; }
+  .ai-memo-textarea { width: 100%; padding: 5px 8px !important; font-size: 11.5px !important; line-height: 1.45 !important; min-height: 46px; resize: vertical; border-radius: 6px !important; background: #fff; }
+  .ai-extract-btn-row { display: flex; gap: 6px; margin-top: 6px; }
+  .btn-ai-extract { flex: 1; padding: 6px 8px; font-size: 12px; font-weight: 700; border-radius: 7px; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .btn-ai-gemini, .btn-ai-chatgpt { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+  .btn-ai-gemini:hover, .btn-ai-chatgpt:hover { background: #dbeafe; border-color: #93c5fd; }
+  .btn-ai-extract:disabled { opacity: 0.55; cursor: not-allowed; }
 
   .btn-submit { display: block; width: 100%; padding: 10px 14px; color: #fff; background: var(--accent-blue); border: none; border-radius: 8px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s, opacity 0.15s; }
   .btn-submit:hover { background: var(--accent-blue-hover); }
@@ -103,10 +129,13 @@
   /* 블로그 10장 추출 썸네일 갤러리 */
   .thumb-gallery-box { background: var(--surface-info); border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px; margin-top: 2px; }
   .thumb-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; color: var(--ink-strong); margin-bottom: 8px; flex-wrap: wrap; gap: 4px; }
-  .thumb-count-badge { background: var(--accent-blue); color: #fff; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
-  .thumb-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-  .thumb-grid.is-landscape { grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  .thumb-grid.is-square { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .thumb-count-badge { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+  .thumb-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .thumb-grid.is-landscape { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .thumb-grid.is-square { grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  @media (max-width: 780px) {
+    .thumb-grid, .thumb-grid.is-landscape, .thumb-grid.is-square { grid-template-columns: repeat(3, 1fr); }
+  }
   .thumb-item { position: relative; border-radius: 6px; overflow: hidden; border: 2px solid var(--accent-blue); aspect-ratio: 9 / 16; background: #111827; cursor: grab; transition: transform 0.15s, opacity 0.15s, border-color 0.15s; user-select: none; }
   .thumb-grid.is-landscape .thumb-item { aspect-ratio: var(--thumb-aspect, 16 / 9); }
   .thumb-grid.is-square .thumb-item { aspect-ratio: 1 / 1; }
@@ -116,6 +145,7 @@
   .thumb-item img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
   .thumb-item.disabled { border-color: #d1d5db; opacity: 0.35; filter: grayscale(100%); }
   .thumb-order { position: absolute; top: 4px; left: 4px; max-width: calc(100% - 28px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(37, 99, 235, 0.92); color: #fff; font-size: 9.5px; font-weight: 700; padding: 1.5px 5px; border-radius: 4px; pointer-events: none; line-height: 1.3; }
+  .thumb-order.is-rep { background: rgba(217, 119, 6, 0.95); }
   .thumb-order.is-gif { background: rgba(17, 24, 39, 0.92); }
   .thumb-item.disabled .thumb-order { background: rgba(107, 114, 128, 0.92); }
   .thumb-btn-x { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; border: none; background: rgba(17, 24, 39, 0.85); color: #fff; font-size: 11px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; z-index: 5; }
@@ -125,31 +155,42 @@
   .thumb-btn-move:hover { background: rgba(255, 255, 255, 0.25); }
   .thumb-orig-num { color: #e5e7eb; font-size: 9px; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; }
 
-  /* 인스타 방식 영상 드래그 캡처 & GIF 생성 스튜디오 */
-  .scrubber-studio-box { background: #fff; border: 1px solid var(--border-soft); border-radius: 8px; padding: 9px; margin-bottom: 8px; display: none; }
-  .scrubber-studio-header { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--ink-strong); }
-  .scrubber-orient-pill { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: #f3f4f6; padding: 1.5px 7px; border-radius: 99px; margin-left: 4px; }
-  .scrubber-studio-body { display: grid; grid-template-columns: 108px 1fr; gap: 8px; align-items: start; }
-  .scrubber-studio-box.is-landscape .scrubber-studio-body { grid-template-columns: 1fr; gap: 7px; }
-  .scrubber-studio-box.is-square .scrubber-studio-body { grid-template-columns: 144px 1fr; gap: 8px; }
-  .scrubber-video-wrap { position: relative; background: #111827; border-radius: 7px; overflow: hidden; aspect-ratio: 9 / 16; display: flex; align-items: center; justify-content: center; border: 1px solid #374151; }
-  .scrubber-studio-box.is-landscape .scrubber-video-wrap { aspect-ratio: var(--video-aspect, 16 / 9); width: 100%; max-height: 220px; margin: 0 auto; }
-  .scrubber-studio-box.is-square .scrubber-video-wrap { aspect-ratio: 1 / 1; }
-  .scrubber-video-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .scrubber-studio-box.is-landscape .scrubber-video-wrap video { object-fit: contain; }
-  .scrubber-time-pill { position: absolute; bottom: 4px; left: 4px; right: 4px; text-align: center; background: rgba(17, 24, 39, 0.82); color: #f9fafb; font-size: 10px; font-weight: 600; padding: 2px 3px; border-radius: 4px; font-family: inherit; font-variant-numeric: tabular-nums; }
-  .scrubber-controls { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-  .scrub-sub-card { background: var(--surface-info); border: 1px solid var(--border-soft); border-radius: 7px; padding: 7px 8px; display: flex; flex-direction: column; gap: 5px; }
+  /* 인스타 방식 영상 드래그 캡처 & GIF 생성 스튜디오 (상단 대형 플레이어 · 하단 도구 세로 배치) */
+  .scrubber-studio-box { background: #fff; border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px; margin-bottom: 8px; display: none; }
+  .scrubber-studio-header { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12px; font-weight: 700; color: var(--ink-strong); }
+  .scrubber-orient-pill { font-size: 11px; font-weight: 600; color: var(--ink-muted); background: #f3f4f6; padding: 2px 8px; border-radius: 99px; margin-left: 0; }
+  .scrubber-slot-pills { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .slot-pill-btn { padding: 3px 8px; font-size: 11px; font-weight: 700; border-radius: 99px; border: 1px solid var(--border-input); background: #fff; color: var(--ink-muted); cursor: pointer; line-height: 1.3; transition: all 0.15s; white-space: nowrap; }
+  .slot-pill-btn:hover { background: #f3f4f6; color: var(--ink-strong); border-color: #9ca3af; }
+  .slot-pill-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+  .scrubber-studio-body { display: flex; flex-direction: column; gap: 8px; }
+  .scrubber-video-stage { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 10px; display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
+  .scrubber-video-wrap { position: relative; background: #000; border-radius: 7px; overflow: hidden; width: 240px; max-width: 100%; max-height: 420px; aspect-ratio: 9 / 16; display: flex; align-items: center; justify-content: center; border: 1px solid #374151; margin: 0 auto; }
+  .scrubber-studio-box.is-landscape .scrubber-video-wrap { aspect-ratio: var(--video-aspect, 16 / 9); width: 100%; max-width: 560px; max-height: 320px; }
+  .scrubber-studio-box.is-square .scrubber-video-wrap { aspect-ratio: 1 / 1; width: 300px; max-width: 100%; max-height: 340px; }
+  .scrubber-video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; background: #000; }
+  .scrubber-time-pill { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); text-align: center; background: rgba(17, 24, 39, 0.85); color: #f9fafb; font-size: 11px; font-weight: 600; padding: 2.5px 9px; border-radius: 99px; font-family: inherit; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scrubber-controls { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .scrub-sub-card { background: var(--surface-info); border: 1px solid var(--border-soft); border-radius: 7px; padding: 6px 8px; display: flex; flex-direction: column; gap: 5px; }
   .scrub-sub-title { font-size: 11.5px; font-weight: 700; color: var(--ink-strong); display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .scrub-slider-row { display: flex; align-items: center; gap: 5px; }
-  .scrub-slider-row input[type="range"] { flex: 1; accent-color: var(--accent-blue); cursor: pointer; margin: 0; }
+  .scrub-slider-row { display: flex; align-items: center; gap: 4px; }
+  .scrub-slider-row input[type="range"] { flex: 1; accent-color: var(--accent-blue); cursor: pointer; margin: 0; min-width: 0; }
   .scrub-btn-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-  .btn-scrub-mini { padding: 4px 7px; font-size: 11px; font-weight: 600; border: 1px solid var(--border-input); background: #fff; color: var(--ink-muted); border-radius: 5px; cursor: pointer; white-space: nowrap; }
+  .scrub-gif-btn-row { display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; }
+  .scrub-gif-btn-row .btn-scrub-mini { padding: 3px 6px; font-size: 10.5px; }
+  .scrub-gif-btn-row .gif-speed-select { padding: 2.5px 5px !important; font-size: 10.5px !important; }
+  .btn-scrub-mini { padding: 3.5px 6.5px; font-size: 11px; font-weight: 600; border: 1px solid var(--border-input); background: #fff; color: var(--ink-muted); border-radius: 5px; cursor: pointer; white-space: nowrap; }
   .btn-scrub-mini:hover { background: #f3f4f6; color: var(--ink-strong); }
+  .btn-scrub-play { min-width: 28px; padding: 3.5px 7px; text-align: center; flex-shrink: 0; }
   .btn-scrub-primary { padding: 4px 9px; font-size: 11.5px; font-weight: 700; border: none; background: var(--accent-blue); color: #fff; border-radius: 5px; cursor: pointer; white-space: nowrap; }
   .btn-scrub-primary:hover { background: var(--accent-blue-hover); }
   .btn-scrub-gif { padding: 4px 9px; font-size: 11.5px; font-weight: 700; border: none; background: var(--ink-strong); color: #fff; border-radius: 5px; cursor: pointer; white-space: nowrap; }
   .btn-scrub-gif:hover { opacity: 0.9; }
+  .scrubber-action-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .scrubber-action-bar .btn-scrub-primary,
+  .scrubber-action-bar .btn-scrub-gif { width: 100%; padding: 7px 8px; font-size: 12px; font-weight: 700; border-radius: 6px; text-align: center; transition: opacity 0.15s, background 0.15s; }
+  .scrubber-action-bar .btn-scrub-primary:disabled,
+  .scrubber-action-bar .btn-scrub-gif:disabled { opacity: 0.42; cursor: not-allowed; }
   .gif-speed-select { width: auto !important; padding: 3px 6px !important; font-size: 11px !important; font-weight: 700; color: var(--ink-strong); background: #fff; border: 1px solid var(--border-input) !important; border-radius: 5px; cursor: pointer; }
   .gif-timeline-track { position: relative; height: 6px; background: #e5e7eb; border-radius: 99px; overflow: hidden; }
   .gif-timeline-fill { position: absolute; top: 0; bottom: 0; background: var(--accent-blue); border-radius: 99px; left: 0%; width: 20%; }
@@ -173,24 +214,12 @@
   .profile-hint { font-size: 12px; color: var(--ink-subtle); margin-top: 3px; display: block; line-height: 1.45; }
   .input-disabled { background: #f3f4f6 !important; color: var(--ink-muted) !important; cursor: not-allowed; }
 
-  /* 신호등 도트 & 1줄 슬림 통합 상태 바 (무료 한도 + 완료 파일 용량) */
+  /* 신호등 도트 & 1줄 슬림 일일 업로드 현황 바 */
   .status-dot { font-size: 10px; line-height: 1; cursor: help; display: inline-flex; align-items: center; }
-  .unified-status-bar { margin-top: 12px; background: var(--surface-info); border: 1px solid var(--border-soft); border-radius: 10px; overflow: hidden; }
-  .status-bar-main { padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .status-bar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; font-size: 12px; color: var(--ink-muted); font-weight: 600; }
-  .status-yt-text { color: var(--ink-strong); font-weight: 700; white-space: nowrap; }
-  .quota-progress-bg { width: 88px; height: 7px; background: #e5e7eb; border-radius: 99px; overflow: hidden; flex-shrink: 0; }
-  .quota-progress-fill { height: 100%; width: 0%; background: var(--accent-blue); border-radius: 99px; transition: width 0.3s ease, background 0.3s ease; }
-  .quota-progress-fill.warn { background: #dc2626; }
-  .status-bar-dot { color: #9ca3af; font-weight: 700; user-select: none; }
-  .status-storage-text { color: var(--ink-strong); font-weight: 600; white-space: nowrap; }
-  .status-bar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-  .btn-status-detail { background: #fff; color: var(--ink-muted); border: 1px solid var(--border-input); border-radius: 7px; padding: 4px 9px; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
+  .unified-status-bar { margin-top: 10px; background: var(--surface-info); border: 1px solid var(--border-soft); border-radius: 9px; padding: 7px 12px; }
+  .quota-slim-row { font-size: 11.5px; color: var(--ink-muted); font-weight: 600; line-height: 1.5; white-space: nowrap; overflow-x: auto; }
+  .btn-status-detail { background: #fff; color: var(--ink-muted); border: 1px solid var(--border-input); border-radius: 7px; padding: 5px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all 0.15s; }
   .btn-status-detail:hover { background: #f3f4f6; color: var(--ink-strong); border-color: #9ca3af; }
-  .btn-clear-slim { padding: 4px 9px; font-size: 11.5px; }
-  .status-bar-detail { display: none; padding: 8px 12px 9px; border-top: 1px solid var(--border-soft); background: #fff; }
-  .status-bar-detail.open { display: block; }
-  .quota-sub-row { font-size: 11.5px; color: var(--ink-muted); line-height: 1.5; }
   .preview-empty-notice { grid-column: 1 / -1; text-align: center; padding: 28px 16px; background: var(--surface-info); border: 1px dashed var(--border-input); border-radius: 10px; color: var(--ink-subtle); font-size: 13px; font-weight: 600; }
 
   /* 초보자 초기 설정 가이드 모달 */
@@ -218,13 +247,13 @@
   .manual-card h4 { margin: 0 0 6px; font-size: 13.5px; color: var(--ink-strong); }
   .manual-card p { margin: 0; font-size: 12.5px; color: var(--ink-muted); line-height: 1.55; }
 
-  /* 영상 규격 사전 검사 배지 영역 */
-  .video-meta-box { display: none; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--surface-info); border: 1px solid var(--border-soft); font-size: 12px; }
-  .video-meta-pills { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-  .meta-pill { display: inline-block; padding: 2px 8px; border-radius: 99px; background: #fff; border: 1px solid var(--border-soft); color: var(--ink-muted); font-weight: 600; font-size: 11.5px; }
+  /* 영상 규격 사전 검사 배지 영역 (슬림 1줄) */
+  .video-meta-box { display: none; margin-top: 6px; padding: 5px 8px; border-radius: 7px; background: var(--surface-info); border: 1px solid var(--border-soft); font-size: 11px; }
+  .video-meta-pills { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .meta-pill { display: inline-block; padding: 1px 7px; border-radius: 99px; background: #fff; border: 1px solid var(--border-soft); color: var(--ink-muted); font-weight: 600; font-size: 10.5px; line-height: 1.45; }
   .meta-pill.ok { background: var(--accent-blue-soft); border-color: #bfdbfe; color: var(--accent-blue); }
-  .meta-warn-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-  .meta-warn-badge { display: inline-block; padding: 3px 8px; border-radius: 6px; background: #f3f4f6; border: 1px solid #d1d5db; color: var(--ink-strong); font-weight: 600; font-size: 11.5px; }
+  .meta-warn-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .meta-warn-badge { display: inline-block; padding: 2px 7px; border-radius: 6px; background: #f3f4f6; border: 1px solid #d1d5db; color: var(--ink-strong); font-weight: 600; font-size: 10.5px; }
 
   /* 발행 결과 요약 & 실패 재시도 박스 */
   .publish-result-box { display: none; margin-bottom: 14px; padding: 11px 14px; border-radius: 10px; background: var(--surface-info); border: 1px solid var(--border-soft); }
@@ -367,6 +396,7 @@
   .save-history-toggle:hover { border-color: var(--accent-blue); background: var(--accent-blue-soft); color: var(--accent-blue); }
   .save-history-toggle input { width: 15px; height: 15px; accent-color: var(--accent-blue); cursor: pointer; margin: 0; }
   @media (max-width: 720px) {
+    .platforms-container { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .wiz-step-pills { grid-template-columns: repeat(2, 1fr); }
     .wiz-plat-grid, .wiz-preview-grid, .wiz-ready-grid, .wiz-mode-tabs { grid-template-columns: 1fr; }
   }
@@ -381,7 +411,7 @@
       <div class="header-actions">
         <button class="btn-tool btn-tool-primary" onclick="openSetupGuide()">⚙️ 매장 설정 &amp; 온보딩</button>
         <button class="btn-tool" id="btnCheckUpdate" onclick="checkForUpdates(true)">🔄 업데이트 확인</button>
-        <button class="btn-tool" id="btnCleanAll" onclick="runCleanAll()" title="로그인 세션을 유지한 채 임시 파일과 크롬 캐시 찌꺼기를 함께 정리합니다">🧹 파일 정리</button>
+        <button class="btn-tool" id="btnCleanAll" onclick="runCleanAll()" title="로그인 세션·기록에 연결된 파일을 보호하고 임시 파일·블랙박스·미참조 완료 영상/GIF·크롬 캐시 찌꺼기를 한 번에 정리합니다">🧹 파일 정리</button>
         <button class="btn-tool" onclick="toggleHistoryPanel()">📜 지난 기록</button>
       </div>
     </div>
@@ -419,69 +449,91 @@
 
         <div>
           <div class="section-title">
-            <span>3. 업로드 플랫폼 선택 및 바로가기</span>
-            <div style="display:flex; gap:5px; align-items:center;">
-              <button type="button" class="btn-tool" id="btnToggleAllPlatforms" style="padding:2px 8px; font-size:11px;" onclick="toggleAllVisiblePlatforms()">☐ 전체 해제</button>
-              <button type="button" class="btn-tool" style="padding:2px 8px; font-size:11px;" onclick="openSetupGuide(0)">⚙️ 플랫폼 표시 설정</button>
-            </div>
+            <span>2. 기본 소스 입력</span>
+            <span class="ai-extract-summary-right">
+              <span class="ai-extract-summary-hint">비우면 AI가 역질문</span>
+              <button type="button" class="btn-ai-tip" id="btnAiMemoTips" onclick="toggleAiMemoTips(event)">💡 작성꿀팁</button>
+            </span>
           </div>
-          <div class="platforms-container">
-            <div class="platform-box" data-platform="yt"><label class="platform-label"><input type="checkbox" id="chkYt" checked><span class="status-dot" id="dotYt" title="상태 확인 중">🔴</span><span class="platform-name">유튜브 쇼츠</span><span class="platform-done-badge">완료</span></label><a href="https://studio.youtube.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="naver"><label class="platform-label"><input type="checkbox" id="chkNaver" checked><span class="status-dot" id="dotNaver" title="상태 확인 중">🔴</span><span class="platform-name">네이버 블로그</span><span class="platform-done-badge">완료</span></label><a id="linkNaverBlog" href="https://blog.naver.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="clip"><label class="platform-label"><input type="checkbox" id="chkClip" checked><span class="status-dot" id="dotClip" title="상태 확인 중">🔴</span><span class="platform-name">네이버 클립</span><span class="platform-done-badge">완료</span></label><a href="https://clipcreators.naver.com/web" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="tt"><label class="platform-label"><input type="checkbox" id="chkTt" checked><span class="status-dot" id="dotTt" title="상태 확인 중">🔴</span><span class="platform-name">틱톡</span><span class="platform-done-badge">완료</span></label><a href="https://www.tiktok.com/tiktokstudio/content" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="ig"><label class="platform-label"><input type="checkbox" id="chkIg" checked><span class="status-dot" id="dotIg" title="상태 확인 중">🔴</span><span class="platform-name">인스타그램</span><span class="platform-done-badge">완료</span></label><a id="linkInstagram" href="https://www.instagram.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="pin"><label class="platform-label"><input type="checkbox" id="chkPin" checked><span class="status-dot" id="dotPin" title="상태 확인 중">🔴</span><span class="platform-name">핀터레스트</span><span class="platform-done-badge">완료</span></label><a id="linkPinterest" href="https://kr.pinterest.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="threads"><label class="platform-label"><input type="checkbox" id="chkThreads" checked><span class="status-dot" id="dotThreads" title="상태 확인 중">🔴</span><span class="platform-name">쓰레드</span><span class="platform-done-badge">완료</span></label><a id="linkThreads" href="https://www.threads.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="x"><label class="platform-label"><input type="checkbox" id="chkX" checked><span class="status-dot" id="dotX" title="상태 확인 중">🔴</span><span class="platform-name">엑스(X)</span><span class="platform-done-badge">완료</span></label><a id="linkX" href="https://x.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="fb"><label class="platform-label"><input type="checkbox" id="chkFb" checked><span class="status-dot" id="dotFb" title="상태 확인 중">🔴</span><span class="platform-name">페이스북(개인)</span><span class="platform-done-badge">완료</span></label><a href="https://www.facebook.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
-            <div class="platform-box" data-platform="fb_page"><label class="platform-label"><input type="checkbox" id="chkFbPage" checked><span class="status-dot" id="dotFbPage" title="상태 확인 중">🔴</span><span class="platform-name">페이스북(매장)</span><span class="platform-done-badge">완료</span></label><a href="https://business.facebook.com/" target="_blank" class="btn-shortcut">열기 ↗</a></div>
+          <div class="ai-extract-box" id="aiExtractDetails">
+            <div class="ai-tip-card" id="aiMemoTipCard" style="margin-top:0; margin-bottom:6px;">
+              <div class="tip-line"><strong>1번 공식:</strong> [모발 조건] + [불편한 상황] + [원하는 느낌]</div>
+              <div class="tip-line"><strong>2번 공식:</strong> [1티어 정확한 시술명] + [핵심 테크닉 1~2개]</div>
+              <div class="tip-line"><strong>3번 공식:</strong> [고객 실제 한마디] + [집에서 하는 10초 손질법]</div>
+              <div class="tip-divider"></div>
+              <div class="tip-line"><span class="tip-highlight">10초 작성 팁:</span> 문장 완성 없이 단어·쉼표만 OK · 숫자 1개(3개월·5분·오일 2펌프 등) 섞기 · 실제 진행한 시술명만 정확히 적기</div>
+            </div>
+            <div class="ai-video-type-row" style="margin-top:0;">
+              <span class="ai-video-type-title">영상 구성</span>
+              <label class="ai-video-type-opt"><input type="radio" name="aiVideoType" id="aiVideoTypeAfter" value="after_only" checked onchange="updateWizardLivePreviews()"> 애프터만</label>
+              <label class="ai-video-type-opt"><input type="radio" name="aiVideoType" id="aiVideoTypeBeforeAfter" value="before_after" onchange="updateWizardLivePreviews()"> 비포+애프터</label>
+            </div>
+            <div class="ai-memo-list">
+              <div class="ai-memo-field">
+                <label class="ai-memo-label" for="aiMemoConcern">1. 고객고민, 시술 전 상태</label>
+                <textarea id="aiMemoConcern" class="ai-memo-textarea" rows="2" aria-label="1. 고객고민, 시술 전 상태" placeholder="예) 숱 많고 반곱슬, 옆머리 심하게 뜸. 3개월 전 펌 풀려 손질 안 됨.&#10;깔끔하고 아침 손질 편한 스타일 원함"></textarea>
+              </div>
+              <div class="ai-memo-field">
+                <label class="ai-memo-label" for="aiMemoTechnique">2. 시술내용, 시술테크닉</label>
+                <textarea id="aiMemoTechnique" class="ai-memo-textarea" rows="2" aria-label="2. 시술내용, 시술테크닉" placeholder="예) 드롭컷 + 전체 다운펌. 윗머리 무거운 무게감 질감처리로 덜고,&#10;뜨는 옆머리·구레나룻 두상에 맞춰 밀착 다운펌 진행"></textarea>
+              </div>
+              <div class="ai-memo-field">
+                <label class="ai-memo-label" for="aiMemoReaction">3. 고객반응, 손질팁</label>
+                <textarea id="aiMemoReaction" class="ai-memo-textarea" rows="2" aria-label="3. 고객반응, 손질팁" placeholder="예) &quot;두상이 훨씬 작아 보여요&quot; 만족하심.&#10;샴푸 후 앞으로 털어 말리고 소프트 왁스·오일 에센스 소량 마무리"></textarea>
+              </div>
+            </div>
+            <div class="ai-extract-btn-row">
+              <button type="button" class="btn-ai-extract btn-ai-gemini" id="btnAiGemini" onclick="launchAiExtract('gemini')">✨ 제미나이로 뽑기</button>
+              <button type="button" class="btn-ai-extract btn-ai-chatgpt" id="btnAiChatgpt" onclick="launchAiExtract('chatgpt')">💬 챗GPT로 뽑기</button>
+            </div>
+            <div style="font-size: 11px; color: #6b7280; margin-top: 5px; line-height: 1.4; text-align: center;">💡 클릭 시 프롬프트 자동 복사 → 열린 새 탭에 영상 첨부 후 붙여넣기(Ctrl+V / Cmd+V)</div>
           </div>
         </div>
       </div>
 
       <div class="right-col">
-        <div class="section-title">2. 기본 소스 입력</div>
-        <textarea id="sourceText" rows="8" placeholder="AI에서 추출한 마스터 베이스 본문"></textarea>
-        <div class="transform-action-row">
-          <button type="button" class="btn-submit" onclick="transformData(this)" style="flex:1;">✨ 미리보기 생성</button>
-          <label class="save-history-toggle" title="체크 시 미리보기 생성과 동시에 지난 기록에 자동 저장됩니다 (동일 제목·본문은 중복 저장 안 함)">
-            <input type="checkbox" id="chkSaveHistoryOnPreview" checked>
-            <span>기록 저장</span>
-          </label>
+        <div style="display:flex; flex-direction:column; flex:1;">
+          <div class="section-title">3. 마스터 본문</div>
+          <textarea id="sourceText" rows="8" style="flex:1;" placeholder="AI에서 추출한 마스터 베이스 본문"></textarea>
+          <div class="transform-action-row">
+            <button type="button" class="btn-submit" onclick="transformData(this)" style="flex:1;">✨ 미리보기 생성</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title">
+            <span>4. 업로드 플랫폼 선택 및 바로가기</span>
+            <div style="display:flex; gap:5px; align-items:center;">
+              <button type="button" class="btn-tool" id="btnToggleAllPlatforms" style="padding:2px 8px; font-size:11px;" onclick="toggleAllVisiblePlatforms()">☐ 전체 해제</button>
+            </div>
+          </div>
+          <div class="platforms-container">
+            <div class="platform-box" data-platform="yt"><label class="platform-label"><input type="checkbox" id="chkYt" checked><span class="status-dot" id="dotYt" title="상태 확인 중">🔴</span><span class="platform-name">유튜브</span><span class="platform-done-badge">완료</span></label><a href="https://studio.youtube.com/" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="naver"><label class="platform-label"><input type="checkbox" id="chkNaver" checked><span class="status-dot" id="dotNaver" title="상태 확인 중">🔴</span><span class="platform-name">블로그</span><span class="platform-done-badge">완료</span></label><a id="linkNaverBlog" href="https://blog.naver.com/" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="clip"><label class="platform-label"><input type="checkbox" id="chkClip" checked><span class="status-dot" id="dotClip" title="상태 확인 중">🔴</span><span class="platform-name">클립</span><span class="platform-done-badge">완료</span></label><a href="https://clipcreators.naver.com/web" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="ig"><label class="platform-label"><input type="checkbox" id="chkIg" checked><span class="status-dot" id="dotIg" title="상태 확인 중">🔴</span><span class="platform-name">인스타</span><span class="platform-done-badge">완료</span></label><a id="linkInstagram" href="https://www.instagram.com/" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="tt"><label class="platform-label"><input type="checkbox" id="chkTt" checked><span class="status-dot" id="dotTt" title="상태 확인 중">🔴</span><span class="platform-name">틱톡</span><span class="platform-done-badge">완료</span></label><a href="https://www.tiktok.com/tiktokstudio/content" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="fb"><label class="platform-label"><input type="checkbox" id="chkFb" checked><span class="status-dot" id="dotFb" title="상태 확인 중">🔴</span><span class="platform-name">페북(개인)</span><span class="platform-done-badge">완료</span></label><a href="https://www.facebook.com/" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="fb_page"><label class="platform-label"><input type="checkbox" id="chkFbPage" checked><span class="status-dot" id="dotFbPage" title="상태 확인 중">🔴</span><span class="platform-name">페북(매장)</span><span class="platform-done-badge">완료</span></label><a href="https://business.facebook.com/" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+            <div class="platform-box" data-platform="pin"><label class="platform-label"><input type="checkbox" id="chkPin" checked><span class="status-dot" id="dotPin" title="상태 확인 중">🔴</span><span class="platform-name">핀터</span><span class="platform-done-badge">완료</span></label><a id="linkPinterest" href="https://kr.pinterest.com/" target="_blank" class="btn-shortcut" title="플랫폼 바로 열기">↗</a></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 1줄 슬림 통합 상태 바 (유튜브 무료 한도 + PC 완료 파일 용량 + [상세 ▾] 토글) -->
+    <!-- 1줄 슬림 오늘 업로드 현황 바 -->
     <div class="unified-status-bar" id="quotaBarBox">
-      <div class="status-bar-main">
-        <div class="status-bar-left">
-          <span aria-hidden="true">📊</span>
-          <span class="status-yt-text" id="quotaYtText">유튜브 API: 0 / 10,000 pt (오늘 0/6건)</span>
-          <div class="quota-progress-bg"><div class="quota-progress-fill" id="quotaYtFill"></div></div>
-          <span class="status-bar-dot">·</span>
-          <span class="status-storage-text" id="storageUsageText">📦 완료 파일: 계산 중...</span>
-          <span class="storage-warn-badge" id="storageWarnBadge" style="display:none;">⚠️ 저장 공간 1GB 초과 · [비우기] 권장</span>
-        </div>
-        <div class="status-bar-actions">
-          <button type="button" class="btn-status-detail" id="btnToggleQuotaDetail" onclick="toggleQuotaDetail()" aria-expanded="false">상세 ▾</button>
-          <button type="button" class="btn-status-detail" id="btnOpenBlackboxFolder" onclick="openBlackboxFolder()" title="오류 진단 리포트(report_upload.md · report_test.md)와 블랙박스 영상(upload.mp4 · test.mp4)이 저장된 blackbox 폴더를 엽니다">📂 오류 폴더 열기</button>
-          <button type="button" class="btn-danger-outline btn-clear-slim" id="btnClearDone" onclick="clearDoneStorage()" title="완료·블랙박스 파일과 크롬 캐시 찌꺼기를 함께 비웁니다 (로그인 세션 유지)">🗑️ 비우기</button>
-        </div>
-      </div>
-      <div class="status-bar-detail" id="quotaDetailPanel">
-        <div class="quota-sub-row" id="quotaPlatformsText">
-          블로그 0/5 · 클립 0/5 · 틱톡 0/5 · 인스타 0/3 · 핀터 0/10 · 쓰레드 0/5 · X 0/5 · 페북(개인) 0/3 · 페북(매장) 0/3 (API 0원 · 계정 보호 권장선) · 원고변환 무제한
-        </div>
+      <div class="quota-slim-row" id="quotaPlatformsText">
+        📊 오늘 업로드 | 유튜브 0/6 · 블로그 0/5 · 클립 0/5 · 인스타 0/3 · 틱톡 0/5 · 페북(개인) 0/3 · 페북(매장) 0/3 · 핀터 0/10
       </div>
     </div>
 
     <div class="preview-area" id="previewSection">
       <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
-        <button type="button" class="btn-submit btn-submit-secondary" id="btnAuthCheck" style="flex:1; min-width:170px;" onclick="startAuthCheck()">🔐 Step 1: 로그인 점검창 띄우기</button>
-        <button type="button" class="btn-submit" id="btnUpload" style="flex:1.25; min-width:190px;" onclick="startUpload()">🚀 Step 2: 체크된 플랫폼 일괄 업로드</button>
-        <button type="button" class="btn-submit btn-submit-secondary" id="btnTestMode" style="flex:0.85; min-width:140px;" onclick="startUpload(null, { testMode: true })" title="실제 게시 없이 최종 게시 버튼 조준 검증까지 수행하고 녹화본·리포트를 blackbox 폴더에 저장">🧪 테스트 모드</button>
+        <button type="button" class="btn-submit btn-submit-secondary" id="btnAuthCheck" style="flex:1; min-width:155px;" onclick="startAuthCheck()">🔐 Step 1: 로그인 점검창 띄우기</button>
+        <button type="button" class="btn-submit" id="btnUpload" style="flex:1.25; min-width:185px;" onclick="startUpload()">🚀 Step 2: 체크된 플랫폼 일괄 업로드</button>
+        <button type="button" class="btn-submit btn-submit-secondary" id="btnTestMode" style="flex:0.8; min-width:125px;" onclick="startUpload(null, { testMode: true })" title="실제 게시 없이 최종 게시 버튼 조준 검증까지 수행하고 녹화본·리포트를 blackbox 폴더에 저장">🧪 테스트 모드</button>
+        <button type="button" class="btn-submit btn-submit-secondary" id="btnSaveHistory" style="flex:0.8; min-width:125px;" onclick="saveCurrentHistory()" title="현재 2번 소스·3번 마스터 본문·8개 플랫폼 편집본·대표사진/GIF/슬롯 상태를 지난 기록에 저장">💾 기록 저장</button>
       </div>
       <div class="publish-result-box" id="publishResultBox"></div>
 
@@ -489,68 +541,62 @@
         <div class="preview-empty-notice" id="previewEmptyNotice" style="display:none;">상단에서 업로드할 플랫폼을 체크하면 해당 편집 카드가 표시됩니다.</div>
         <!-- 1행: 유튜브 쇼츠 | 네이버 블로그 -->
         <div class="card" data-platform="yt">
-          <div class="card-header"><h3 class="card-title">🔴 유튜브 쇼츠 편집</h3><button class="btn-single" onclick="uploadSingle('yt')">개별 업로드</button></div>
+          <div class="card-header"><h3 class="card-title">🔴 유튜브 쇼츠</h3><button class="btn-single" onclick="uploadSingle('yt')">개별 업로드</button></div>
           <div><span class="field-label">제목</span><input type="text" id="ytTitle"></div>
           <div><span class="field-label">본문</span><textarea id="ytBody" rows="6"></textarea></div>
           <div><span class="field-label">태그 (10개)</span><input type="text" id="ytTags"></div>
         </div>
 
         <div class="card" data-platform="naver">
-          <div class="card-header"><h3 class="card-title">🟢 네이버 블로그 편집</h3><button class="btn-single" onclick="uploadSingle('naver')">개별 업로드</button></div>
+          <div class="card-header"><h3 class="card-title">🟢 네이버 블로그</h3><button class="btn-single" onclick="uploadSingle('naver')">개별 업로드</button></div>
           <div><span class="field-label">제목</span><input type="text" id="naverTitle"></div>
-          <div><span class="field-label">본문 ([미디어 자료N] 위치에 해당 슬롯의 사진·GIF가 삽입됩니다 · ✕로 끈 번호는 당겨지지 않고 빈자리로 넘어갑니다)</span><textarea id="naverBody" rows="12"></textarea></div>
+          <div><span class="field-label">본문 ([미디어 자료1~5] 자동 삽입)</span><textarea id="naverBody" rows="12"></textarea></div>
 
-          <!-- 10장 추출 썸네일: 인스타 방식 드래그 캡처 + GIF 구간 생성 + 고정 슬롯 갤러리 -->
+          <!-- 6칸 썸네일: 인스타 방식 드래그 캡처 + GIF 구간 생성 + 고정 슬롯 갤러리 -->
           <div class="thumb-gallery-box">
             <div class="thumb-header">
-              <span>📸 영상 드래그 캡처 · GIF 생성 · 순서 변경(드래그 / ◀ ▶) 및 제외(✕)</span>
-              <span class="thumb-count-badge" id="activeThumbCount">선택됨: 0장</span>
+              <span>📸 영상 드래그 캡처 · GIF 생성</span>
+              <span class="thumb-count-badge" id="activeThumbCount">💡 사진 4~5개 · GIF 1개 추천</span>
             </div>
 
-            <!-- 인스타 썸네일 방식 영상 드래그 캡처 & GIF 생성 스튜디오 -->
+            <!-- 인스타 썸네일 방식 영상 드래그 캡처 & GIF 생성 스튜디오 (상단 대형 플레이어 · 하단 도구 세로 배치) -->
             <div class="scrubber-studio-box" id="blogScrubberStudio">
-              <div class="scrubber-studio-header">
-                <span>🎬 영상 드래그 캡처 &amp; GIF 만들기 <span class="scrubber-orient-pill" id="scrubberOrientBadge">📱 세로</span></span>
-                <div style="display:flex; align-items:center; gap:5px;">
-                  <span style="font-size:11px; color:#475569;">적용 슬롯:</span>
-                  <select id="scrubberTargetSlot" onchange="onTargetSlotSelectChange()" style="width:auto; padding:3px 7px; font-size:11px; font-weight:700;">
-                    <option value="0">[미디어 자료1]</option>
-                    <option value="1">[미디어 자료2]</option>
-                    <option value="2">[미디어 자료3]</option>
-                    <option value="3">[미디어 자료4]</option>
-                    <option value="4">[미디어 자료5]</option>
-                    <option value="5">[미디어 자료6]</option>
-                    <option value="6">[미디어 자료7]</option>
-                    <option value="7">[미디어 자료8]</option>
-                    <option value="8">[미디어 자료9]</option>
-                    <option value="9">[미디어 자료10]</option>
-                  </select>
-                </div>
-              </div>
               <div class="scrubber-studio-body">
-                <div class="scrubber-video-wrap">
-                  <video id="blogScrubberVideo" muted playsinline preload="auto"></video>
-                  <div class="scrubber-time-pill" id="scrubberTimeLabel">00:00.0 / 00:00.0</div>
+                <!-- 상단: 큼직한 영상 미리보기 플레이어 -->
+                <div class="scrubber-video-stage">
+                  <div class="scrubber-video-wrap">
+                    <video id="blogScrubberVideo" muted playsinline preload="auto"></video>
+                    <div class="scrubber-time-pill" id="scrubberTimeLabel">00:00.0 / 00:00.0</div>
+                  </div>
                 </div>
+
+                <!-- 하단: 슬롯 선택 알약 바 · 1) 장면 탐색 · 2) 구간 GIF · 사진/GIF 넣기 버튼 -->
                 <div class="scrubber-controls">
-                  <!-- 1) 원하는 장면 드래그 캡처 -->
+                  <div class="scrubber-studio-header">
+                    <span class="scrubber-orient-pill" id="scrubberOrientBadge">📱 세로</span>
+                    <div class="scrubber-slot-pills" id="scrubberSlotPills" role="group" aria-label="적용 슬롯 선택">
+                      <button type="button" class="slot-pill-btn active" data-slot="0" onclick="selectThumbTargetSlot(0)" title="⭐ 대표사진 (최상단 고정 · JPG)">⭐ 대표</button>
+                      <button type="button" class="slot-pill-btn" data-slot="1" onclick="selectThumbTargetSlot(1)" title="[미디어 자료1]">1</button>
+                      <button type="button" class="slot-pill-btn" data-slot="2" onclick="selectThumbTargetSlot(2)" title="[미디어 자료2]">2</button>
+                      <button type="button" class="slot-pill-btn" data-slot="3" onclick="selectThumbTargetSlot(3)" title="[미디어 자료3]">3</button>
+                      <button type="button" class="slot-pill-btn" data-slot="4" onclick="selectThumbTargetSlot(4)" title="[미디어 자료4]">4</button>
+                      <button type="button" class="slot-pill-btn" data-slot="5" onclick="selectThumbTargetSlot(5)" title="[미디어 자료5]">5</button>
+                    </div>
+                  </div>
+                  <!-- 1) 장면 탐색 (1줄 통합) -->
                   <div class="scrub-sub-card">
                     <div class="scrub-sub-title">
-                      <span>📸 1) 장면 캡처</span>
-                      <span style="font-size:10px; color:#64748b;">썸네일 클릭으로 슬롯 선택</span>
+                      <span>📸 1) 장면 탐색</span>
                     </div>
                     <div class="scrub-slider-row">
+                      <button type="button" class="btn-scrub-mini btn-scrub-play" id="btnScrubPlay" onclick="toggleScrubPlay()" title="재생/일시정지">▶</button>
                       <button type="button" class="btn-scrub-mini" onclick="stepScrubFrame(-0.2)" title="0.2초 뒤로">◀</button>
                       <input type="range" id="frameScrubSlider" min="0" max="10" step="0.05" value="0" oninput="onFrameScrubInput(this.value)">
                       <button type="button" class="btn-scrub-mini" onclick="stepScrubFrame(0.2)" title="0.2초 앞으로">▶</button>
                     </div>
-                    <div class="scrub-btn-row">
-                      <button type="button" class="btn-scrub-mini" id="btnScrubPlay" onclick="toggleScrubPlay()">▶ 재생</button>
-                      <button type="button" class="btn-scrub-primary" id="btnCaptureFrame" onclick="captureCurrentScrubberFrame()">📸 현재 장면 슬롯 넣기</button>
-                    </div>
                   </div>
 
-                  <!-- 2) 드래그 구간 GIF 생성 + 재생배속 -->
+                  <!-- 2) 드래그 구간 GIF 설정 + 재생배속 -->
                   <div class="scrub-sub-card">
                     <div class="scrub-sub-title">
                       <span>🎞️ 2) 구간 GIF</span>
@@ -567,7 +613,7 @@
                         <input type="range" id="gifEndSlider" min="0" max="10" step="0.1" value="2.5" oninput="onGifSliderChange('end')">
                       </label>
                     </div>
-                    <div class="scrub-btn-row">
+                    <div class="scrub-gif-btn-row">
                       <select id="gifSpeedSelect" class="gif-speed-select" onchange="onGifSpeedChange(this.value)" title="GIF 재생배속">
                         <option value="0.5">0.5x</option>
                         <option value="0.75">0.75x</option>
@@ -576,11 +622,16 @@
                         <option value="1.5">1.5x</option>
                         <option value="2">2x</option>
                       </select>
-                      <button type="button" class="btn-scrub-mini" onclick="setGifPointFromCurrent('start')" title="현재 재생 위치를 시작점으로">시작=현재</button>
+                      <button type="button" class="btn-scrub-mini" onclick="setGifPointFromCurrent('start')" title="현재 재생 위치를 시작점으로 설정하고 끝점을 +2.5초로 자동 맞춤">시작=현재</button>
                       <button type="button" class="btn-scrub-mini" onclick="setGifPointFromCurrent('end')" title="현재 재생 위치를 끝점으로">끝=현재</button>
                       <button type="button" class="btn-scrub-mini" id="btnGifPreview" onclick="toggleGifRangePreview()">🔁 미리보기</button>
-                      <button type="button" class="btn-scrub-gif" id="btnCreateGif" onclick="createGifIntoSelectedSlot()">✨ GIF 생성</button>
                     </div>
+                  </div>
+
+                  <!-- 하단 2분할 통합 액션 바 -->
+                  <div class="scrubber-action-bar">
+                    <button type="button" class="btn-scrub-primary" id="btnCaptureFrame" onclick="captureCurrentScrubberFrame()">📸 사진으로 넣기</button>
+                    <button type="button" class="btn-scrub-gif" id="btnCreateGif" onclick="createGifIntoSelectedSlot()" disabled title="대표사진은 고화질 정지 사진(JPG)만 가능합니다">✨ GIF로 넣기</button>
                   </div>
                 </div>
               </div>
@@ -588,7 +639,7 @@
 
             <div class="thumb-grid" id="blogThumbGrid">
               <div style="grid-column: 1 / -1; text-align: center; color: #64748b; font-size: 11.5px; padding: 14px 0;">
-                영상을 먼저 첨부한 뒤 [✨ 미리보기 생성]을 누르면 10장의 캡처본이 표시됩니다.
+                영상을 먼저 첨부한 뒤 [✨ 미리보기 생성]을 누르면 대표사진 + 본문 5장의 고화질 캡처본이 표시됩니다.
               </div>
             </div>
           </div>
@@ -610,9 +661,9 @@
           </div>
         </div>
 
-        <!-- 2행: 네이버 클립 | 틱톡 -->
+        <!-- 2행: 네이버 클립 | 인스타그램 -->
         <div class="card" data-platform="clip">
-          <div class="card-header"><h3 class="card-title">🟢 네이버 클립 편집</h3><button class="btn-single" onclick="uploadSingle('clip')">개별 업로드</button></div>
+          <div class="card-header"><h3 class="card-title">🟢 네이버 클립</h3><button class="btn-single" onclick="uploadSingle('clip')">개별 업로드</button></div>
           <div><span class="field-label">제목</span><input type="text" id="clipTitle"></div>
           <div><span class="field-label">본문</span><textarea id="clipBody" rows="6"></textarea></div>
           <div class="opt-row">
@@ -621,8 +672,18 @@
           </div>
         </div>
 
+        <div class="card" data-platform="ig">
+          <div class="card-header"><h3 class="card-title">🟣 인스타그램</h3><button class="btn-single" onclick="uploadSingle('ig')">개별 업로드</button></div>
+          <div><span class="field-label">본문</span><textarea id="igBody" rows="7"></textarea></div>
+          <div class="opt-row">
+            <div><span class="field-label">해시태그 (5개)</span><input type="text" id="igTags"></div>
+            <div><span class="field-label">위치 추가</span><input type="text" id="igLocation" value="" placeholder="기본정보 매장명 자동 입력"></div>
+          </div>
+        </div>
+
+        <!-- 3행: 틱톡 | 페이스북(개인) -->
         <div class="card" data-platform="tt">
-          <div class="card-header"><h3 class="card-title">⚫ 틱톡 편집</h3><button class="btn-single" onclick="uploadSingle('tt')">개별 업로드</button></div>
+          <div class="card-header"><h3 class="card-title">⚫ 틱톡</h3><button class="btn-single" onclick="uploadSingle('tt')">개별 업로드</button></div>
           <div><span class="field-label">제목</span><input type="text" id="ttTitle"></div>
           <div><span class="field-label">본문</span><textarea id="ttBody" rows="6"></textarea></div>
           <div class="opt-row">
@@ -631,45 +692,28 @@
           </div>
         </div>
 
-        <!-- 3행: 인스타그램 | 핀터레스트 -->
-        <div class="card" data-platform="ig">
-          <div class="card-header"><h3 class="card-title">🟣 인스타그램 릴스 편집</h3><button class="btn-single" onclick="uploadSingle('ig')">개별 업로드</button></div>
-          <div><span class="field-label">본문</span><textarea id="igBody" rows="7"></textarea></div>
-          <div class="opt-row">
-            <div><span class="field-label">해시태그 (5개)</span><input type="text" id="igTags"></div>
-            <div><span class="field-label">위치 추가</span><input type="text" id="igLocation" value="" placeholder="기본정보 매장명 자동 입력"></div>
-          </div>
+        <div class="card" data-platform="fb">
+          <div class="card-header"><h3 class="card-title">📘 페이스북(개인)</h3><button class="btn-single" onclick="uploadSingle('fb')">개별 업로드</button></div>
+          <div><span class="field-label">본문</span><textarea id="fbBody" rows="6"></textarea></div>
+          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="fbTags"></div>
+        </div>
+
+        <!-- 4행: 페이스북(매장) | 핀터레스트 -->
+        <div class="card" data-platform="fb_page">
+          <div class="card-header"><h3 class="card-title">🏪 페이스북(매장)</h3><button class="btn-single" onclick="uploadSingle('fb_page')">개별 업로드</button></div>
+          <div><span class="field-label">본문</span><textarea id="fbPageBody" rows="6"></textarea></div>
+          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="fbPageTags"></div>
         </div>
 
         <div class="card" data-platform="pin">
-          <div class="card-header"><h3 class="card-title">🔴 핀터레스트 편집</h3><button class="btn-single" onclick="uploadSingle('pin')">개별 업로드</button></div>
-          <div><span class="field-label">핀 제목</span><input type="text" id="pinTitle"></div>
-          <div><span class="field-label">핀 설명</span><textarea id="pinBody" rows="4"></textarea></div>
+          <div class="card-header"><h3 class="card-title">🔴 핀터레스트</h3><button class="btn-single" onclick="uploadSingle('pin')">개별 업로드</button></div>
+          <div><span class="field-label">제목</span><input type="text" id="pinTitle"></div>
+          <div><span class="field-label">본문</span><textarea id="pinBody" rows="4"></textarea></div>
           <div><span class="field-label">해시태그 (5개)</span><input type="text" id="pinTags"></div>
           <div class="opt-row">
             <div><span class="field-label">목적지 링크</span><input type="text" id="pinDestUrl" value=""></div>
             <div><span class="field-label">보드 이름</span><input type="text" id="pinBoard" value=""></div>
           </div>
-        </div>
-        <div class="card" data-platform="threads">
-          <div class="card-header"><h3 class="card-title">🧵 쓰레드(Threads) 편집</h3><button class="btn-single" onclick="uploadSingle('threads')">개별 업로드</button></div>
-          <div><span class="field-label">소통형 본문</span><textarea id="threadsBody" rows="6"></textarea></div>
-          <div><span class="field-label">대표 토픽 태그 (1개 권장)</span><input type="text" id="threadsTags"></div>
-        </div>
-        <div class="card" data-platform="x">
-          <div class="card-header"><h3 class="card-title">𝕏 엑스(X / 트위터) 편집</h3><button class="btn-single" onclick="uploadSingle('x')">개별 업로드</button></div>
-          <div><span class="field-label">초간결 본문 (140자 제한 맞춤)</span><textarea id="xBody" rows="5"></textarea></div>
-          <div><span class="field-label">핵심 해시태그 (2개)</span><input type="text" id="xTags"></div>
-        </div>
-        <div class="card" data-platform="fb">
-          <div class="card-header"><h3 class="card-title">📘 페이스북(개인) 릴스 편집</h3><button class="btn-single" onclick="uploadSingle('fb')">개별 업로드</button></div>
-          <div><span class="field-label">릴스 본문</span><textarea id="fbBody" rows="6"></textarea></div>
-          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="fbTags"></div>
-        </div>
-        <div class="card" data-platform="fb_page">
-          <div class="card-header"><h3 class="card-title">🏪 페이스북(매장) 페이지 릴스 편집</h3><button class="btn-single" onclick="uploadSingle('fb_page')">개별 업로드</button></div>
-          <div><span class="field-label">매장 페이지 릴스 본문 (메타 비즈니스 스위트 연동)</span><textarea id="fbPageBody" rows="6"></textarea></div>
-          <div><span class="field-label">해시태그 (5개)</span><input type="text" id="fbPageTags"></div>
         </div>
       </div>
     </div>
@@ -743,7 +787,6 @@
           <div class="wiz-section-title">
             <span>🎯 1단계: 사용할 플랫폼 선택 &amp; 로그인 연결</span>
             <div style="display:flex; gap:5px; flex-wrap:wrap;">
-              <button type="button" class="btn-tool" style="padding:3px 8px; font-size:11px;" onclick="setWizardPlatformPreset('core')">⭐ 핵심 3종 추천</button>
               <button type="button" class="btn-tool" style="padding:3px 8px; font-size:11px;" onclick="setWizardPlatformPreset('all')">전체 선택</button>
               <button type="button" class="btn-tool" id="btnRefreshSetupStatus" style="padding:3px 8px; font-size:11px;" onclick="refreshSetupAndQuota(true)">🔄 상태 새로고침</button>
             </div>
@@ -789,11 +832,11 @@
         </details>
       </div>
 
-      <!-- 2단계: 기본 정보 입력 + 플랫폼별 전용 설정 -->
+      <!-- 2단계: 동선 중심 4개 카드 (매장 기본 정보 → SNS 프로필 복붙 → 네이버 블로그 한 번에 세팅 → 핀터레스트 설정) -->
       <div class="guide-pane" id="wizPane1">
-        <!-- (1) 핵심 기본 정보 -->
-        <div class="wiz-section-box">
-          <div class="wiz-section-title"><span>🏪 핵심 기본 정보</span><span style="font-size:11px; color:#64748b; font-weight:600;">입력하는 즉시 자동 임시 저장됩니다</span></div>
+        <!-- 카드 1: 매장 기본 정보 (핵심 기본 정보 + 매장 상세 정보 통합) -->
+        <div class="wiz-section-box" id="wizBasicInfoCard">
+          <div class="wiz-section-title"><span>🏪 매장 기본 정보</span><span style="font-size:11px; color:#64748b; font-weight:600;">입력하는 즉시 자동 임시 저장됩니다</span></div>
           <div class="profile-grid">
             <div>
               <span class="field-label">매장명 <b style="color:#dc2626;">*필수</b></span>
@@ -814,25 +857,13 @@
               <input type="text" id="wizSpecialty" placeholder="예: 남자 다운펌·드롭컷 / 집에서 손질 편한 머리를 추구합니다" oninput="onWizardFieldInput()">
             </div>
             <div style="grid-column: span 2;">
-              <span class="field-label">대표 통합 링크 (인포크링크 URL)</span>
-              <div class="wiz-inline-btn-row">
-                <input type="text" id="wizBookingUrl" placeholder="예: https://link.inpock.co.kr/myid (아직 없다면 우측 가이드 버튼 클릭)" oninput="onWizardFieldInput()">
-                <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; font-weight:800; white-space:nowrap;" onclick="openInpockGuideModal()">🔗 인포크링크 만들기 가이드</button>
-              </div>
-              <span class="profile-hint">네이버 예약·카톡 상담·가격표를 한 번에 묶어두는 통합 링크입니다. 아직 없다면 우측 가이드 버튼으로 3분 만에 만들 수 있어요.</span>
-            </div>
-            <div style="grid-column: span 2;">
               <span class="field-label">개인 제외 해시태그 (선택 · 쉼표로 구분)</span>
               <input type="text" id="wizPersonalBanned" placeholder="예: 김민수실장, 김민수" oninput="onWizardFieldInput()">
               <span class="profile-hint">디자이너 이름(띄어쓰기 제거)과 공통 제외 태그는 자동으로 함께 제외됩니다.</span>
             </div>
           </div>
-        </div>
 
-        <!-- (2) 매장 상세 정보 -->
-        <div class="wiz-section-box">
-          <div class="wiz-section-title"><span>📍 매장 상세 정보 (블로그 '오시는 길' 고정글 전용)</span></div>
-          <div class="profile-grid">
+          <div class="profile-grid" style="border-top: 1px solid #e5e7eb; margin-top: 12px; padding-top: 12px;">
             <div style="grid-column: span 2;">
               <span class="field-label">매장 주소</span>
               <input type="text" id="wizSalonAddress" placeholder="예: 서울 강남구 테헤란로 123, 3층" oninput="onWizardFieldInput()">
@@ -848,53 +879,112 @@
           </div>
         </div>
 
-        <!-- (3) 네이버 블로그 설정 전용 카드 (1단계 미선택 시 전체 숨김) -->
+        <!-- 카드 2: SNS 프로필 복붙 & 사전 준비 바로가기 통합 (정적 배치로 입력 포커스 유지) -->
+        <div class="wiz-section-box" id="wizProfileBioCard">
+          <div class="wiz-section-title">
+            <span>✍️ SNS 프로필 복붙 (인스타 · 틱톡 · 페북 · 유튜브 소개 칸)</span>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn-tool" style="background:#2563eb; color:#fff; border-color:#2563eb; font-weight:700;" onclick="copyTextById('wizBioUniversal')">📋 소개글 복사</button>
+              <button type="button" class="btn-tool" onclick="copyWizardBookingLinkOnly()">🔗 예약 링크만 복사</button>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <span class="field-label">대표 통합 링크 (인포크링크 URL)</span>
+            <div class="wiz-inline-btn-row">
+              <input type="text" id="wizBookingUrl" placeholder="예: https://link.inpock.co.kr/myid (아직 없다면 우측 가이드 버튼 클릭)" oninput="onWizardFieldInput()">
+              <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8; font-weight:800; white-space:nowrap;" onclick="openInpockGuideModal()">🔗 인포크링크 만들기 가이드</button>
+            </div>
+            <span class="profile-hint">네이버 예약·카톡 상담·가격표를 한 번에 묶어두는 통합 링크입니다. 아직 없다면 우측 가이드 버튼으로 3분 만에 만들 수 있어요.</span>
+          </div>
+          <div class="wiz-copy-card" style="margin-bottom:0;">
+            <pre class="wiz-copy-pre" id="wizBioUniversal"></pre>
+          </div>
+          <div class="profile-hint" style="margin-top:8px; color:#4b5563; line-height:1.6;">
+            <div>💡 예약 링크는 인스타·페북·틱톡 프로필(웹사이트 칸)에 딱 1번만 넣어두세요.</div>
+            <div>💡 블로그·핀터레스트·유튜브는 글 올릴 때마다 프로그램이 자동으로 링크를 넣어드립니다.</div>
+          </div>
+          <div id="wizSnsPrepWrap" style="border-top: 1px solid #e5e7eb; margin-top: 12px; padding-top: 12px; display: none;">
+            <div class="wiz-check-list" id="wizSnsPrepContainer"></div>
+          </div>
+        </div>
+
+        <!-- 카드 3: 네이버 블로그 한 번에 세팅 (1단계 미선택 시 전체 숨김) -->
         <div class="wiz-section-box" id="wizNaverSectionCard">
-          <div class="wiz-section-title"><span>🟢 네이버 블로그 설정</span></div>
+          <div class="wiz-section-title">
+            <span>🟢 네이버 블로그 한 번에 세팅</span>
+            <a id="wizBlogManageLink" href="https://blog.naver.com/" target="_blank" rel="noopener noreferrer" class="btn-tool" style="text-decoration:none;">블로그 관리 열기 ↗</a>
+          </div>
           <div class="profile-grid">
             <div id="wizNaverIdWrap" style="grid-column: span 2;">
               <span class="field-label">네이버 블로그 주소 (또는 ID)</span>
               <div class="prefix-input-wrap">
                 <span class="prefix-addon">blog.naver.com/</span>
-                <input type="text" id="wizNaverId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('wizNaverId', 'naver', 'wizNaverIdStatus', true, false)" onblur="smartExtractIdInput('wizNaverId', 'naver', 'wizNaverIdStatus', true, true)" onchange="smartExtractIdInput('wizNaverId', 'naver', 'wizNaverIdStatus', true, true)">
+                <input type="text" id="wizNaverId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('wizNaverId', 'naver', true, false)" onblur="smartExtractIdInput('wizNaverId', 'naver', true, true)" onchange="smartExtractIdInput('wizNaverId', 'naver', true, true)">
               </div>
-              <span class="wiz-id-badge" id="wizNaverIdStatus"></span>
             </div>
 
             <div id="wizBlogCatsWrap" style="grid-column: span 2;">
-              <span class="field-label">네이버 블로그 게시판 목록 (현재 블로그에 있는 게시판 중 자동 업로드를 할 게시판들만 등록해주세요)</span>
+              <span class="field-label">업로드 할 네이버 블로그 게시판 (최소 2개 추천, Men, Women)</span>
               <div class="cat-chip-wrap" id="wizBlogCatChips"></div>
               <div class="cat-input-row">
                 <input type="text" id="wizBlogCatInput" placeholder="게시판명 입력 후 [+ 추가] (예: Men, Women, 복구펌)" onkeydown="if(event.key==='Enter'){event.preventDefault();addBlogCategoryFromInput('wizBlogCatInput');}">
                 <button type="button" class="btn-tool" onclick="addBlogCategoryFromInput('wizBlogCatInput')">+ 추가</button>
-                <button type="button" class="btn-tool" style="background:#eff6ff; border-color:#93c5fd; color:#1d4ed8;" onclick="fillDefaultBlogCategories()">✨ 기본 추천 채우기 (Men, Women)</button>
               </div>
-              <span class="profile-hint">💡 '오시는 길'은 일상 시술 업로드 목록에 섞지 않고, 아래 고정글 세팅 카드에서 별도로 안내해 드립니다.</span>
             </div>
           </div>
+
+          <details class="wiz-yt-details" id="wizDirectionsDetails" style="margin-top:12px; background:#fff;">
+            <summary style="padding:10px 12px; font-size:13px;">
+              <span>🗺️ '오시는 길' 고정글 세팅 (펼쳐서 초안 복사)</span>
+              <span style="font-size:11px; color:#64748b; font-weight:600;">펼치기 / 접기 ▾</span>
+            </summary>
+            <div class="wiz-yt-details-body" style="padding:10px 12px 12px;">
+              <label class="wiz-check-item" style="background:#f8fafc; border-color:#d1d5db; margin-bottom:10px;">
+                <span><input type="checkbox" id="wizDirectionsCatChecked" onchange="toggleOnboardingCheck('directions_cat', this.checked)"> 1회성 고정글 전용 <b>「오시는 길」</b> 카테고리 별도 추가</span>
+                <span style="font-size:11.5px; color:#4b5563; font-weight:600;">인포크링크 연결용</span>
+              </label>
+              <div class="wiz-copy-card" style="margin-bottom:0;">
+                <div class="wiz-copy-head"><span>🗺️ '오시는 길' 고정 게시글 초안 (자동 완성)</span><button type="button" class="btn-tool" onclick="copyTextById('wizDirectionsDraft')">📋 초안 복사</button></div>
+                <pre class="wiz-copy-pre" id="wizDirectionsDraft"></pre>
+                <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12.5px; font-weight:600; color:#2563eb; cursor:pointer;">
+                  <input type="checkbox" id="wizDirectionsMapChecked" onchange="toggleOnboardingCheck('directions_map', this.checked)" style="accent-color:#2563eb;"> '오시는 길' 글 작성 시 스마트플레이스 지도 첨부까지 완료했습니다
+                </label>
+              </div>
+            </div>
+          </details>
         </div>
 
-        <!-- (4) 핀터레스트 설정 전용 카드 (1단계 미선택 시 전체 숨김) -->
-        <div class="wiz-section-box" id="wizPinSectionCard">
-          <div class="wiz-section-title"><span>📌 핀터레스트 설정</span></div>
+        <!-- 카드 4: 핀터레스트 설정 (1단계 미선택 시 전체 숨김) -->
+        <div class="wiz-section-box" id="wizPinSectionCard" style="margin-bottom:0;">
+          <div class="wiz-section-title">
+            <span>📌 핀터레스트 설정</span>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn-guide-sub" onclick="openPlatformGuideModal('pin')" title="초기 세팅 가이드 보기">가이드</button>
+              <a id="wizPinShortcutLink" href="https://kr.pinterest.com/" target="_blank" rel="noopener noreferrer" class="btn-tool" style="text-decoration:none; padding:4px 9px; font-size:11.5px;">핀터레스트 ↗</a>
+            </div>
+          </div>
           <div class="profile-grid">
             <div id="wizPinIdWrap">
               <span class="field-label">핀터레스트 주소 (또는 ID)</span>
               <div class="prefix-input-wrap">
                 <span class="prefix-addon">pinterest.com/</span>
-                <input type="text" id="wizPinId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('wizPinId', 'pin', 'wizPinIdStatus', true, false)" onblur="smartExtractIdInput('wizPinId', 'pin', 'wizPinIdStatus', true, true)" onchange="smartExtractIdInput('wizPinId', 'pin', 'wizPinIdStatus', true, true)">
+                <input type="text" id="wizPinId" placeholder="아이디 또는 전체 주소·이메일 붙여넣기" oninput="smartExtractIdInput('wizPinId', 'pin', true, false)" onblur="smartExtractIdInput('wizPinId', 'pin', true, true)" onchange="smartExtractIdInput('wizPinId', 'pin', true, true)">
               </div>
-              <span class="wiz-id-badge" id="wizPinIdStatus"></span>
             </div>
             <div id="wizPinBoardWrap">
               <span class="field-label">핀터레스트 보드명 (빈칸 시 첫 번째 보드)</span>
               <input type="text" id="wizPinBoard" placeholder="예: 강남역 미용실 헤어스타일" oninput="onWizardFieldInput()">
             </div>
           </div>
+          <div style="border-top: 1px solid #e5e7eb; margin-top: 12px; padding-top: 10px;">
+            <div class="wiz-check-item" style="margin-bottom:0;">
+              <div class="wiz-check-main">
+                <label><input type="checkbox" id="wizPrepPinChecked" onchange="toggleOnboardingCheck('prep_pin', this.checked)"> <span id="wizPrepPinLabel"><b>핀터레스트:</b> 스타일 모음 보드 1개 이상 생성 및 프로필 ID 확인</span></label>
+                <div class="wiz-check-hint">↳ 프로필 ID는 핀터레스트 내 프로필 주소(pinterest.com/아이디)의 뒷부분입니다.</div>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <!-- (5) 실시간 연동 프로필·블로그·사전 세팅 영역 (위쪽 입력값 실시간 반영) -->
-        <div id="wizStep2DynamicContainer"></div>
       </div>
 
       <!-- 3단계: 나만의 '본문뽑기' 마스터 프롬프트 발급 (2모드: 기본 표준 vs 내 스타일 입히기) & 10초 체험 -->
@@ -999,7 +1089,7 @@
           <a href="https://link.inpock.co.kr/" target="_blank" class="btn-tool" style="text-decoration:none; background:#2563eb; color:#fff; border-color:#2563eb; font-weight:700;">🌐 인포크링크 바로가기 ↗</a>
         </div>
         <div class="wiz-desc-text">
-          인스타·유튜브·쓰레드·블로그 곳곳에 흩어진 예약 링크를 <b>딱 1개의 통합 페이지</b>로 묶어두면 예약 전환율이 훨씬 올라갑니다.
+          인스타·유튜브·틱톡·블로그 곳곳에 흩어진 예약 링크를 <b>딱 1개의 통합 페이지</b>로 묶어두면 예약 전환율이 훨씬 올라갑니다.
         </div>
         <div class="wiz-info-callout">
           💡 <b>영업시간·정기 휴무일 관리 팁:</b> 블로그/SNS 글마다 적지 마시고 <b>인포크링크 상단 소개에 직접 입력</b>해 두시면 추후 변경 시 한 곳만 고치면 되어 가장 깔끔합니다.
@@ -1059,6 +1149,8 @@ let currentPreviewVideoUrl = "";
 let previewFallbackRequested = false;
 let scrubberFrameNudged = false;
 let extractedThumbs = [];
+let thumbsVideoName = "";
+let hasCustomThumbEdits = false;
 let selectedThumbSlot = 0;
 let scrubDuration = 0;
 let gifStartSec = 0;
@@ -1069,7 +1161,7 @@ let currentVideoAspect = { width: 0, height: 0, mode: 'portrait' };
 let draggedThumbIdx = null;
 let currentProfile = {};
 let currentBlogCategories = [];
-let currentEnabledPlatforms = ['yt', 'naver', 'clip', 'tt', 'ig', 'pin', 'threads', 'x', 'fb', 'fb_page'];
+let currentEnabledPlatforms = ['yt', 'naver', 'clip', 'ig', 'tt', 'fb', 'fb_page', 'pin'];
 let onboardingChecks = {};
 let onboardingPromptCopied = false;
 let isProfileConfigured = false;
@@ -1091,13 +1183,11 @@ const PLATFORM_META = [
   { key: 'yt', dotId: 'dotYt', chkId: 'chkYt', label: '유튜브 쇼츠', desc: '공식 무료 API (하루 최대 6건)' },
   { key: 'naver', dotId: 'dotNaver', chkId: 'chkNaver', label: '네이버 블로그', desc: '검색 유입 핵심 · 사진/GIF 자동 배치' },
   { key: 'clip', dotId: 'dotClip', chkId: 'chkClip', label: '네이버 클립', desc: '플레이스 연동 숏폼' },
-  { key: 'tt', dotId: 'dotTt', chkId: 'chkTt', label: '틱톡', desc: '글로벌 숏폼 노출' },
   { key: 'ig', dotId: 'dotIg', chkId: 'chkIg', label: '인스타그램', desc: '릴스 저장/예약 전환 핵심' },
-  { key: 'pin', dotId: 'dotPin', chkId: 'chkPin', label: '핀터레스트', desc: '스타일 검색 + 링크 유입' },
-  { key: 'threads', dotId: 'dotThreads', chkId: 'chkThreads', label: '쓰레드', desc: '대화형 소통 · 인스타 연동' },
-  { key: 'x', dotId: 'dotX', chkId: 'chkX', label: '엑스(X)', desc: '초간결 스타일 피드' },
+  { key: 'tt', dotId: 'dotTt', chkId: 'chkTt', label: '틱톡', desc: '글로벌 숏폼 노출' },
   { key: 'fb', dotId: 'dotFb', chkId: 'chkFb', label: '페이스북(개인)', desc: '개인 계정 릴스 노출' },
-  { key: 'fb_page', dotId: 'dotFbPage', chkId: 'chkFbPage', label: '페이스북(매장)', desc: '매장 전용 · 메타 비즈니스 페이지 릴스' }
+  { key: 'fb_page', dotId: 'dotFbPage', chkId: 'chkFbPage', label: '페이스북(매장)', desc: '매장 전용 · 메타 비즈니스 페이지 릴스' },
+  { key: 'pin', dotId: 'dotPin', chkId: 'chkPin', label: '핀터레스트', desc: '스타일 검색 + 링크 유입' }
 ];
 
 const WIZARD_STEP_TITLES = [
@@ -1190,9 +1280,12 @@ function renderVideoMeta(meta) {
     pills.push(`<span class="${cls}">📱 ${meta.orientation}</span>`);
   }
   const warnings = Array.isArray(meta.warnings) ? meta.warnings : [];
+  if (!warnings.length) {
+    pills.push('<span class="meta-pill ok">✅ 주요 숏폼 플랫폼 규격 적합</span>');
+  }
   const warnHtml = warnings.length
     ? `<div class="meta-warn-list">${warnings.map(w => `<span class="meta-warn-badge">⚠️ ${w}</span>`).join('')}</div>`
-    : `<div class="meta-warn-list"><span class="meta-pill ok">✅ 주요 숏폼 플랫폼 규격 적합</span></div>`;
+    : '';
   box.innerHTML = `<div class="video-meta-pills">${pills.join('')}</div>${warnHtml}`;
   box.style.display = 'block';
 }
@@ -1219,11 +1312,15 @@ function renderPublishResults(results, isBusy) {
   }).join('');
 
   const retryBtnHtml = failedKeys.length > 0
-    ? `<button type="button" class="btn-retry-failed" onclick="retryFailedPlatforms()">🔁 실패한 플랫폼만 다시 올리기 (${failedKeys.length}개)</button>`
+    ? `<div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+         <button type="button" class="btn-status-detail" onclick="openBlackboxFolder()" title="오류 진단 리포트(report_upload.md · report_test.md)와 블랙박스 영상(upload.mp4 · test.mp4)이 저장된 blackbox 폴더를 엽니다">📂 오류 폴더 열기</button>
+         <button type="button" class="btn-retry-failed" onclick="retryFailedPlatforms()">🔁 실패한 플랫폼만 다시 올리기 (${failedKeys.length}개)</button>
+       </div>`
     : `<span style="font-size:11.5px; color:#059669; font-weight:700;">✅ 모든 선택 플랫폼 성공!</span>`;
 
+  const errorChatUrl = escapeHtml((latestReleaseInfo && latestReleaseInfo.chat_url && String(latestReleaseInfo.chat_url).trim() !== '#') ? String(latestReleaseInfo.chat_url).trim() : 'https://open.kakao.com/o/gixPiVXi');
   const errorHelpHtml = failedKeys.length > 0
-    ? `<div style="margin-top:8px; font-size:11.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:6px 9px;">💡 플랫폼 화면이 바뀌었나요? 상단 <b>[🔄 업데이트 확인]</b> 또는 하단 <b>[💬 질문·소통방]</b>을 확인하세요.</div>`
+    ? `<div style="margin-top:8px; font-size:11.5px; color:#92400e; background:#fffbeb; border:1px solid #fcd34d; border-radius:6px; padding:6px 9px;">💡 플랫폼 화면이 바뀌었나요? 상단 <b>[🔄 업데이트 확인]</b> 또는 <a href="${errorChatUrl}" target="_blank" rel="noopener noreferrer" style="color:#92400e; font-weight:700; text-decoration:underline;">[💬 질문·소통방]</a>을 확인하세요.</div>`
     : '';
 
   box.innerHTML = `
@@ -1324,62 +1421,20 @@ function extractInstagramId(raw) {
   return s;
 }
 
-function extractThreadsId(raw) {
-  let s = String(raw || '').trim();
-  if (!s) return '';
-  const mu = s.match(/threads\.(?:com|net)\/@?([A-Za-z0-9._]+)/i);
-  if (mu) {
-    if (['login', 'logout', 'search', 'activity', 'following', 'for_you', 'settings', 'accounts', 'post', 't'].includes(mu[1].toLowerCase())) return '';
-    return mu[1].replace(/^@/, '');
-  }
-  if (/threads\.(?:com|net)/i.test(s)) return '';
-  s = s.replace(/^https?:\/\//i, '').replace(/^\/+/, '').split('/')[0].split('?')[0].trim().replace(/^@/, '');
-  if (s.includes('@')) s = s.split('@')[0].trim();
-  return s;
-}
-
-function extractXId(raw) {
-  let s = String(raw || '').trim();
-  if (!s) return '';
-  const mu = s.match(/(?:x\.com|twitter\.com)\/@?([A-Za-z0-9_]+)/i);
-  if (mu) {
-    if (['home', 'explore', 'notifications', 'messages', 'compose', 'i', 'search', 'settings', 'login', 'intent'].includes(mu[1].toLowerCase())) return '';
-    return mu[1].replace(/^@/, '');
-  }
-  if (/(?:x\.com|twitter\.com)/i.test(s)) return '';
-  s = s.replace(/^https?:\/\//i, '').replace(/^\/+/, '').split('/')[0].split('?')[0].trim().replace(/^@/, '');
-  if (s.includes('@')) s = s.split('@')[0].trim();
-  return s;
-}
-
-function formatIdConnectText(type, extracted) {
-  if (!extracted) return '';
-  if (type === 'naver') return `✅ 연결 주소: blog.naver.com/${extracted}`;
-  if (type === 'pin') return `✅ 연결 주소: pinterest.com/${extracted}`;
-  if (type === 'ig') return `✅ 연결 주소: instagram.com/${extracted}/ · threads.com/@${extracted}`;
-  if (type === 'x') return `✅ 연결 주소: x.com/${extracted}`;
-  return '';
-}
-
-function smartExtractIdInput(inputId, type, statusId, triggerWizardSync = false, forceNormalize = false) {
+function smartExtractIdInput(inputId, type, triggerWizardSync = false, forceNormalize = false) {
   const el = document.getElementById(inputId);
-  const stEl = document.getElementById(statusId);
   if (!el) return;
   const raw = (el.value || '').trim();
   let extracted = '';
   if (type === 'naver') extracted = extractNaverBlogId(raw);
   else if (type === 'pin') extracted = extractPinterestId(raw);
   else if (type === 'ig') extracted = extractInstagramId(raw);
-  else if (type === 'x') extracted = extractXId(raw);
-  const looksLikeUrl = /https?:\/\/|blog\.naver\.com|pinterest\.|instagram\.com|threads\.(?:com|net)|x\.com|twitter\.com|[/?]/i.test(raw);
+  const looksLikeUrl = /https?:\/\/|blog\.naver\.com|pinterest\.|instagram\.com|[/?]/i.test(raw);
   const looksLikeAtHandle = raw.startsWith('@');
   const looksLikeFullEmail = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(raw);
 
   if (raw && extracted && raw !== extracted && (forceNormalize || looksLikeUrl || looksLikeAtHandle || looksLikeFullEmail)) {
     el.value = extracted;
-  }
-  if (stEl) {
-    stEl.innerText = formatIdConnectText(type, extracted);
   }
   if (triggerWizardSync) onWizardFieldInput();
 }
@@ -1477,7 +1532,7 @@ function renderBlogCategoryChips() {
   const wrap = document.getElementById('wizBlogCatChips');
   if (wrap) {
     if (!cats.length) {
-      wrap.innerHTML = `<span style="font-size:11px; color:#94a3b8;">등록된 게시판이 없습니다 (빈칸이면 블로그 기본 게시판 발행 · 위 [✨ 기본 추천 채우기] 클릭 가능)</span>`;
+      wrap.innerHTML = `<span style="font-size:11px; color:#94a3b8;">등록된 게시판이 없습니다 (빈칸이면 블로그 기본 게시판 발행)</span>`;
     } else {
       wrap.innerHTML = cats.map((c, idx) =>
         `<span class="cat-chip">${escapeHtml(c)}<button type="button" title="삭제" onclick="removeBlogCategory(${idx})">×</button></span>`
@@ -1514,17 +1569,6 @@ function addBlogCategoryFromInput(inputId) {
 
 function removeBlogCategory(idx) {
   currentBlogCategories.splice(idx, 1);
-  renderBlogCategoryChips();
-  updateWizardLivePreviews();
-  debouncedSaveWizardDraft();
-}
-
-function fillDefaultBlogCategories() {
-  ['Men', 'Women'].forEach(c => {
-    if (!currentBlogCategories.some(ex => ex.toLowerCase() === c.toLowerCase())) {
-      currentBlogCategories.push(c);
-    }
-  });
   renderBlogCategoryChips();
   updateWizardLivePreviews();
   debouncedSaveWizardDraft();
@@ -1613,17 +1657,6 @@ function syncPreviewCardsVisibility() {
   updateToggleAllPlatformsBtn();
 }
 
-function toggleQuotaDetail() {
-  const panel = document.getElementById('quotaDetailPanel');
-  const btn = document.getElementById('btnToggleQuotaDetail');
-  if (!panel) return;
-  const isOpen = panel.classList.toggle('open');
-  if (btn) {
-    btn.innerText = isOpen ? '상세 ▴' : '상세 ▾';
-    btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  }
-}
-
 function applyUploadedPlatformsUI(platformsList, opts = {}) {
   const { autoUncheck = false, resetChecksForUnuploaded = false, onlyUncheckNewlyAdded = false } = opts || {};
   const prevSet = new Set(uploadedPlatformsSet);
@@ -1687,18 +1720,12 @@ function syncProfileShortcutLinks(prof) {
   const naverId = extractNaverBlogId(p.naver_blog_id || '');
   const pinId = extractPinterestId(p.pinterest_id || '');
   const igId = extractInstagramId(p.instagram_id || '');
-  const threadsId = extractThreadsId(p.threads_id || '');
-  const xId = extractXId(p.x_id || '');
   const naverLink = document.getElementById('linkNaverBlog');
   const pinLink = document.getElementById('linkPinterest');
   const igLink = document.getElementById('linkInstagram');
-  const threadsLink = document.getElementById('linkThreads');
-  const xLink = document.getElementById('linkX');
   if (naverLink) naverLink.href = naverId ? `https://blog.naver.com/${encodeURIComponent(naverId)}` : 'https://blog.naver.com/';
   if (pinLink) pinLink.href = pinId ? `https://kr.pinterest.com/${encodeURIComponent(pinId)}/` : 'https://kr.pinterest.com/';
   if (igLink) igLink.href = igId ? `https://www.instagram.com/${encodeURIComponent(igId)}/` : 'https://www.instagram.com/';
-  if (threadsLink) threadsLink.href = threadsId ? `https://www.threads.com/@${encodeURIComponent(threadsId)}` : 'https://www.threads.com/';
-  if (xLink) xLink.href = xId ? `https://x.com/${encodeURIComponent(xId)}/media` : 'https://x.com/';
 }
 
 function applyProfileToUI(data) {
@@ -1754,12 +1781,6 @@ function applyProfileToUI(data) {
   if (pinDestEl) pinDestEl.value = prof.booking_url || '';
   if (pinBoardEl) pinBoardEl.value = prof.pinterest_board || '';
 
-  const naverId = extractNaverBlogId(prof.naver_blog_id || '');
-  const pinId = extractPinterestId(prof.pinterest_id || '');
-  const naverStatusEl = document.getElementById('wizNaverIdStatus');
-  if (naverStatusEl) naverStatusEl.innerText = formatIdConnectText('naver', naverId);
-  const pinStatusEl = document.getElementById('wizPinIdStatus');
-  if (pinStatusEl) pinStatusEl.innerText = formatIdConnectText('pin', pinId);
   syncProfileShortcutLinks(prof);
 
   renderBlogCategoryChips();
@@ -1895,12 +1916,8 @@ function toggleWizardPlatform(key, ev) {
   setWizardPlatformState(key, !currentEnabledPlatforms.includes(key));
 }
 
-function setWizardPlatformPreset(mode) {
-  if (mode === 'core') {
-    currentEnabledPlatforms = ['naver', 'ig', 'yt'];
-  } else {
-    currentEnabledPlatforms = PLATFORM_META.map(p => p.key);
-  }
+function setWizardPlatformPreset() {
+  currentEnabledPlatforms = PLATFORM_META.map(p => p.key);
   renderWizardPlatforms();
   applyEnabledPlatformsToUI();
   refreshSetupStatus();
@@ -1963,7 +1980,6 @@ function getLiveWizardValues() {
     naverId: extractNaverBlogId(readField('wizNaverId', 'naver_blog_id')),
     pinId: extractPinterestId(readField('wizPinId', 'pinterest_id')),
     igId: extractInstagramId(currentProfile.instagram_id || ''),
-    xId: extractXId(currentProfile.x_id || ''),
     pinBoard: readField('wizPinBoard', 'pinterest_board'),
     address: readField('wizSalonAddress', 'salon_address'),
     locationGuide: readField('wizLocationGuide', 'location_guide'),
@@ -1974,10 +1990,11 @@ function getLiveWizardValues() {
 }
 
 function buildUniversalSnsBio(v) {
-  // URL 제외 · 모든 SNS 공용 3줄 프로필 소개글 (기본정보 실시간 연동)
+  // URL 제외 · 복붙 프로필 3줄 소개글 (한 줄 아이덴티티 우선 반영)
+  const secondLine = (v && v.specialty ? String(v.specialty).trim() : '') || '실제 시술 기록과 손질 팁을 공유합니다.';
   return [
     `${v.salon}${v.designer ? ' | ' + v.designer : ''}`,
-    `실제 시술 기록과 손질 팁을 공유합니다.`,
+    secondLine,
     `👇 예약·상담·가격표는 아래 링크 클릭`
   ].join('\n');
 }
@@ -1990,7 +2007,7 @@ function copyWizardBookingLinkOnly() {
   const v = getLiveWizardValues();
   const url = (v.booking || '').trim();
   if (!url) {
-    showAppToast('⚠️ 위 핵심 기본 정보에서 대표 통합 링크(예약·상담 URL)를 먼저 입력해 주세요.');
+    showAppToast('⚠️ 대표 통합 링크(인포크링크 URL)를 먼저 입력해 주세요.');
     return;
   }
   copyRawText(url, '🔗 예약 링크만 클립보드에 복사되었습니다! 각 앱의 [웹사이트/링크] 칸에 붙여넣어 주세요.');
@@ -2063,7 +2080,19 @@ function copyStyleExtractPrompt() {
   copyRawText(buildStyleExtractPromptText(), '✅ 내 스타일 추출 요청 프롬프트가 복사되었습니다! ChatGPT/Gemini에 붙여넣고 내 글을 함께 보내세요.');
 }
 
-function buildMasterPromptText(v) {
+function getSelectedAiVideoType() {
+  const ba = document.getElementById('aiVideoTypeBeforeAfter');
+  return (ba && ba.checked) ? 'before_after' : 'after_only';
+}
+
+function buildBlogMediaContextRule(videoType) {
+  if (videoType === 'before_after') {
+    return `- [미디어 자료1~5] 문맥 구성(비포+애프터): [미디어 자료1]은 시술 전 고민 상태, [미디어 자료2]~[미디어 자료5]는 시술 후 변화·결감·완성 컷 중심으로 서술하세요.`;
+  }
+  return `- [미디어 자료1~5] 문맥 구성(애프터만): [미디어 자료1]~[미디어 자료5] 모두 완성 스타일의 실루엣·결감·라인·움직임 중심으로 서술하세요.`;
+}
+
+function buildMasterPromptText(v, videoType = 'after_only') {
   const regionTags = getDynamicRegionTags(v.region, 3);
   const primaryRegion = getPrimaryRegionName(v.region);
   const regionDisplay = primaryRegion || '(대표 지역 입력)';
@@ -2105,7 +2134,7 @@ function buildMasterPromptText(v) {
     `- '${regionFilePrefix}미용실_메인시술_서브시술_스타일특징' 형식의 명사형 언더스코어(_) 연결 1줄 (동사형·문장형 금지)`,
     ``,
     `[제목3종]`,
-    `- 아래 3가지 역할로 명확히 구분해 번호(1.~3.)를 붙여 작성하세요:`,
+    `- 아래 3가지 역할로 명확히 구분해 번호(1.~3.)를 붙여 작성하세요 ('메인 후킹형', '결과 중심형', '로컬 검색형' 같은 라벨명은 출력하지 말고, 번호 뒤에 실제 제목만 1줄씩 바로 작성):`,
     `1. 메인 후킹형 (영상 자막, 고객 실제 말, 또는 시술 핵심 포인트 기반)`,
     `2. 결과 중심형 (궁금증을 유발하는 간결한 제목)`,
     `3. 로컬 검색형 ('${regionDisplay} 미용실' + 실제 검색어 중심)`,
@@ -2121,14 +2150,24 @@ function buildMasterPromptText(v) {
     ``,
     `[블로그 전용 본문]`,
     `- 도입부는 반드시 "${blogGreeting}"로 시작하세요.`,
+    `- 첫 인사말과 짧은 도입부 바로 아래(첫 번째 소제목 시작 전)에 입력된 3줄 팩트 메모 기반 사실만 담아 아래 형식의 '오늘의 시술 3줄 요약' 블록을 반드시 단독 줄로 포함할 것 (이모티콘 금지 · 요약 블록 앞뒤 빈 줄 1칸 확보):`,
+    `**오늘의 시술 요약**`,
+    `시술명 : (실제 진행한 시술명)`,
+    `모발 상태 : (고객 모발 조건·고민 요약)`,
+    `추천 대상 : (이 스타일을 추천하는 대상 1줄 요약)`,
     `- 네이버 SEO 기준 공백 포함 2,000자 내외(약 1,900~2,300자)로 작성`,
     `- 반드시 4단계 흐름(도입부 → 문제 진단 → 해결 과정 → 마무리·손질법)으로 구성하고 모바일 호흡(짧은 줄바꿈) 유지`,
+    `- 번호(1., 2. 등) 없이 공백 포함 18자 이내의 깔끔한 소제목 4개를 반드시 단독 줄로 작성할 것.`,
+    `- 본문 안에서 '위 사진처럼', '아래 사진에서 보시듯', '사진 속 모습' 같은 미디어 직접 지칭 표현을 절대 쓰지 말고, 중간에 사진이 빠지더라도 텍스트만으로 문맥이 자연스럽게 이어지게 작성할 것.`,
+    `- 블로그 본문에서는 이모티콘(🎉, ✨, 😍, 🔥, 📍 등)을 사용하지 말고 순수 텍스트와 소제목·굵은 강조만으로 깔끔하게 작성할 것.`,
     `- 블로그 본문 하단의 예약 안내·영업시간·휴무일·방문 안내 문구는 업로더가 자동으로 붙이므로 본문에 절대 쓰지 말고, 손질 팁과 짧은 마무리 인사 1줄로만 끝낼 것.`,
-    `- 사진/GIF 구분 없이 문맥 흐름에 맞춰 아래 4개 자리 표시자를 반드시 '단독 줄'로 자연 배치:`,
+    buildBlogMediaContextRule(videoType),
+    `- 사진/GIF 구분 없이 문맥 흐름에 맞춰 아래 5개 자리 표시자를 반드시 '단독 줄'로 자연 배치:`,
     `[미디어 자료1]`,
     `[미디어 자료2]`,
     `[미디어 자료3]`,
     `[미디어 자료4]`,
+    `[미디어 자료5]`,
     ``,
     `[대댓글 유도용 텍스트]`,
     `- [숏폼 전용 본문] 마지막 줄과 겹치지 않는 질문·공감 1~2줄 + [해시태그]와 중복되지 않는 서브 해시태그 5개`,
@@ -2136,7 +2175,7 @@ function buildMasterPromptText(v) {
     ``,
     `[출력 형식 절대 규칙 — 단일 코드박스 출력 필수]`,
     `1. 최종 원고는 [파일제목]부터 [대댓글 유도용 텍스트]까지 전체를 하나의 일반 텍스트 코드박스(\`\`\`text ... \`\`\`) 안에 담아 출력하세요.`,
-    `2. 코드박스 내부에는 마크다운 표(|---|), 인용문(>), 굵은 글씨 기호(**), 제목 기호(# ) 등 불필요한 마크다운 문법을 절대 넣지 마세요.`,
+    `2. 코드박스 내부에는 마크다운 표(|---|), 인용문(>), 굵은 글씨 기호(**)(단, 지정된 **오늘의 시술 요약** 표기 제외), 제목 기호(# ) 등 불필요한 마크다운 문법을 절대 넣지 마세요.`,
     `3. 매장명은 반드시 '${v.salon}'으로 정확히 표기하고, 과장·반복·광고체 없이 실제 시술 기록처럼 자연스럽게 작성하세요.`,
     `4. 사실 엄수(임의 창작 절대 금지): 입력받지 않은 정기 휴무일, 영업시간, 시술 가격·할인 이벤트, 주소·주차 안내는 절대 임의로 지어내어 쓰지 마세요.`,
     ``,
@@ -2144,7 +2183,7 @@ function buildMasterPromptText(v) {
   ].join('\n');
 }
 
-function buildCustomMasterPromptText(v, customStyleGuide) {
+function buildCustomMasterPromptText(v, customStyleGuide, videoType = 'after_only') {
   const regionTags = getDynamicRegionTags(v.region, 3);
   const primaryRegion = getPrimaryRegionName(v.region);
   const regionDisplay = primaryRegion || '(대표 지역 입력)';
@@ -2182,28 +2221,29 @@ function buildCustomMasterPromptText(v, customStyleGuide) {
     `■ Step 2. 최종 원고 6개 구분자 출력 (순서·형식 엄수)`,
     `답변을 받으면 반드시 아래 6개 대괄호 구분자를 정확한 이름으로 순서대로 빠짐없이 작성하세요.`,
     `- [파일제목]: '${regionFilePrefix}미용실_메인시술_서브시술_스타일특징' 형식의 명사형 언더스코어(_) 연결 1줄 (동사형·문장형 금지)`,
-    `- [제목3종]: 아래 3가지 역할로 구분해 1.~3. 번호로 작성`,
+    `- [제목3종]: 아래 3가지 역할로 구분해 1.~3. 번호로 작성 ('메인 후킹형', '결과 중심형', '로컬 검색형' 같은 라벨명은 출력하지 말고, 번호 뒤에 실제 제목만 1줄씩 바로 작성)`,
     `  1. 메인 후킹형 (영상 자막, 고객 실제 말, 또는 시술 핵심 포인트 기반)`,
     `  2. 결과 중심형 (궁금증을 유발하는 간결한 제목)`,
     `  3. 로컬 검색형 ('${regionDisplay} 미용실' + 실제 검색어 중심)`,
     `- [해시태그]: 핵심 5개 한 줄 출력 (황금 비율: 지역 기반 2개[${coreRegionHint}] + 실제 검색되는 1티어 메인 스타일명 2~3개 + 성별·기장 0~1개). 성별·기장은 시술명만으로 드러나지 않을 때(레이어드컷·매직셋팅·히피펌·염색 등)만 1개 추가(#여자긴머리·#중단발 등)하고, 이미 드러날 때(태슬컷·드롭컷·아이비리그컷 등)는 생략하고 메인 스타일명 3개로 채울 것. (금지: 무관한 스타일명, #남자뒷머리·#뒷통수볼륨·#예쁜머리·#머리스타일·#머리손질법 등 애매한 부위·추상·임의 합성 태그, 디자이너(${designerDisplay}) 태그${bannedExtra})`,
     `- [숏폼 전용 본문]: 한 문장을 중간에 쉼표로 끊어 두 줄로 나누지 말고 각 줄을 완결된 문장으로 작성하며, 도입부(공감 1줄) → 빈 줄 → 시술 변화(완결 1~2문장) → 빈 줄 → 손질 팁 1줄 → 빈 줄 → 고정 푸터(별도 커스텀 서명이 없으면 '${footerLine}' 사용) 순서로 문단 사이 빈 줄을 넣어 모바일 가독성을 확보`,
-    `- [블로그 전용 본문]: 도입부는 반드시 "${blogGreeting}"로 시작, SEO 공백 포함 2,000자 내외(약 1,900~2,300자), 4단계 흐름(도입부 → 문제 진단 → 해결 과정 → 마무리·손질법) 구성. 블로그 본문 하단의 예약 안내·영업시간·휴무일·방문 안내 문구는 업로더가 자동으로 붙이므로 본문에 절대 쓰지 말고, 손질 팁과 짧은 마무리 인사 1줄로만 끝낼 것. 사진/GIF 구분 없이 아래 4개 자리 표시자를 반드시 '단독 줄'로 자연 배치:`,
+    `- [블로그 전용 본문]: 도입부는 반드시 "${blogGreeting}"로 시작, SEO 공백 포함 2,000자 내외(약 1,900~2,300자), 4단계 흐름(도입부 → 문제 진단 → 해결 과정 → 마무리·손질법) 구성. 번호(1., 2. 등) 없이 공백 포함 18자 이내의 깔끔한 소제목 4개를 반드시 단독 줄로 작성할 것. 본문 안에서 '위 사진처럼', '아래 사진에서 보시듯', '사진 속 모습' 같은 미디어 직접 지칭 표현을 절대 쓰지 말고, 중간에 사진이 빠지더라도 텍스트만으로 문맥이 자연스럽게 이어지게 작성할 것. 블로그 본문에서는 이모티콘(🎉, ✨, 😍, 🔥, 📍 등)을 사용하지 말고 순수 텍스트와 소제목·굵은 강조만으로 깔끔하게 작성할 것. 블로그 본문 하단의 예약 안내·영업시간·휴무일·방문 안내 문구는 업로더가 자동으로 붙이므로 본문에 절대 쓰지 말고, 손질 팁과 짧은 마무리 인사 1줄로만 끝낼 것. ${buildBlogMediaContextRule(videoType).replace(/^- /, '')} 사진/GIF 구분 없이 아래 5개 자리 표시자를 반드시 '단독 줄'로 자연 배치:`,
     `[미디어 자료1]`,
     `[미디어 자료2]`,
     `[미디어 자료3]`,
     `[미디어 자료4]`,
+    `[미디어 자료5]`,
     `- [대댓글 유도용 텍스트]: 본문 마지막 줄과 겹치지 않는 질문·공감 1~2줄 + [해시태그]와 중복되지 않는 서브 해시태그 5개 (저검색 손질 태그 대신 지역+시술 조합 및 확장 지역 2~3개[${thirdRegionHint}#${regionFilePrefix}다운펌 등] + 연관 스타일명 또는 실제 모발 고민[#곱슬머리·#손상모·#가는모발 등] 2~3개 · 금지 태그 규칙 동일 적용)`,
     ``,
     `■ 출력 형식 절대 규칙 — 단일 코드박스 출력 필수`,
     `1. 최종 원고는 [파일제목]부터 [대댓글 유도용 텍스트]까지 전체를 하나의 일반 텍스트 코드박스(\`\`\`text ... \`\`\`) 안에 담아 출력하세요.`,
-    `2. 코드박스 내부에는 마크다운 표(|---|), 인용문(>), 굵은 글씨 기호(**), 제목 기호(# ) 등 불필요한 마크다운 문법을 절대 넣지 마세요.`,
+    `2. 코드박스 내부에는 마크다운 표(|---|), 인용문(>), 굵은 글씨 기호(**)(단, 지정된 **오늘의 시술 요약** 표기 제외), 제목 기호(# ) 등 불필요한 마크다운 문법을 절대 넣지 마세요.`,
     `3. 매장명은 반드시 '${v.salon}'으로 정확히 표기하고, 해시태그는 [해시태그]·[대댓글 유도용 텍스트] 지정 영역에만 출력하세요.`,
     `4. 사실 엄수(임의 창작 절대 금지): 입력받지 않은 정기 휴무일, 영업시간, 시술 가격·할인 이벤트, 주소·주차 안내는 절대 임의로 지어내어 쓰지 마세요.`,
     ``,
     `[2순위 영역 분리 규칙 — 내 스타일 안전 적용]`,
     `- [숏폼 전용 본문]에는 아래 [내 스타일 가이드]의 말투·어투, 이모지 사용 습관, 줄바꿈 리듬, 영문 요약/병기, 하단 커스텀 서명·DM 푸터를 100% 반영해 작성하세요.`,
-    `- [블로그 전용 본문]에는 [내 스타일 가이드]의 말투의 결만 자연스럽게 유지하되, 도입부 고정 인사("${blogGreeting}"), 분량(공백 포함 약 1,900~2,300자), 4단계 흐름, [미디어 자료1~4] 단독 줄 배치는 반드시 위 1순위 업로더 표준 규격을 따르세요.`,
+    `- [블로그 전용 본문]에는 [내 스타일 가이드]의 말투의 결만 자연스럽게 유지하되, 도입부 고정 인사("${blogGreeting}"), 분량(공백 포함 약 1,900~2,300자), 4단계 흐름, [미디어 자료1~5] 단독 줄 배치는 반드시 위 1순위 업로더 표준 규격을 따르세요.`,
     `- [내 스타일 가이드]와 1순위 업로더 필수 규격이 충돌할 경우, 항상 1순위 업로더 필수 규격을 우선 적용하세요.`,
     ``,
     `[내 스타일 가이드]`,
@@ -2231,7 +2271,7 @@ function updateWizardLivePreviews() {
       `① <b>네이버 예약</b> — 매장 네이버 플레이스 예약 URL 연결`,
       `② <b>1:1 오픈채팅 · 시술 가격표</b> — 카카오톡 오픈채팅방 또는 가격 안내 링크`,
       `③ <b>주차 · 오시는 길 안내</b> — 2단계에서 작성할 네이버 블로그 '오시는 길' 고정글 링크`,
-      `④ <b>하단 SNS 아이콘</b> — 인스타·유튜브·블로그·쓰레드 등 사용 중인 채널 아이콘 연결`
+      `④ <b>하단 SNS 아이콘</b> — 인스타·유튜브·블로그·틱톡 등 사용 중인 채널 아이콘 연결`
     ].join('<br>');
   }
 
@@ -2239,13 +2279,14 @@ function updateWizardLivePreviews() {
   renderWizardStep2(v);
 
   // 3단계: 본문뽑기 마스터 프롬프트 (기본 표준 + 내 스타일 입히기) & 설정 상태 신호등
+  const aiVideoType = getSelectedAiVideoType();
   const promptEl = document.getElementById('wizMasterPromptBox');
-  if (promptEl) promptEl.innerText = buildMasterPromptText(v);
+  if (promptEl) promptEl.innerText = buildMasterPromptText(v, aiVideoType);
   const extractEl = document.getElementById('wizStyleExtractPromptBox');
   if (extractEl) extractEl.innerText = buildStyleExtractPromptText();
   const styleGuideVal = (document.getElementById('wizCustomStyleGuide')?.value ?? currentProfile.custom_style_guide ?? '').trim();
   const customPromptEl = document.getElementById('wizCustomMasterPromptBox');
-  if (customPromptEl) customPromptEl.innerText = buildCustomMasterPromptText(v, styleGuideVal);
+  if (customPromptEl) customPromptEl.innerText = buildCustomMasterPromptText(v, styleGuideVal, aiVideoType);
   renderWizardReadiness(v);
   updateWizardProgress(v);
 }
@@ -2295,7 +2336,7 @@ function calculateWizardProgress(vOpt) {
   if (enabled.has('naver')) {
     countItem(Boolean(onboardingChecks['directions_map']));
   }
-  const prepKeys = ['ig', 'clip', 'pin', 'tt', 'threads', 'x', 'fb', 'fb_page'];
+  const prepKeys = ['clip', 'ig', 'tt', 'fb', 'fb_page', 'pin'];
   prepKeys.forEach(k => {
     if (enabled.has(k)) {
       countItem(Boolean(onboardingChecks['prep_' + k]));
@@ -2320,155 +2361,98 @@ function updateWizardProgress(vOpt) {
 }
 
 function renderWizardStep2(v) {
-  const container = document.getElementById('wizStep2DynamicContainer');
-  if (!container) return;
   const enabled = new Set(currentEnabledPlatforms);
-  const blocks = [];
 
-  // 1) 모든 SNS 공용 프로필 소개글 통합 카드 (원클릭 복사 + 예약 링크 단독 복사)
-  blocks.push(`
-    <div class="wiz-section-box">
-      <div class="wiz-section-title">
-        <span>✍️ 모든 SNS 공용 프로필 소개글 (원클릭 복사)</span>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          <button type="button" class="btn-tool" style="background:#2563eb; color:#fff; border-color:#2563eb; font-weight:700;" onclick="copyTextById('wizBioUniversal')">📋 소개글 복사</button>
-          <button type="button" class="btn-tool" onclick="copyWizardBookingLinkOnly()">🔗 예약 링크만 복사</button>
-        </div>
-      </div>
-      <div class="wiz-copy-card" style="margin-bottom:0;">
-        <pre class="wiz-copy-pre" id="wizBioUniversal">${escapeHtml(buildUniversalSnsBio(v))}</pre>
-      </div>
-      <div class="profile-hint" style="margin-top:8px; color:#4b5563;">
-        인스타·쓰레드·틱톡·X·핀터레스트·유튜브·블로그 모두 공용으로 사용하세요. 예약 링크는 각 앱의 <b>[웹사이트/링크]</b> 칸(또는 소개글 맨 아래)에 붙여넣으시면 됩니다.
-      </div>
-    </div>
-  `);
+  // 카드 2: 복붙 프로필 소개글 실시간 갱신
+  const bioEl = document.getElementById('wizBioUniversal');
+  if (bioEl) bioEl.textContent = buildUniversalSnsBio(v);
 
-  // 2) 네이버 블로그 세팅 (선택 시)
-  if (enabled.has('naver')) {
-    const blogManageUrl = v.naverId ? `https://admin.blog.naver.com/${v.naverId}` : 'https://blog.naver.com/';
-    const catChecks = v.cats.length
-      ? v.cats.map((c, idx) => {
-          const ckKey = 'cat_' + idx;
-          const isCk = onboardingChecks[ckKey] ? 'checked' : '';
-          return `<label class="wiz-check-item"><span><input type="checkbox" ${isCk} onchange="toggleOnboardingCheck('${ckKey}', this.checked)"> 시술 업로드용 게시판 <b>「${escapeHtml(c)}」</b> 확인</span><span style="font-size:11.5px; color:#2563eb; font-weight:600;">자동 업로드용</span></label>`;
-        }).join('')
-      : `<div style="font-size:12px; color:#6b7280;">2단계에서 자동 업로드할 블로그 게시판을 추가하면 여기에 체크리스트가 표시됩니다.</div>`;
-    const dirCatCk = onboardingChecks['directions_cat'] ? 'checked' : '';
-    const dirMapCk = onboardingChecks['directions_map'] ? 'checked' : '';
-    blocks.push(`
-      <div class="wiz-section-box">
-        <div class="wiz-section-title">
-          <span>🟢 네이버 블로그 게시판 &amp; '오시는 길' 고정글 세팅</span>
-          <a href="${blogManageUrl}" target="_blank" class="btn-tool" style="text-decoration:none;">블로그 관리 열기 ↗</a>
-        </div>
-        <div class="wiz-check-list" style="margin-bottom:10px;">
-          ${catChecks}
-          <label class="wiz-check-item" style="background:#f8fafc; border-color:#d1d5db;">
-            <span><input type="checkbox" ${dirCatCk} onchange="toggleOnboardingCheck('directions_cat', this.checked)"> 1회성 고정글 전용 <b>「오시는 길」</b> 카테고리 별도 추가</span>
-            <span style="font-size:11.5px; color:#4b5563; font-weight:600;">인포크링크 연결용</span>
-          </label>
-        </div>
-        <div class="wiz-copy-card" style="margin-bottom:0;">
-          <div class="wiz-copy-head"><span>🗺️ '오시는 길' 고정 게시글 초안 (자동 완성)</span><button type="button" class="btn-tool" onclick="copyTextById('wizDirectionsDraft')">📋 초안 복사</button></div>
-          <pre class="wiz-copy-pre" id="wizDirectionsDraft">${escapeHtml(buildDirectionsPostDraft(v))}</pre>
-          <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:12.5px; font-weight:600; color:#2563eb; cursor:pointer;">
-            <input type="checkbox" id="wizDirectionsMapChecked" ${dirMapCk} onchange="toggleOnboardingCheck('directions_map', this.checked)" style="accent-color:#2563eb;"> '오시는 길' 글 작성 시 스마트플레이스 지도 첨부까지 완료했습니다
-          </label>
-        </div>
-      </div>
-    `);
+  // 카드 2 하단: 선택한 SNS 사전 준비 체크리스트 (네이버 클립 · 인스타 · 틱톡 · 페북 개인/매장)
+  const prepWrap = document.getElementById('wizSnsPrepWrap');
+  const prepContainer = document.getElementById('wizSnsPrepContainer');
+  if (prepContainer) {
+    const prepCk = k => (onboardingChecks['prep_' + k] ? 'checked' : '');
+    const buildPrepRow = ({ key, labelHtml, hintText, hasGuide, shortcutUrl, shortcutLabel }) => {
+      const hintHtml = hintText ? `<div class="wiz-check-hint">${escapeHtml(hintText)}</div>` : '';
+      const guideHtml = hasGuide
+        ? `<button type="button" class="btn-guide-sub" onclick="openPlatformGuideModal('${key}')" title="초기 세팅 가이드 보기">가이드</button>`
+        : '';
+      return `<div class="wiz-check-item"><div class="wiz-check-main"><label><input type="checkbox" ${prepCk(key)} onchange="toggleOnboardingCheck('prep_${key}', this.checked)"> ${labelHtml}</label>${hintHtml}</div><div class="wiz-check-actions">${guideHtml}<a href="${shortcutUrl}" target="_blank" rel="noopener noreferrer" class="btn-shortcut">${shortcutLabel}</a></div></div>`;
+    };
+    const prepItems = [];
+    if (enabled.has('clip')) {
+      prepItems.push(buildPrepRow({
+        key: 'clip',
+        labelHtml: '<b>네이버 클립:</b> 클립 크리에이터 센터 1회 약관 동의 완료',
+        hasGuide: true,
+        shortcutUrl: 'https://clipcreators.naver.com/web',
+        shortcutLabel: '클립 스튜디오 ↗'
+      }));
+    }
+    if (enabled.has('ig')) {
+      prepItems.push(buildPrepRow({
+        key: 'ig',
+        labelHtml: '<b>인스타그램:</b> 프로페셔널(비즈니스/크리에이터) 계정 전환 &amp; 프로필 링크에 인포크링크 등록',
+        hasGuide: true,
+        shortcutUrl: 'https://www.instagram.com/accounts/edit/',
+        shortcutLabel: '프로필 편집 ↗'
+      }));
+    }
+    if (enabled.has('tt')) {
+      prepItems.push(buildPrepRow({
+        key: 'tt',
+        labelHtml: '<b>틱톡:</b> 틱톡 스튜디오 웹 접속 및 프로필 링크 확인',
+        hasGuide: true,
+        shortcutUrl: 'https://www.tiktok.com/tiktokstudio',
+        shortcutLabel: '틱톡 스튜디오 ↗'
+      }));
+    }
+    if (enabled.has('fb')) {
+      prepItems.push(buildPrepRow({
+        key: 'fb',
+        labelHtml: '<b>페이스북(개인):</b> 개인 계정 로그인 및 릴스 공개 범위 확인',
+        hasGuide: true,
+        shortcutUrl: 'https://www.facebook.com/',
+        shortcutLabel: '페이스북 ↗'
+      }));
+    }
+    if (enabled.has('fb_page')) {
+      prepItems.push(buildPrepRow({
+        key: 'fb_page',
+        labelHtml: '<b>페이스북(매장):</b> 메타 비즈니스 스위트에서 매장 페이지 연결 확인',
+        hasGuide: true,
+        shortcutUrl: 'https://business.facebook.com/',
+        shortcutLabel: '비즈니스 스위트 ↗'
+      }));
+    }
+    prepContainer.innerHTML = prepItems.join('');
+    if (prepWrap) prepWrap.style.display = prepItems.length ? 'block' : 'none';
   }
 
-  // 3) 선택한 플랫폼별 사전 준비 체크리스트 & 바로가기 (화면 내 [가이드] 모달 팝업 + 일열 정렬)
-  const buildPrepRow = ({ key, labelHtml, hintText, hasGuide, shortcutUrl, shortcutLabel }) => {
-    const hintHtml = hintText ? `<div class="wiz-check-hint">${escapeHtml(hintText)}</div>` : '';
-    const guideHtml = hasGuide
-      ? `<button type="button" class="btn-guide-sub" onclick="openPlatformGuideModal('${key}')" title="초기 세팅 가이드 보기">가이드</button>`
-      : '';
-    return `<div class="wiz-check-item"><div class="wiz-check-main"><label><input type="checkbox" ${prepCk(key)} onchange="toggleOnboardingCheck('prep_${key}', this.checked)"> ${labelHtml}</label>${hintHtml}</div><div class="wiz-check-actions">${guideHtml}<a href="${shortcutUrl}" target="_blank" rel="noopener noreferrer" class="btn-shortcut">${shortcutLabel}</a></div></div>`;
-  };
-  const prepItems = [];
-  const prepCk = k => (onboardingChecks['prep_' + k] ? 'checked' : '');
-  if (enabled.has('ig')) {
-    prepItems.push(buildPrepRow({
-      key: 'ig',
-      labelHtml: '<b>인스타그램:</b> 프로페셔널(비즈니스/크리에이터) 계정 전환 &amp; 프로필 링크에 인포크링크 등록',
-      hasGuide: true,
-      shortcutUrl: 'https://www.instagram.com/accounts/edit/',
-      shortcutLabel: '프로필 편집 ↗'
-    }));
+  // 카드 3: 네이버 블로그 관리 링크 · '오시는 길' 고정글 초안 & 체크 상태 갱신 (정적 <details> 접힘 상태 유지)
+  const blogManageLink = document.getElementById('wizBlogManageLink');
+  if (blogManageLink) {
+    blogManageLink.href = v.naverId ? `https://admin.blog.naver.com/${encodeURIComponent(v.naverId)}` : 'https://blog.naver.com/';
   }
-  if (enabled.has('clip')) {
-    prepItems.push(buildPrepRow({
-      key: 'clip',
-      labelHtml: '<b>네이버 클립:</b> 클립 크리에이터 센터 1회 약관 동의 완료',
-      hasGuide: true,
-      shortcutUrl: 'https://clipcreators.naver.com/web',
-      shortcutLabel: '클립 스튜디오 ↗'
-    }));
+  const dirDraftEl = document.getElementById('wizDirectionsDraft');
+  if (dirDraftEl) dirDraftEl.textContent = buildDirectionsPostDraft(v);
+  const dirCatEl = document.getElementById('wizDirectionsCatChecked');
+  if (dirCatEl) dirCatEl.checked = Boolean(onboardingChecks['directions_cat']);
+  const dirMapEl = document.getElementById('wizDirectionsMapChecked');
+  if (dirMapEl) dirMapEl.checked = Boolean(onboardingChecks['directions_map']);
+
+  // 카드 4: 핀터레스트 바로가기 링크 · 보드명 체크 라벨 & 체크 상태 갱신
+  const pinShortcutLink = document.getElementById('wizPinShortcutLink');
+  if (pinShortcutLink) {
+    pinShortcutLink.href = v.pinId ? `https://kr.pinterest.com/${encodeURIComponent(v.pinId)}/` : 'https://kr.pinterest.com/';
   }
-  if (enabled.has('pin')) {
+  const prepPinChk = document.getElementById('wizPrepPinChecked');
+  if (prepPinChk) prepPinChk.checked = Boolean(onboardingChecks['prep_pin']);
+  const prepPinLbl = document.getElementById('wizPrepPinLabel');
+  if (prepPinLbl) {
     const bNote = v.pinBoard ? `보드 <b>「${escapeHtml(v.pinBoard)}」</b> 생성` : '스타일 모음 보드 1개 이상 생성';
-    prepItems.push(buildPrepRow({
-      key: 'pin',
-      labelHtml: `<b>핀터레스트:</b> ${bNote} 및 프로필 ID 확인`,
-      hintText: '↳ 프로필 ID는 핀터레스트 내 프로필 주소(pinterest.com/아이디)의 뒷부분입니다.',
-      hasGuide: true,
-      shortcutUrl: v.pinId ? `https://kr.pinterest.com/${encodeURIComponent(v.pinId)}/` : 'https://kr.pinterest.com/',
-      shortcutLabel: '핀터레스트 ↗'
-    }));
+    prepPinLbl.innerHTML = `<b>핀터레스트:</b> ${bNote} 및 프로필 ID 확인`;
   }
-  if (enabled.has('tt')) {
-    prepItems.push(buildPrepRow({
-      key: 'tt',
-      labelHtml: '<b>틱톡:</b> 틱톡 스튜디오 웹 접속 및 프로필 링크 확인',
-      hasGuide: true,
-      shortcutUrl: 'https://www.tiktok.com/tiktokstudio',
-      shortcutLabel: '틱톡 스튜디오 ↗'
-    }));
-  }
-  if (enabled.has('threads')) {
-    prepItems.push(buildPrepRow({
-      key: 'threads',
-      labelHtml: '<b>쓰레드:</b> 인스타그램 계정으로 쓰레드 프로필 개설 완료',
-      hasGuide: true,
-      shortcutUrl: 'https://www.threads.com/',
-      shortcutLabel: '쓰레드 ↗'
-    }));
-  }
-  if (enabled.has('x')) {
-    prepItems.push(buildPrepRow({
-      key: 'x',
-      labelHtml: '<b>엑스(X):</b> 프로필 소개 및 링크 반영',
-      hasGuide: true,
-      shortcutUrl: 'https://x.com/',
-      shortcutLabel: 'X 홈 ↗'
-    }));
-  }
-  if (enabled.has('fb')) {
-    prepItems.push(buildPrepRow({
-      key: 'fb',
-      labelHtml: '<b>페이스북(개인):</b> 개인 계정 로그인 및 릴스 공개 범위 확인',
-      hasGuide: true,
-      shortcutUrl: 'https://www.facebook.com/',
-      shortcutLabel: '페이스북 ↗'
-    }));
-  }
-  if (enabled.has('fb_page')) {
-    prepItems.push(buildPrepRow({
-      key: 'fb_page',
-      labelHtml: '<b>페이스북(매장):</b> 메타 비즈니스 스위트에서 매장 페이지 연결 확인',
-      hasGuide: true,
-      shortcutUrl: 'https://business.facebook.com/',
-      shortcutLabel: '비즈니스 스위트 ↗'
-    }));
-  }
-  if (prepItems.length) {
-    blocks.push(`<div class="wiz-section-box" style="margin-bottom:0;"><div class="wiz-section-title"><span>✅ 선택한 플랫폼 사전 준비 체크리스트</span></div><div class="wiz-check-list">${prepItems.join('')}</div></div>`);
-  }
-
-  container.innerHTML = blocks.join('') || `<div class="wiz-section-box">1단계에서 사용할 플랫폼을 선택해 주세요.</div>`;
 }
 
 const PLATFORM_SETUP_GUIDES = {
@@ -2506,37 +2490,17 @@ const PLATFORM_SETUP_GUIDES = {
     name: '틱톡',
     steps: [
       '하단 [바로 이동하기 ↗] 버튼으로 틱톡 스튜디오 웹에 접속해 틱톡 계정으로 로그인합니다.',
-      '틱톡 앱 또는 웹의 [프로필 편집]에서 웹사이트(링크) 항목에 예약/인포크링크가 정상 등록되어 있는지 확인합니다.',
+      '<b>웹사이트 링크 등록 안내:</b> 팔로워 1,000명 미만 개인 계정은 웹사이트 링크 칸이 막혀 있으므로, <b>[비즈니스 계정 전환 + 사업자 인증]</b>으로 웹사이트 칸을 열거나 개인 계정 유지 시 <b>[프로필 편집 → 소셜 → 인스타그램 계정 연결]</b>로 예약 동선을 연결하세요.',
       '틱톡 스튜디오 웹에서 업로드 화면이 정상적으로 열리면 초기 세팅이 완료됩니다.'
     ],
     getShortcutUrl: () => 'https://www.tiktok.com/tiktokstudio',
     helpUrl: 'https://support.tiktok.com/ko'
   },
-  threads: {
-    name: '쓰레드',
-    steps: [
-      '하단 [바로 이동하기 ↗] 버튼으로 접속한 뒤 [Instagram으로 계속하기]를 클릭합니다.',
-      '멀티업로더에 연동할 인스타그램 계정으로 로그인합니다.',
-      "'Instagram에서 정보 가져오기'로 프로필을 불러온 뒤, '공개 프로필'로 설정하여 개설을 완료합니다."
-    ],
-    getShortcutUrl: () => 'https://www.threads.com/',
-    helpUrl: 'https://help.instagram.com/788669719351544'
-  },
-  x: {
-    name: '엑스(X)',
-    steps: [
-      '하단 [바로 이동하기 ↗] 버튼으로 접속해 로그인한 뒤 좌측 메뉴에서 [프로필]을 클릭합니다.',
-      '우측 상단의 [프로필 수정] 버튼을 누릅니다.',
-      "'자기소개'에 매장 안내 문구를 작성하고, '웹사이트' 항목에 인포크링크(또는 예약 링크)를 입력한 뒤 [저장]을 누릅니다."
-    ],
-    getShortcutUrl: () => 'https://x.com/',
-    helpUrl: 'https://help.x.com/ko'
-  },
   fb: {
     name: '페이스북(개인)',
     steps: [
       '하단 [바로 이동하기 ↗] 버튼으로 페이스북에 접속해 릴스를 게시할 계정으로 로그인합니다.',
-      '프로필 설정에서 릴스 기본 공개 범위가 [전체 공개]로 되어 있는지 확인합니다.',
+      '프로필 설정에서 릴스 기본 공개 범위가 [전체 공개]로 되어 있는지 확인하고, <b>[프로필 → 정보 → 연락처 및 기본 정보 → 웹사이트 추가]</b>(또는 프로필 편집 링크 칸)에 인포크링크를 1회 등록합니다.',
       '페이스북 개인·매장 페이지는 동일한 페이스북 계정 쿠키를 공유하므로 한 번만 로그인하면 둘 다 연동됩니다.'
     ],
     getShortcutUrl: () => 'https://www.facebook.com/',
@@ -2547,7 +2511,7 @@ const PLATFORM_SETUP_GUIDES = {
     steps: [
       '하단 [바로 이동하기 ↗] 버튼으로 메타 비즈니스 스위트(business.facebook.com)에 접속합니다.',
       '좌측 상단 페이지 목록에 2단계에서 입력한 매장명과 동일한 페이스북 매장 페이지가 표시되는지 확인합니다.',
-      '매장 페이지가 아직 없다면 페이스북에서 페이지를 개설한 뒤 메타 비즈니스 스위트에 연결해 주세요.'
+      '<b>매장 링크 등록:</b> 매장 페이지의 <b>[정보 → 연락처 및 기본 정보 → 웹사이트 추가]</b>(또는 페이지 행동 유도 버튼)에 인포크링크/예약 링크를 1회 등록해 두세요.'
     ],
     getShortcutUrl: () => 'https://business.facebook.com/',
     helpUrl: 'https://www.facebook.com/business/help'
@@ -2753,8 +2717,11 @@ function runSampleOnboardingPreview() {
   });
 }
 
-function refreshSetupStatus(deep = false) {
-  const endpoint = deep ? '/api/setup_status?deep=1' : '/api/setup_status';
+function refreshSetupStatus(deep = false, force = false) {
+  let endpoint = '/api/setup_status';
+  if (deep) {
+    endpoint = force ? '/api/setup_status?deep=1&force=1' : '/api/setup_status?deep=1';
+  }
   return fetch(endpoint).then(r => r.json()).then(st => {
     latestSetupStatus = st || {};
     if (st && st.profile_ids && typeof st.profile_ids === 'object') {
@@ -2799,30 +2766,32 @@ function refreshQuotaStatus() {
   return fetch('/api/quota_status').then(r => r.json()).then(q => {
     if (!q || !q.youtube) return;
     const yt = q.youtube;
-    const pct = Math.min(100, Math.round((yt.used_points / yt.max_points) * 100));
-    const ytText = document.getElementById('quotaYtText');
-    const ytFill = document.getElementById('quotaYtFill');
-    if (ytText) ytText.innerText = `유튜브 API: ${yt.used_points.toLocaleString()} / ${yt.max_points.toLocaleString()} pt (오늘 ${yt.used_count}/${yt.max_count}건)`;
-    if (ytFill) {
-      ytFill.style.width = pct + '%';
-      ytFill.classList.toggle('warn', yt.used_points >= 8000);
-    }
+    const ytMax = Number(yt.max_count ?? 6);
+    const ytUsed = Number(yt.used_count ?? 0);
     const p = q.platforms || {};
-    const fmt = (k, name) => `${name} ${(p[k]?.used ?? 0)}/${(p[k]?.limit ?? 0)}`;
-    const sub = document.getElementById('quotaPlatformsText');
-    if (sub) {
-      sub.innerText = `${fmt('naver', '블로그')} · ${fmt('clip', '클립')} · ${fmt('tt', '틱톡')} · ${fmt('ig', '인스타')} · ${fmt('pin', '핀터')} · ${fmt('threads', '쓰레드')} · ${fmt('x', 'X')} · ${fmt('fb', '페북(개인)')} · ${fmt('fb_page', '페북(매장)')} (API 0원 · 계정 보호 권장선) · 원고변환 무제한`;
+    const blogUsed = Number(p.naver?.used ?? 0), blogMax = Number(p.naver?.limit ?? 5);
+    const clipUsed = Number(p.clip?.used ?? 0), clipMax = Number(p.clip?.limit ?? 5);
+    const instaUsed = Number(p.ig?.used ?? 0), instaMax = Number(p.ig?.limit ?? 3);
+    const ttUsed = Number(p.tt?.used ?? 0), ttMax = Number(p.tt?.limit ?? 5);
+    const fbUsed = Number(p.fb?.used ?? 0), fbMax = Number(p.fb?.limit ?? 3);
+    const fbPageUsed = Number(p.fb_page?.used ?? 0), fbPageMax = Number(p.fb_page?.limit ?? 3);
+    const pinUsed = Number(p.pin?.used ?? 0), pinMax = Number(p.pin?.limit ?? 10);
+    const row = document.getElementById('quotaPlatformsText');
+    if (row) {
+      row.innerText = `📊 오늘 업로드 | 유튜브 ${ytUsed}/${ytMax} · 블로그 ${blogUsed}/${blogMax} · 클립 ${clipUsed}/${clipMax} · 인스타 ${instaUsed}/${instaMax} · 틱톡 ${ttUsed}/${ttMax} · 페북(개인) ${fbUsed}/${fbMax} · 페북(매장) ${fbPageUsed}/${fbPageMax} · 핀터 ${pinUsed}/${pinMax}`;
     }
   }).catch(() => {});
 }
 
-function refreshSetupAndQuota(isManual = false) {
+function refreshSetupAndQuota(isManual = false, opts = {}) {
+  const deep = (opts && typeof opts.deep === 'boolean') ? opts.deep : Boolean(isManual);
+  const force = (opts && typeof opts.force === 'boolean') ? opts.force : Boolean(isManual);
   const btn = document.getElementById('btnRefreshSetupStatus');
   if (isManual && btn) {
     btn.disabled = true;
     btn.innerText = '🔄 확인 중...';
   }
-  return Promise.all([refreshSetupStatus(isManual), refreshQuotaStatus()]).finally(() => {
+  return Promise.all([refreshSetupStatus(deep, force), refreshQuotaStatus()]).finally(() => {
     if (isManual && btn) {
       btn.disabled = false;
       btn.innerText = '🔄 상태 새로고침';
@@ -2855,7 +2824,7 @@ function logoutSinglePlatform(key, btnEl) {
   .then(r => r.json())
   .then(d => {
     if (d && d.ok) {
-      refreshSetupAndQuota(false);
+      refreshSetupAndQuota(false, { deep: true, force: true });
       showAppToast(`🚪 ${d.msg || `[${label}] 로그아웃이 완료되었습니다.`}`);
     } else {
       alert(`⚠️ ${(d && d.msg) || '로그아웃 처리 중 오류가 발생했습니다.'}`);
@@ -2893,8 +2862,6 @@ function loginSinglePlatform(key) {
     tt: 'use_tt',
     ig: 'use_ig',
     pin: 'use_pin',
-    threads: 'use_threads',
-    x: 'use_x',
     fb: 'use_fb',
     fb_page: 'use_fb_page'
   };
@@ -2922,10 +2889,8 @@ function loginMissingPlatforms() {
     use_naver: needLogin('naver'),
     use_clip: needLogin('clip'),
     use_ig: needLogin('ig'),
-    use_threads: needLogin('threads'),
     use_tt: needLogin('tt'),
     use_pin: needLogin('pin'),
-    use_x: needLogin('x'),
     use_fb: needLogin('fb'),
     use_fb_page: needLogin('fb_page')
   };
@@ -2956,13 +2921,11 @@ const FIELD_MAP = {
   ttTitle: ['tiktok_title', 'tt_title'], ttBody: ['tiktok_body', 'tt_body'], ttTags: ['tiktok_tags', 'tt_tags'],
   igBody: ['instagram_body', 'ig_body'], igTags: ['instagram_tags', 'ig_tags'],
   pinTitle: ['pin_title'], pinBody: ['pin_body'], pinTags: ['pin_tags'],
-  threadsBody: ['threads_body'], threadsTags: ['threads_tags'],
-  xBody: ['x_body'], xTags: ['x_tags'],
   fbBody: ['fb_body'], fbTags: ['fb_tags'],
   fbPageBody: ['fb_page_body'], fbPageTags: ['fb_page_tags']
 };
 
-const TAG_INPUT_IDS = ['ytTags', 'naverTags', 'clipTags', 'ttTags', 'igTags', 'pinTags', 'threadsTags', 'xTags', 'fbTags', 'fbPageTags'];
+const TAG_INPUT_IDS = ['ytTags', 'naverTags', 'clipTags', 'ttTags', 'igTags', 'pinTags', 'fbTags', 'fbPageTags'];
 
 function cleanTagsString(raw) {
   if (!raw) return '';
@@ -3154,7 +3117,7 @@ function loadVideoIntoScrubber(srcUrl) {
   const pBtn = document.getElementById('btnGifPreview');
   if (pBtn) pBtn.innerText = '🔁 미리보기';
   const playBtn = document.getElementById('btnScrubPlay');
-  if (playBtn) playBtn.innerText = '▶ 재생';
+  if (playBtn) playBtn.innerText = '▶';
   vid.pause();
   vid.playbackRate = 1.0;
   vid.src = srcUrl;
@@ -3180,7 +3143,7 @@ function onFrameScrubInput(val) {
   vid.pause();
   vid.playbackRate = 1.0;
   const playBtn = document.getElementById('btnScrubPlay');
-  if (playBtn) playBtn.innerText = '▶ 재생';
+  if (playBtn) playBtn.innerText = '▶';
   vid.currentTime = Math.max(0, Number(val) || 0);
   updateScrubberUI();
 }
@@ -3203,10 +3166,10 @@ function toggleScrubPlay() {
   vid.playbackRate = 1.0;
   if (vid.paused) {
     vid.play().catch(() => {});
-    if (btn) btn.innerText = '⏸ 일시정지';
+    if (btn) btn.innerText = '⏸';
   } else {
     vid.pause();
-    if (btn) btn.innerText = '▶ 재생';
+    if (btn) btn.innerText = '▶';
   }
 }
 
@@ -3238,11 +3201,10 @@ function setGifPointFromCurrent(which) {
   const vid = document.getElementById('blogScrubberVideo');
   if (!vid) return;
   const cur = Number(vid.currentTime || 0);
+  const maxDur = Number(scrubDuration || vid.duration || 0);
   if (which === 'start') {
     gifStartSec = cur;
-    if (gifEndSec <= gifStartSec + 0.4 || gifEndSec - gifStartSec > 8.0) {
-      gifEndSec = Math.min(scrubDuration || (cur + 2.5), cur + 2.5);
-    }
+    gifEndSec = maxDur > 0 ? Math.min(maxDur, cur + 2.5) : (cur + 2.5);
   } else {
     gifEndSec = cur;
     if (gifEndSec <= gifStartSec + 0.4 || gifEndSec - gifStartSec > 8.0) {
@@ -3262,35 +3224,57 @@ function toggleGifRangePreview() {
     vid.pause();
     vid.playbackRate = 1.0;
     if (btn) btn.innerText = '🔁 미리보기';
-    if (playBtn) playBtn.innerText = '▶ 재생';
+    if (playBtn) playBtn.innerText = '▶';
   } else {
     isGifLoopPreview = true;
     vid.playbackRate = Math.max(0.5, Math.min(2.0, Number(gifSpeed) || 1.0));
     vid.currentTime = gifStartSec;
     vid.play().catch(() => {});
     if (btn) btn.innerText = '⏹ 중지';
-    if (playBtn) playBtn.innerText = '⏸ 일시정지';
+    if (playBtn) playBtn.innerText = '⏸';
   }
 }
 
-function onTargetSlotSelectChange() {
-  const sel = document.getElementById('scrubberTargetSlot');
-  if (!sel) return;
-  selectedThumbSlot = Math.max(0, Math.min(9, parseInt(sel.value, 10) || 0));
-  renderThumbGallery();
+function getBlogSlotCount() {
+  return extractedThumbs.length > 0 ? Math.min(6, Math.max(6, extractedThumbs.length)) : 6;
+}
+
+function syncScrubberSlotUI() {
+  const slotCount = getBlogSlotCount();
+  selectedThumbSlot = Math.max(0, Math.min(slotCount - 1, selectedThumbSlot));
+  const pillWrap = document.getElementById('scrubberSlotPills');
+  if (pillWrap) {
+    let html = '';
+    for (let i = 0; i < slotCount; i++) {
+      const lbl = i === 0 ? '⭐ 대표' : String(i);
+      const tip = i === 0 ? '⭐ 대표사진 (최상단 고정 · JPG)' : `[미디어 자료${i}]`;
+      const cls = i === selectedThumbSlot ? 'slot-pill-btn active' : 'slot-pill-btn';
+      html += `<button type="button" class="${cls}" data-slot="${i}" onclick="selectThumbTargetSlot(${i})" title="${tip}">${lbl}</button>`;
+    }
+    pillWrap.innerHTML = html;
+  }
+  const gifBtn = document.getElementById('btnCreateGif');
+  if (gifBtn && !gifBtn.dataset.busy) {
+    const isRep = (selectedThumbSlot === 0);
+    gifBtn.disabled = isRep;
+    gifBtn.title = isRep
+      ? '대표사진은 고화질 정지 사진(JPG)만 가능합니다'
+      : `[미디어 자료${selectedThumbSlot}] 슬롯에 GIF로 넣기`;
+  }
 }
 
 function selectThumbTargetSlot(idx) {
-  selectedThumbSlot = Math.max(0, Math.min(9, idx));
-  const sel = document.getElementById('scrubberTargetSlot');
-  if (sel) sel.value = String(selectedThumbSlot);
+  const maxIdx = Math.max(0, getBlogSlotCount() - 1);
+  selectedThumbSlot = Math.max(0, Math.min(maxIdx, idx));
+  syncScrubberSlotUI();
   renderThumbGallery();
 }
 
 function ensureThumbSlotsUpTo(idx) {
-  while (extractedThumbs.length <= idx) {
-    const n = extractedThumbs.length + 1;
-    extractedThumbs.push({ url: '', path: '', active: false, origIdx: n, kind: 'image', tagLabel: `빈 슬롯` });
+  const limit = Math.min(5, Math.max(0, idx));
+  while (extractedThumbs.length <= limit) {
+    const n = extractedThumbs.length;
+    extractedThumbs.push({ url: '', path: '', active: false, origIdx: n === 0 ? '대표' : n, kind: 'image', tagLabel: `빈 슬롯` });
   }
 }
 
@@ -3300,15 +3284,17 @@ function getBlogMediaSlotNumbers(bodyText) {
   let m;
   while ((m = re.exec(bodyText || '')) !== null) {
     const n = parseInt(m[1], 10);
-    if (n >= 1 && n <= 10) nums.add(n);
+    if (n >= 1 && n <= 5) nums.add(n);
   }
   return nums;
 }
 
 function ensureBlogPlaceholderForSlot(slotIdx, kind) {
+  // 인덱스 0(⭐ 대표사진)은 본문 마커([미디어 자료N]) 없이 최상단 대표사진으로 고정 삽입
+  if (slotIdx <= 0) return;
   const bodyEl = document.getElementById('naverBody');
   if (!bodyEl) return;
-  const slotNum = slotIdx + 1;
+  const slotNum = slotIdx;
   const text = bodyEl.value || '';
   const slotRe = new RegExp(`\\[(?:미디어\\s*자료|사진)\\s*${slotNum}(?:\\s*[·•\\-]?\\s*GIF)?\\]`, 'i');
   if (slotRe.test(text)) return;
@@ -3332,6 +3318,7 @@ function captureCurrentScrubberFrame() {
   const vid = document.getElementById('blogScrubberVideo');
   const btn = document.getElementById('btnCaptureFrame');
   const timeSec = vid ? Number(vid.currentTime || 0) : 0;
+  const targetSlot = selectedThumbSlot;
   if (btn) { btn.disabled = true; btn.innerText = '⏳ 캡처 중...'; }
   fetch('/api/capture_frame', {
     method: 'POST',
@@ -3345,15 +3332,22 @@ function captureCurrentScrubberFrame() {
   })
   .then(d => {
     if (!d.ok) return alert('⚠️ ' + (d.msg || '장면 캡처에 실패했습니다.'));
-    ensureThumbSlotsUpTo(selectedThumbSlot);
-    extractedThumbs[selectedThumbSlot] = {
+    ensureThumbSlotsUpTo(targetSlot);
+    extractedThumbs[targetSlot] = {
       url: d.url,
       path: d.path,
       active: true,
       origIdx: `${d.time_sec}초`,
-      kind: 'image'
+      kind: 'image',
+      isCustom: true
     };
-    ensureBlogPlaceholderForSlot(selectedThumbSlot, 'image');
+    hasCustomThumbEdits = true;
+    thumbsVideoName = currentVideoName || thumbsVideoName;
+    ensureBlogPlaceholderForSlot(targetSlot, 'image');
+    const maxIdx = Math.max(0, getBlogSlotCount() - 1);
+    if (targetSlot < maxIdx) {
+      selectedThumbSlot = targetSlot + 1;
+    }
     renderThumbGallery();
   })
   .catch(err => {
@@ -3362,15 +3356,21 @@ function captureCurrentScrubberFrame() {
     alert(msg);
   })
   .finally(() => {
-    if (btn) { btn.disabled = false; btn.innerText = '📸 현재 장면 슬롯 넣기'; }
+    if (btn) { btn.disabled = false; btn.innerText = '📸 사진으로 넣기'; }
+    syncScrubberSlotUI();
   });
 }
 
 function createGifIntoSelectedSlot() {
+  if (selectedThumbSlot === 0) {
+    showAppToast('⚠️ 대표사진은 고화질 정지 사진(JPG)만 가능합니다');
+    return;
+  }
   if (!currentVideoName) return alert('⚠️ 먼저 영상을 첨부해 주세요!');
   const btn = document.getElementById('btnCreateGif');
   const spd = Math.max(0.5, Math.min(2.0, Number(gifSpeed) || 1.0));
-  if (btn) { btn.disabled = true; btn.innerText = '⏳ 생성 중...'; }
+  const targetSlot = selectedThumbSlot;
+  if (btn) { btn.dataset.busy = '1'; btn.disabled = true; btn.innerText = '⏳ 생성 중...'; }
   fetch('/api/create_gif', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -3388,16 +3388,23 @@ function createGifIntoSelectedSlot() {
   })
   .then(d => {
     if (!d.ok) return alert('⚠️ ' + (d.msg || 'GIF 생성에 실패했습니다.'));
-    ensureThumbSlotsUpTo(selectedThumbSlot);
+    ensureThumbSlotsUpTo(targetSlot);
     const spdTag = (d.speed && Math.abs(Number(d.speed) - 1) > 0.01) ? `·${Number(Number(d.speed).toFixed(2))}x` : '';
-    extractedThumbs[selectedThumbSlot] = {
+    extractedThumbs[targetSlot] = {
       url: d.url,
       path: d.path,
       active: true,
       origIdx: `${d.start_sec}~${d.end_sec}s${spdTag}`,
-      kind: 'gif'
+      kind: 'gif',
+      isCustom: true
     };
-    ensureBlogPlaceholderForSlot(selectedThumbSlot, 'gif');
+    hasCustomThumbEdits = true;
+    thumbsVideoName = currentVideoName || thumbsVideoName;
+    ensureBlogPlaceholderForSlot(targetSlot, 'gif');
+    const maxIdx = Math.max(0, getBlogSlotCount() - 1);
+    if (targetSlot < maxIdx) {
+      selectedThumbSlot = targetSlot + 1;
+    }
     renderThumbGallery();
   })
   .catch(err => {
@@ -3406,32 +3413,38 @@ function createGifIntoSelectedSlot() {
     alert(msg);
   })
   .finally(() => {
-    if (btn) { btn.disabled = false; btn.innerText = '✨ GIF 생성'; }
+    if (btn) { delete btn.dataset.busy; btn.innerText = '✨ GIF로 넣기'; }
+    syncScrubberSlotUI();
   });
 }
 
 function renderThumbGallery() {
+  syncScrubberSlotUI();
   const grid = document.getElementById('blogThumbGrid');
-  const badge = document.getElementById('activeThumbCount');
-  if (!grid || !badge) return;
+  if (!grid) return;
   if (!extractedThumbs.length) {
     grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: #64748b; font-size: 11.5px; padding: 14px 0;">영상을 먼저 첨부한 뒤 [✨ 미리보기 생성] 또는 위 드래그 캡처/GIF 생성을 이용해 보세요.</div>`;
-    badge.innerText = "선택됨: 0장";
     return;
   }
-  grid.innerHTML = extractedThumbs.map((item, idx) => {
-    const slotNum = idx + 1;
+  grid.innerHTML = extractedThumbs.slice(0, 6).map((item, idx) => {
+    const isRep = (idx === 0);
+    const slotNum = idx;
     const isGif = item.kind === 'gif' || (item.path || '').toLowerCase().endsWith('.gif');
     const isTarget = idx === selectedThumbSlot;
-    const label = item.active ? (isGif ? `[${slotNum}·GIF]` : `[${slotNum}]`) : `[${slotNum}·제외]`;
-    const slotTitle = item.active
-      ? `[미디어 자료${slotNum}]${isGif ? ' (GIF)' : ' (사진)'}`
-      : `[미디어 자료${slotNum}] (제외됨 · 번호 유지)`;
+    const label = isRep
+      ? (item.active ? '⭐ 대표' : '⭐ 대표·제외')
+      : (item.active ? (isGif ? `[${slotNum}·GIF]` : `[${slotNum}]`) : `[${slotNum}·제외]`);
+    const slotTitle = isRep
+      ? (item.active ? '⭐ 대표사진 (최상단 고정 · 고화질 JPG)' : '⭐ 대표사진 (제외됨)')
+      : (item.active
+        ? `[미디어 자료${slotNum}]${isGif ? ' (GIF)' : ' (사진)'}`
+        : `[미디어 자료${slotNum}] (제외됨 · 번호 유지)`);
     const icon = item.active ? '✕' : '↺';
     const mediaHtml = item.url
       ? `<img src="${item.url}" alt="캡처 ${item.origIdx}">`
       : `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:10px;">빈 슬롯</div>`;
     const subLabel = typeof item.origIdx === 'number' ? `#${item.origIdx}` : `${item.origIdx}`;
+    const orderCls = (isRep && item.active) ? 'is-rep' : ((isGif && item.active) ? 'is-gif' : '');
     return `
       <div class="thumb-item ${item.active ? '' : 'disabled'} ${isTarget ? 'target-slot' : ''}"
            title="${slotTitle}"
@@ -3443,7 +3456,7 @@ function renderThumbGallery() {
            ondragleave="onThumbDragLeave(event)"
            ondrop="onThumbDrop(event, ${idx})">
         ${mediaHtml}
-        <span class="thumb-order ${isGif && item.active ? 'is-gif' : ''}">${label}</span>
+        <span class="thumb-order ${orderCls}">${label}</span>
         <button type="button" class="thumb-btn-x" onclick="toggleThumb(event, ${idx})" title="${item.active ? '이 자리 빼기 (번호 당겨지지 않음)' : '다시 넣기'}">${icon}</button>
         <div class="thumb-move-bar">
           <button type="button" class="thumb-btn-move" onclick="moveThumb(event, ${idx}, -1)" title="앞으로 이동">◀</button>
@@ -3453,18 +3466,14 @@ function renderThumbGallery() {
       </div>
     `;
   }).join('');
-  const activeItems = extractedThumbs.filter(t => t.active && t.path);
-  const gifCnt = activeItems.filter(t => t.kind === 'gif' || (t.path || '').toLowerCase().endsWith('.gif')).length;
-  const imgCnt = activeItems.length - gifCnt;
-  badge.innerText = gifCnt > 0
-    ? `선택: 사진 ${imgCnt} · GIF ${gifCnt}`
-    : `선택: ${imgCnt}장 (제외 시 빈자리 유지)`;
 }
 
 function toggleThumb(e, idx) {
   e.stopPropagation();
   if (extractedThumbs[idx]) {
     extractedThumbs[idx].active = !extractedThumbs[idx].active;
+    hasCustomThumbEdits = true;
+    thumbsVideoName = currentVideoName || thumbsVideoName;
     if (extractedThumbs[idx].active) {
       ensureBlogPlaceholderForSlot(idx, extractedThumbs[idx].kind || 'image');
     }
@@ -3476,13 +3485,18 @@ function moveThumb(e, idx, dir) {
   e.stopPropagation();
   const targetIdx = idx + dir;
   if (targetIdx < 0 || targetIdx >= extractedThumbs.length) return;
+  const isGifItem = (it) => Boolean(it && (it.kind === 'gif' || String(it.path || '').toLowerCase().endsWith('.gif')));
+  if ((targetIdx === 0 && isGifItem(extractedThumbs[idx])) || (idx === 0 && isGifItem(extractedThumbs[targetIdx]))) {
+    showAppToast('⚠️ 대표사진은 고화질 정지 사진(JPG)만 가능합니다');
+    return;
+  }
   const temp = extractedThumbs[idx];
   extractedThumbs[idx] = extractedThumbs[targetIdx];
   extractedThumbs[targetIdx] = temp;
+  hasCustomThumbEdits = true;
+  thumbsVideoName = currentVideoName || thumbsVideoName;
   if (selectedThumbSlot === idx) {
     selectedThumbSlot = targetIdx;
-    const sel = document.getElementById('scrubberTargetSlot');
-    if (sel) sel.value = String(selectedThumbSlot);
   }
   renderThumbGallery();
 }
@@ -3506,11 +3520,22 @@ function onThumbDrop(e, targetIdx) {
   e.stopPropagation();
   e.currentTarget.classList.remove('drag-over');
   if (draggedThumbIdx === null || draggedThumbIdx === targetIdx) return;
+  const isGifItem = (it) => Boolean(it && (it.kind === 'gif' || String(it.path || '').toLowerCase().endsWith('.gif')));
+  if (targetIdx === 0 && isGifItem(extractedThumbs[draggedThumbIdx])) {
+    draggedThumbIdx = null;
+    showAppToast('⚠️ 대표사진은 고화질 정지 사진(JPG)만 가능합니다');
+    return;
+  }
+  if (draggedThumbIdx === 0 && targetIdx > 0 && isGifItem(extractedThumbs[1])) {
+    draggedThumbIdx = null;
+    showAppToast('⚠️ 대표사진은 고화질 정지 사진(JPG)만 가능합니다');
+    return;
+  }
   const movedItem = extractedThumbs.splice(draggedThumbIdx, 1)[0];
   extractedThumbs.splice(targetIdx, 0, movedItem);
+  hasCustomThumbEdits = true;
+  thumbsVideoName = currentVideoName || thumbsVideoName;
   selectedThumbSlot = targetIdx;
-  const sel = document.getElementById('scrubberTargetSlot');
-  if (sel) sel.value = String(selectedThumbSlot);
   draggedThumbIdx = null;
   renderThumbGallery();
 }
@@ -3527,10 +3552,10 @@ async function handleFileChunkUpload(file) {
   currentPreviewVideoUrl = "";
   previewFallbackRequested = false;
   extractedThumbs = [];
+  thumbsVideoName = "";
+  hasCustomThumbEdits = false;
   selectedThumbSlot = 0;
   gifSpeed = 1.0;
-  const slotSel = document.getElementById('scrubberTargetSlot');
-  if (slotSel) slotSel.value = '0';
   const spdSel = document.getElementById('gifSpeedSelect');
   if (spdSel) spdSel.value = '1';
   renderThumbGallery();
@@ -3578,22 +3603,45 @@ async function handleFileChunkUpload(file) {
   }
 }
 
+function hasCustomizedThumbsForCurrentVideo() {
+  if (!currentVideoName || !extractedThumbs.length) return false;
+  if (thumbsVideoName !== currentVideoName) return false;
+  if (hasCustomThumbEdits) return true;
+  return extractedThumbs.some(t => {
+    if (!t) return false;
+    const p = String(t.path || '').toLowerCase();
+    return Boolean(
+      t.isCustom
+      || t.savedFilename
+      || t.kind === 'gif'
+      || !t.active
+      || p.includes('custom_frame_')
+      || p.includes('restored_')
+      || p.endsWith('.gif')
+    );
+  });
+}
+
 function transformData(btn) {
-  resetUploadedPlatformsUI(false);
+  const prevHistoryId = activeHistoryId || '';
+  if (!prevHistoryId) {
+    resetUploadedPlatformsUI(false);
+  }
   const targetBtn = btn || null;
   if (targetBtn) {
-    targetBtn.innerText = "⏳ 변환 및 영상 10컷 추출 중...";
+    targetBtn.innerText = "⏳ 변환 및 영상 6컷 추출 중...";
     targetBtn.disabled = true;
   }
   const sourceEl = document.getElementById('sourceText');
   const sourceVal = sourceEl ? sourceEl.value : '';
-  const saveHistoryChk = document.getElementById('chkSaveHistoryOnPreview');
-  const saveHistory = saveHistoryChk ? !!saveHistoryChk.checked : true;
 
   fetch('/api/transform', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ data_text: sourceVal, video_name: currentVideoName, save_history: saveHistory })
+    body: JSON.stringify({
+      data_text: sourceVal,
+      video_name: currentVideoName
+    })
   })
   .then(async r => {
     const rawText = await r.text();
@@ -3612,7 +3660,6 @@ function transformData(btn) {
       return;
     }
     fillFormFields(d.data);
-    activeHistoryId = d.history_id || '';
     if (d.video_meta && d.video_meta.ok) {
       renderVideoMeta(d.video_meta);
     }
@@ -3636,15 +3683,20 @@ function transformData(btn) {
         updateGifRangeUI();
       }
     }
-    if (Array.isArray(d.thumbnails) && d.thumbnails.length) {
+    if (hasCustomizedThumbsForCurrentVideo()) {
+      // 동일 영상에서 사용자가 캡처·GIF·제외 편집한 6칸 슬롯 상태 보호
+      renderThumbGallery();
+    } else if (Array.isArray(d.thumbnails) && d.thumbnails.length) {
       const bodySlots = getBlogMediaSlotNumbers(document.getElementById('naverBody')?.value || d.data.naver_body || '');
-      extractedThumbs = d.thumbnails.map((t, i) => ({
+      extractedThumbs = d.thumbnails.slice(0, 6).map((t, i) => ({
         url: t.url,
         path: t.path,
-        active: bodySlots.size > 0 ? bodySlots.has(i + 1) : (i < 6),
-        origIdx: i + 1,
+        active: i === 0 ? true : (bodySlots.size > 0 ? bodySlots.has(i) : true),
+        origIdx: i === 0 ? '대표' : i,
         kind: 'image'
       }));
+      thumbsVideoName = currentVideoName || '';
+      hasCustomThumbEdits = false;
       renderThumbGallery();
     } else if (!extractedThumbs.length) {
       renderThumbGallery();
@@ -3667,6 +3719,60 @@ function transformData(btn) {
   });
 }
 
+function toggleAiMemoTips(ev) {
+  if (ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+  }
+  const card = document.getElementById('aiMemoTipCard');
+  const btn = document.getElementById('btnAiMemoTips');
+  if (!card) return;
+  const isOpen = (card.style.display === 'block');
+  card.style.display = isOpen ? 'none' : 'block';
+  if (btn) {
+    btn.textContent = isOpen ? '💡 작성꿀팁' : '💡 작성꿀팁 ▲';
+  }
+}
+
+function launchAiExtract(provider) {
+  const targetProvider = (provider === 'chatgpt') ? 'chatgpt' : 'gemini';
+  const providerLabel = (targetProvider === 'chatgpt') ? '챗GPT' : '제미나이';
+  const targetUrl = (targetProvider === 'chatgpt') ? 'https://chatgpt.com/' : 'https://gemini.google.com/app';
+
+  if (!isProfileConfigured) {
+    if (confirm('⚠️ 아직 매장 기본 정보가 설정되지 않았습니다.\n초기 설정 마법사(2단계)에서 매장명과 기본 정보를 먼저 입력하시겠습니까?')) {
+      openSetupGuide(1);
+    }
+    return;
+  }
+
+  const v = getLiveWizardValues();
+  const aiVideoType = getSelectedAiVideoType();
+  const styleGuideVal = (document.getElementById('wizCustomStyleGuide')?.value ?? currentProfile.custom_style_guide ?? '').trim();
+  const basePrompt = (currentPromptMode === 'custom')
+    ? buildCustomMasterPromptText(v, styleGuideVal, aiVideoType)
+    : buildMasterPromptText(v, aiVideoType);
+
+  const memoConcern = (document.getElementById('aiMemoConcern')?.value || '').trim();
+  const memoTechnique = (document.getElementById('aiMemoTechnique')?.value || '').trim();
+  const memoReaction = (document.getElementById('aiMemoReaction')?.value || '').trim();
+
+  let finalPrompt = String(basePrompt || '').trim();
+  if (memoConcern || memoTechnique || memoReaction) {
+    const memoBlock = [
+      '[오늘 시술 팩트 메모 — 역질문 없이 바로 Step 2 최종 원고 6개 구분자 단일 코드박스로 작성해 주세요]',
+      `1. 고객고민, 시술 전 상태: ${memoConcern}`,
+      `2. 시술내용, 시술테크닉: ${memoTechnique}`,
+      `3. 고객반응, 손질팁: ${memoReaction}`
+    ].join('\n');
+    finalPrompt = finalPrompt ? `${finalPrompt}\n\n${memoBlock}` : memoBlock;
+  }
+
+  const noticeMsg = `📋 [${providerLabel}] 마스터 프롬프트+메모가 복사되었습니다! 열린 새 탭에 영상을 올리고 붙여넣기(Cmd+V / Ctrl+V) 하세요.`;
+  copyRawText(finalPrompt, noticeMsg);
+  window.open(targetUrl, '_blank', 'noopener,noreferrer');
+}
+
 function startAuthCheck() {
   const enabled = new Set(Array.isArray(currentEnabledPlatforms) ? currentEnabledPlatforms : []);
   const isChecked = (key, chkId) => {
@@ -3675,9 +3781,8 @@ function startAuthCheck() {
   };
   const payload = {
     use_naver: isChecked('naver', 'chkNaver'), use_clip: isChecked('clip', 'chkClip'),
-    use_ig: isChecked('ig', 'chkIg'), use_threads: isChecked('threads', 'chkThreads'),
+    use_ig: isChecked('ig', 'chkIg'),
     use_tt: isChecked('tt', 'chkTt'), use_pin: isChecked('pin', 'chkPin'),
-    use_x: isChecked('x', 'chkX'),
     use_fb: isChecked('fb', 'chkFb'), use_fb_page: isChecked('fb_page', 'chkFbPage')
   };
   fetch('/api/auth_check', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) })
@@ -3708,24 +3813,32 @@ function startUpload(overrideTargets = null, opts = {}) {
   });
   const getVal = id => document.getElementById(id)?.value || '';
   const getBranchVal = id => normalizeBranchName(getVal(id));
+  const repThumb = extractedThumbs[0];
+  const repIsGif = Boolean(repThumb && (repThumb.kind === 'gif' || String(repThumb.path || '').toLowerCase().endsWith('.gif')));
+  const naverRepImage = (repThumb && repThumb.active && repThumb.path && !repIsGif) ? repThumb.path : "";
+  const bodyThumbs = extractedThumbs.slice(1, 6);
   let payload = {
     test_mode: testMode,
+    save_history: false,
     history_id: testMode ? '' : (activeHistoryId || ''),
     video_name: currentVideoName, source_text: getVal('sourceText'),
+    ai_video_type: getSelectedAiVideoType(),
+    ai_memo_concern: getVal('aiMemoConcern'), ai_memo_technique: getVal('aiMemoTechnique'), ai_memo_reaction: getVal('aiMemoReaction'),
     use_yt: isEnabled('yt', 'chkYt'), yt_title: getBranchVal('ytTitle'), yt_body: getBranchVal('ytBody'), yt_tags: cleanTagsString(getVal('ytTags')),
     use_naver: isEnabled('naver', 'chkNaver'), naver_title: getBranchVal('naverTitle'), naver_body: getBranchVal('naverBody'), naver_tags: cleanTagsString(getVal('naverTags')), naver_category: getVal('naverCategory'), naver_place: getBranchVal('naverPlace'),
-    naver_selected_images: extractedThumbs.map(t => (t && t.active && t.path) ? t.path : ""),
-    naver_gif_meta: extractedThumbs.map((t, idx) => (
+    naver_rep_image: naverRepImage,
+    cover_image: naverRepImage,
+    thumbnail_path: naverRepImage,
+    naver_selected_images: bodyThumbs.map(t => (t && t.active && t.path) ? t.path : ""),
+    naver_gif_meta: bodyThumbs.map((t, idx) => (
       (t && t.active && t.path && (t.kind === 'gif' || String(t.path).toLowerCase().endsWith('.gif')))
         ? { slot_idx: idx, label: String(t.origIdx || 'GIF'), saved_filename: String(t.savedFilename || '') }
         : null
     )).filter(Boolean),
     use_clip: isEnabled('clip', 'chkClip'), clip_title: getBranchVal('clipTitle'), clip_body: getBranchVal('clipBody'), clip_tags: cleanTagsString(getVal('clipTags')), clip_place: getBranchVal('clipPlace'),
-    use_tt: isEnabled('tt', 'chkTt'), tt_title: getBranchVal('ttTitle'), tt_body: getBranchVal('ttBody'), tt_tags: cleanTagsString(getVal('ttTags')), tt_location: getBranchVal('ttLocation'),
+    use_tt: isEnabled('tt', 'chkTt'), tt_title: getBranchVal('ttTitle'), tt_body: getBranchVal('ttBody'), tt_tags: cleanTagsString(getVal('ttTags')), tt_location: getBranchVal('ttLocation'), tt_cover_image: naverRepImage,
     use_ig: isEnabled('ig', 'chkIg'), ig_body: getBranchVal('igBody'), ig_tags: cleanTagsString(getVal('igTags')), ig_location: getBranchVal('igLocation'),
     use_pin: isEnabled('pin', 'chkPin'), pin_title: getBranchVal('pinTitle'), pin_body: getBranchVal('pinBody'), pin_tags: cleanTagsString(getVal('pinTags')), pin_dest_url: getVal('pinDestUrl'), pin_board: getVal('pinBoard'),
-    use_threads: isEnabled('threads', 'chkThreads'), threads_body: getBranchVal('threadsBody'), threads_tags: cleanTagsString(getVal('threadsTags')),
-    use_x: isEnabled('x', 'chkX'), x_body: getBranchVal('xBody'), x_tags: cleanTagsString(getVal('xTags')),
     use_fb: isEnabled('fb', 'chkFb'), fb_body: getBranchVal('fbBody'), fb_tags: cleanTagsString(getVal('fbTags')),
     use_fb_page: isEnabled('fb_page', 'chkFbPage'), fb_page_body: getBranchVal('fbPageBody'), fb_page_tags: cleanTagsString(getVal('fbPageTags'))
   };
@@ -3745,6 +3858,87 @@ function startUpload(overrideTargets = null, opts = {}) {
 function uploadSingle(target) {
   if(!currentVideoName) return alert("⚠️ 영상 파일이 아직 첨부되지 않았습니다!");
   startUpload([target]);
+}
+
+function saveCurrentHistory() {
+  const btn = document.getElementById('btnSaveHistory');
+  const getVal = id => document.getElementById(id)?.value || '';
+  const getBranchVal = id => normalizeBranchName(getVal(id));
+  TAG_INPUT_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = cleanTagsString(el.value);
+  });
+
+  const savedSlotsInput = extractedThumbs.slice(0, 6).map((t, idx) => {
+    const isGif = Boolean(t && (t.kind === 'gif' || String(t.path || '').toLowerCase().endsWith('.gif')));
+    return {
+      slot_idx: idx,
+      path: (t && t.path) ? String(t.path) : '',
+      kind: isGif ? 'gif' : 'image',
+      active: Boolean(t && t.active),
+      label: (t && t.origIdx !== undefined && t.origIdx !== null) ? String(t.origIdx) : (idx === 0 ? '대표' : String(idx)),
+      saved_filename: (t && t.savedFilename) ? String(t.savedFilename) : ''
+    };
+  });
+
+  const payload = {
+    history_id: activeHistoryId || '',
+    video_name: currentVideoName || '',
+    ai_video_type: getSelectedAiVideoType(),
+    ai_memo_concern: getVal('aiMemoConcern'),
+    ai_memo_technique: getVal('aiMemoTechnique'),
+    ai_memo_reaction: getVal('aiMemoReaction'),
+    source_text: getVal('sourceText'),
+    yt_title: getBranchVal('ytTitle'), yt_body: getBranchVal('ytBody'), yt_tags: cleanTagsString(getVal('ytTags')),
+    naver_title: getBranchVal('naverTitle'), naver_body: getBranchVal('naverBody'), naver_tags: cleanTagsString(getVal('naverTags')), naver_category: getVal('naverCategory'),
+    clip_title: getBranchVal('clipTitle'), clip_body: getBranchVal('clipBody'), clip_tags: cleanTagsString(getVal('clipTags')),
+    tt_title: getBranchVal('ttTitle'), tt_body: getBranchVal('ttBody'), tt_tags: cleanTagsString(getVal('ttTags')),
+    ig_body: getBranchVal('igBody'), ig_tags: cleanTagsString(getVal('igTags')),
+    pin_title: getBranchVal('pinTitle'), pin_body: getBranchVal('pinBody'), pin_tags: cleanTagsString(getVal('pinTags')),
+    fb_body: getBranchVal('fbBody'), fb_tags: cleanTagsString(getVal('fbTags')),
+    fb_page_body: getBranchVal('fbPageBody'), fb_page_tags: cleanTagsString(getVal('fbPageTags')),
+    saved_slots: savedSlotsInput
+  };
+
+  if (btn) { btn.disabled = true; btn.innerText = '⏳ 저장 중...'; }
+  fetch('/api/history/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(async r => {
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d) throw new Error(d?.msg || `HTTP ${r.status}`);
+    return d;
+  })
+  .then(d => {
+    if (!d.ok) {
+      const msg = d.msg || '지난 기록 저장에 실패했습니다.';
+      appendUiLog('⚠️ ' + msg);
+      showAppToast('⚠️ ' + msg);
+      return;
+    }
+    if (d.history_id) {
+      activeHistoryId = d.history_id;
+    }
+    if (Array.isArray(d.saved_slots)) {
+      d.saved_slots.forEach(s => {
+        const idx = Number(s.slot_idx);
+        if (Number.isInteger(idx) && idx >= 0 && idx < extractedThumbs.length && extractedThumbs[idx] && s.filename) {
+          extractedThumbs[idx].savedFilename = s.filename;
+        }
+      });
+    }
+    showAppToast('💾 현재 본문과 미디어(대표사진·GIF·슬롯 상태)가 지난 기록에 저장되었습니다.');
+  })
+  .catch(err => {
+    const msg = `⚠️ 지난 기록 저장 중 오류: ${err?.message || err}`;
+    appendUiLog(msg);
+    showAppToast(msg);
+  })
+  .finally(() => {
+    if (btn) { btn.disabled = false; btn.innerText = '💾 기록 저장'; }
+  });
 }
 
 function renderHistoryList(list) {
@@ -3842,26 +4036,6 @@ function toggleHistoryPanel() {
   }
 }
 
-function formatStorageMb(totalMb) {
-  const mb = Number(totalMb) || 0;
-  if (mb >= 1024) {
-    return `${(mb / 1024).toFixed(2).replace(/\.00$/, '')}GB`;
-  }
-  return `${Math.round(mb)}MB`;
-}
-
-function refreshStorageInfo() {
-  return fetch('/api/storage_info').then(r => r.json()).then(d => {
-    if (!d || !d.ok) return;
-    const txtEl = document.getElementById('storageUsageText');
-    const warnEl = document.getElementById('storageWarnBadge');
-    const sizeText = formatStorageMb(d.total_mb);
-    const cnt = Number(d.file_count) || 0;
-    if (txtEl) txtEl.innerText = `📦 완료 파일: ${sizeText} (${cnt}개)`;
-    if (warnEl) warnEl.style.display = d.over_1gb ? 'inline-flex' : 'none';
-  }).catch(() => {});
-}
-
 function openBlackboxFolder() {
   fetch('/api/open_blackbox_folder', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}) })
   .then(r => r.json())
@@ -3875,69 +4049,95 @@ function openBlackboxFolder() {
   .catch(() => alert('⚠️ 오류 폴더 열기 요청 중 통신 오류가 발생했습니다.'));
 }
 
-function clearDoneStorage() {
-  const ok = confirm(
-    "PC에 보관 중인 완료 파일(done), 임시 썸네일, 블랙박스 파일(blackbox)과 크롬 캐시 찌꺼기가 함께 정리됩니다.\n" +
-    "이미 SNS에 올라간 게시물, 로그인 세션(쿠키), 아직 올리지 않은 대기 파일은 100% 안전하게 유지됩니다."
-  );
-  if (!ok) return;
-
-  const btn = document.getElementById('btnClearDone');
-  if (btn) { btn.disabled = true; btn.innerText = '🗑️ 비우는 중...'; }
-  fetch('/api/clear_done', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}) })
-  .then(r => r.json())
-  .then(d => {
-    if (d && d.ok) {
-      refreshStorageInfo();
-      showAppToast(`✅ ${d.msg || '완료 파일을 비웠습니다!'}`);
-    } else {
-      alert(`⚠️ ${(d && d.msg) || '파일 비우기에 실패했습니다.'}`);
-    }
-  })
-  .catch(() => alert('⚠️ 파일 비우기 요청 중 통신 오류가 발생했습니다.'))
-  .finally(() => {
-    if (btn) { btn.disabled = false; btn.innerText = '🗑️ 비우기'; }
-  });
-}
-
 function restoreHistory(id) {
   fetch('/api/history/restore', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id: id}) })
   .then(r => r.json()).then(d => {
     if(!d.success) return;
     activeHistoryId = d.record.id || id || '';
     document.getElementById('sourceText').value = d.record.source_text || "";
+    const restoredVideoType = (d.record.ai_video_type === 'before_after') ? 'before_after' : 'after_only';
+    const elAfter = document.getElementById('aiVideoTypeAfter');
+    const elBA = document.getElementById('aiVideoTypeBeforeAfter');
+    if (elAfter) elAfter.checked = (restoredVideoType !== 'before_after');
+    if (elBA) elBA.checked = (restoredVideoType === 'before_after');
+    updateWizardLivePreviews();
+
+    const mConcern = d.record.ai_memo_concern || "";
+    const mTechnique = d.record.ai_memo_technique || "";
+    const mReaction = d.record.ai_memo_reaction || "";
+    const elConcern = document.getElementById('aiMemoConcern');
+    const elTechnique = document.getElementById('aiMemoTechnique');
+    const elReaction = document.getElementById('aiMemoReaction');
+    if (elConcern) elConcern.value = mConcern;
+    if (elTechnique) elTechnique.value = mTechnique;
+    if (elReaction) elReaction.value = mReaction;
+
     fillFormFields(d.record);
     const donePlatforms = Array.isArray(d.record.uploaded_platforms) ? d.record.uploaded_platforms : [];
     applyUploadedPlatformsUI(donePlatforms, { autoUncheck: true, resetChecksForUnuploaded: true });
     syncPreviewCardsVisibility();
     currentVideoName = d.record.video_name || "";
     extractedThumbs = [];
+    thumbsVideoName = currentVideoName || "";
+    hasCustomThumbEdits = false;
     if (Array.isArray(d.thumbnails) && d.thumbnails.length) {
       const bodySlots = getBlogMediaSlotNumbers(document.getElementById('naverBody')?.value || d.record.naver_body || '');
-      extractedThumbs = d.thumbnails.map((t, i) => ({
+      extractedThumbs = d.thumbnails.slice(0, 6).map((t, i) => ({
         url: t.url,
         path: t.path,
-        active: bodySlots.size > 0 ? bodySlots.has(i + 1) : (i < 6),
-        origIdx: i + 1,
+        active: i === 0 ? true : (bodySlots.size > 0 ? bodySlots.has(i) : true),
+        origIdx: i === 0 ? '대표' : i,
         kind: 'image'
       }));
     }
+
+    const restoredSlots = Array.isArray(d.restored_slots) ? d.restored_slots : [];
     const restoredGifs = Array.isArray(d.restored_gifs) ? d.restored_gifs : [];
+    let restoredMediaCount = 0;
     let restoredGifCount = 0;
-    restoredGifs.forEach(g => {
-      const idx = Number(g.slot_idx);
-      if (!Number.isInteger(idx) || idx < 0 || idx > 9 || !g.path || !g.url) return;
-      ensureThumbSlotsUpTo(idx);
-      extractedThumbs[idx] = {
-        url: g.url,
-        path: g.path,
-        active: true,
-        origIdx: g.label || 'GIF',
-        kind: 'gif',
-        savedFilename: g.filename || ''
-      };
-      restoredGifCount += 1;
-    });
+    if (restoredSlots.length > 0) {
+      restoredSlots.forEach(s => {
+        const sIdx = Number(s.slot_idx);
+        if (!Number.isInteger(sIdx) || sIdx < 0 || sIdx > 5) return;
+        ensureThumbSlotsUpTo(sIdx);
+        if (s.path && s.url) {
+          const isGif = (s.kind === 'gif' || String(s.path).toLowerCase().endsWith('.gif'));
+          extractedThumbs[sIdx] = {
+            url: s.url,
+            path: s.path,
+            active: Boolean(s.active),
+            origIdx: s.label || (sIdx === 0 ? '대표' : sIdx),
+            kind: isGif ? 'gif' : 'image',
+            savedFilename: s.filename || '',
+            isCustom: true
+          };
+          restoredMediaCount += 1;
+          if (isGif) restoredGifCount += 1;
+        } else if (extractedThumbs[sIdx]) {
+          extractedThumbs[sIdx].active = Boolean(s.active);
+        }
+      });
+      hasCustomThumbEdits = true;
+    } else if (restoredGifs.length > 0) {
+      // 과거 기록(saved_gifs) 하위 호환 복원
+      restoredGifs.forEach(g => {
+        const rawIdx = Number(g.slot_idx);
+        const targetIdx = rawIdx + 1;
+        if (!Number.isInteger(rawIdx) || targetIdx < 1 || targetIdx > 5 || !g.path || !g.url) return;
+        ensureThumbSlotsUpTo(targetIdx);
+        extractedThumbs[targetIdx] = {
+          url: g.url,
+          path: g.path,
+          active: true,
+          origIdx: g.label || 'GIF',
+          kind: 'gif',
+          savedFilename: g.filename || '',
+          isCustom: true
+        };
+        restoredGifCount += 1;
+      });
+      hasCustomThumbEdits = true;
+    }
     renderThumbGallery();
     if(currentVideoName) {
       document.getElementById('fileNameDisplay').textContent = "✅ 복원된 파일: " + currentVideoName;
@@ -3951,7 +4151,11 @@ function restoreHistory(id) {
       renderVideoMeta(d.video_meta);
     }
     toggleHistoryPanel();
-    if (donePlatforms.length > 0 && restoredGifCount > 0) {
+    if (restoredMediaCount > 0 && donePlatforms.length > 0) {
+      showAppToast(`📜 기록 복원 완료! 저장 미디어 ${restoredMediaCount}개 복구 · 이미 업로드된 ${donePlatforms.length}개 플랫폼은 자동 체크 해제되었습니다.`);
+    } else if (restoredMediaCount > 0) {
+      showAppToast(`📜 기록 복원 완료! 대표사진·커스텀 미디어 ${restoredMediaCount}개와 슬롯 상태가 복구되었습니다.`);
+    } else if (donePlatforms.length > 0 && restoredGifCount > 0) {
       showAppToast(`📜 기록 복원 완료! GIF ${restoredGifCount}개 복구 · 이미 업로드된 ${donePlatforms.length}개 플랫폼은 자동 체크 해제되었습니다.`);
     } else if (donePlatforms.length > 0) {
       showAppToast(`📜 기록 복원 완료! 이미 업로드된 ${donePlatforms.length}개 플랫폼은 완료 표시 및 자동 체크 해제되었습니다.`);
@@ -3963,23 +4167,27 @@ function restoreHistory(id) {
 
 function runCleanAll() {
   const msg =
-    "로그인을 유지한 채 임시 파일과 크롬 캐시 찌꺼기를 함께 정리할까요?\n\n" +
-    "[정리 대상]\n" +
-    "• 임시 스냅샷 및 임시 썸네일 파일\n" +
-    "• auth_data 크롬 캐시 찌꺼기 (Cache·GPUCache·Code Cache 등)\n\n" +
-    "[안전 보호 — 절대 삭제되지 않음]\n" +
-    "• 프로그램 파일, 로그인 세션(쿠키), 매장 설정, 대기 중인 영상 파일";
+    "임시 파일·블랙박스·미참조 완료 파일·크롬 캐시를 정리할까요?\n\n" +
+    "(로그인 세션·매장 설정·대기 영상·지난 기록 연결 파일은 안전하게 보호됩니다)";
   if (!confirm(msg)) return;
 
   const btn = document.getElementById('btnCleanAll');
   if (btn) { btn.disabled = true; btn.innerText = '🧹 정리 중...'; }
   fetch('/api/cleanup', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ action: 'clean_all' }) })
   .then(r => r.json()).then(d => {
-    refreshStorageInfo();
-    alert(d.msg || '파일 정리가 완료되었습니다.');
+    if (d && d.ok === false) {
+      const failMsg = d.msg || '파일 정리 중 오류가 발생했습니다.';
+      appendUiLog(`⚠️ ${failMsg}`);
+      showAppToast(`⚠️ ${failMsg}`);
+    } else {
+      if (d && d.msg) appendUiLog(d.msg);
+      showAppToast('🧹 파일 정리 완료! 상세 내역은 우측 실행 로그를 확인하세요.');
+    }
   })
   .catch(() => {
-    alert('⚠️ 파일 정리 요청 중 통신 오류가 발생했습니다.');
+    const errMsg = '⚠️ 파일 정리 요청 중 통신 오류가 발생했습니다.';
+    appendUiLog(errMsg);
+    showAppToast(errMsg);
   })
   .finally(() => {
     if (btn) { btn.disabled = false; btn.innerText = '🧹 파일 정리'; }
@@ -4043,15 +4251,16 @@ setInterval(() => {
     const curAuthSeq = Number(d.auth_check_seq || 0);
     const authSeqChanged = (lastAuthCheckSeq >= 0 && curAuthSeq !== lastAuthCheckSeq);
     lastAuthCheckSeq = curAuthSeq;
-    if ((wasBusy && !d.busy) || authSeqChanged) {
+    if (authSeqChanged) {
+      refreshSetupAndQuota(false, { deep: true, force: true });
+    } else if (wasBusy && !d.busy) {
       refreshSetupAndQuota(false);
-      refreshStorageInfo();
     }
     wasBusy = !!d.busy;
   }).catch(()=>{});
 }, 1500);
 
-let latestReleaseInfo = { version: '1.0.0', author: '@hair_auto_lab', youtube_url: '#', chat_url: '#', instagram_url: 'https://www.instagram.com/hair_auto_lab/' };
+let latestReleaseInfo = { version: '1.0.0', author: '@hair_auto_lab', youtube_url: '#', chat_url: 'https://open.kakao.com/o/gixPiVXi', instagram_url: 'https://www.instagram.com/hair_auto_lab/' };
 let latestUpdateCheck = null;
 let appToastTimer = null;
 
@@ -4078,8 +4287,8 @@ function renderOfficialSlimBar(targetId, info) {
   const el = document.getElementById(targetId);
   if (!el) return;
   const ver = (info && info.version ? String(info.version) : '1.0.0').replace(/^v/i, '');
-  const ytUrl = (info && info.youtube_url ? String(info.youtube_url).trim() : '#') || '#';
-  const chatUrl = (info && info.chat_url ? String(info.chat_url).trim() : '#') || '#';
+  const rawChatUrl = info && info.chat_url ? String(info.chat_url).trim() : '';
+  const chatUrl = (rawChatUrl && rawChatUrl !== '#') ? rawChatUrl : 'https://open.kakao.com/o/gixPiVXi';
   const igUrl = (info && info.instagram_url ? String(info.instagram_url).trim() : '') || 'https://www.instagram.com/hair_auto_lab/';
 
   const makeLink = (url, label) => {
@@ -4091,8 +4300,9 @@ function renderOfficialSlimBar(targetId, info) {
 
   const safeIgUrl = escapeHtml(igUrl);
   const igTargetAttr = (igUrl && igUrl !== '#') ? ' target="_blank" rel="noopener noreferrer"' : '';
-  const authorLink = `<a href="${safeIgUrl}"${igTargetAttr} onclick="return handleOfficialLinkClick(event, '${safeIgUrl}', '@hair_auto_lab')">@hair_auto_lab</a>`;
-  el.innerHTML = `<span class="official-ver-tag">v${escapeHtml(ver)}</span> | 제작: ${authorLink} · ${makeLink(ytUrl, '📺 사용법 영상')} · ${makeLink(chatUrl, '💬 질문·소통방')}`;
+  const igIconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:3px;" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>';
+  const authorLink = `<a href="${safeIgUrl}"${igTargetAttr} onclick="return handleOfficialLinkClick(event, '${safeIgUrl}', 'hair_auto_lab')">${igIconSvg}hair_auto_lab</a>`;
+  el.innerHTML = `<span class="official-ver-tag">v${escapeHtml(ver)}</span> | 제작: ${authorLink} · ${makeLink(chatUrl, '💬 질문·소통방')}`;
 }
 
 function loadReleaseInfo() {
@@ -4201,8 +4411,7 @@ window.addEventListener('DOMContentLoaded', () => {
   loadReleaseInfo();
   checkForUpdates(false);
   loadProfileFromServer(true);
-  refreshSetupAndQuota();
-  refreshStorageInfo();
+  refreshSetupAndQuota(false, { deep: true, force: false });
 
   PLATFORM_META.forEach(p => {
     const chk = document.getElementById(p.chkId);
@@ -4262,7 +4471,7 @@ window.addEventListener('DOMContentLoaded', () => {
         scrubVid.play().catch(() => {});
       } else {
         const playBtn = document.getElementById('btnScrubPlay');
-        if (playBtn) playBtn.innerText = '▶ 재생';
+        if (playBtn) playBtn.innerText = '▶';
       }
     });
   }

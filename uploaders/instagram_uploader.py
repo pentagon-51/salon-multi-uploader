@@ -15,6 +15,7 @@ from os_utils import (
     wait_for_manual_login,
     wait_for_test_mode_close,
     finalize_playwright_session,
+    open_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
@@ -206,7 +207,7 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
     page = None
     video_obj = None
 
-    with sync_playwright() as p:
+    with open_playwright_session() as p:
         try:
             context = launch_persistent_chromium(
                 p,

@@ -339,7 +339,7 @@
   <div class="hero">
     <span class="hero-badge">미용실 무료 배포 · 3분 시작 안내</span>
     <h1>미용실 멀티업로더 — 처음 시작 3단계 안내</h1>
-    <p>복잡한 설정 없이 아래 3단계만 순서대로 따라하시면 10개 SNS 동시 업로드를 바로 시작할 수 있습니다.</p>
+    <p>복잡한 설정 없이 아래 3단계만 순서대로 따라하시면 8개 SNS 동시 업로드를 바로 시작할 수 있습니다.</p>
   </div>
 
   <div class="content">
@@ -459,7 +459,7 @@
             <span class="cmd-label">① 필수 파이썬 패키지 설치</span>
             <button type="button" class="btn-copy" onclick="copyCmd('cmdPip')">복사</button>
           </div>
-          <pre class="cmd-code" id="cmdPip">python -m pip install --upgrade pip playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib</pre>
+          <pre class="cmd-code" id="cmdPip">python -m pip install --upgrade pip playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib imageio-ffmpeg</pre>
         </div>
 
         <div class="cmd-card">
@@ -475,7 +475,7 @@
             <span class="cmd-label">⚡ 한 번에 실행하기 (① + ② 통합 명령어)</span>
             <button type="button" class="btn-copy" onclick="copyCmd('cmdAll')">복사</button>
           </div>
-          <pre class="cmd-code" id="cmdAll">python -m pip install --upgrade pip playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib && python -m playwright install chromium</pre>
+          <pre class="cmd-code" id="cmdAll">python -m pip install --upgrade pip playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib imageio-ffmpeg && python -m playwright install chromium</pre>
         </div>
       </div>
     </details>
@@ -489,7 +489,7 @@
 <div class="toast" id="copyToast">✅ 명령어가 클립보드에 복사되었습니다!</div>
 
 <script>
-const DEFAULT_RELEASE_META = /*RELEASE_META_START*/{"version":"1.0.9","author":"@hair_auto_lab","notion_url":"#","youtube_url":"#","chat_url":"#","instagram_url":"https://www.instagram.com/hair_auto_lab/"}/*RELEASE_META_END*/;
+const DEFAULT_RELEASE_META = /*RELEASE_META_START*/{"version":"1.0.10","author":"@hair_auto_lab","notion_url":"#","youtube_url":"#","chat_url":"https://open.kakao.com/o/gixPiVXi","instagram_url":"https://www.instagram.com/hair_auto_lab/"}/*RELEASE_META_END*/;
 
 let toastTimer = null;
 function showToast(msg) {
@@ -518,8 +518,8 @@ function renderGuideOfficialBar(info) {
   const footer = document.getElementById('guideOfficialFooter');
   if (!footer) return;
   const ver = (info && info.version ? String(info.version) : '1.0.0').replace(/^v/i, '');
-  const ytUrl = (info && info.youtube_url ? String(info.youtube_url).trim() : '#') || '#';
-  const chatUrl = (info && info.chat_url ? String(info.chat_url).trim() : '#') || '#';
+  const rawChatUrl = info && info.chat_url ? String(info.chat_url).trim() : '';
+  const chatUrl = (rawChatUrl && rawChatUrl !== '#') ? rawChatUrl : 'https://open.kakao.com/o/gixPiVXi';
   const igUrl = (info && info.instagram_url ? String(info.instagram_url).trim() : '') || 'https://www.instagram.com/hair_auto_lab/';
 
   const makeLink = (url, label) => {
@@ -530,9 +530,10 @@ function renderGuideOfficialBar(info) {
   };
   const safeIgUrl = escapeHtmlGuide(igUrl);
   const igTargetAttr = (igUrl && igUrl !== '#') ? ' target="_blank" rel="noopener noreferrer"' : '';
-  const authorLink = `<a href="${safeIgUrl}"${igTargetAttr} onclick="return handleGuideOfficialLink(event, '${safeIgUrl}', '@hair_auto_lab')">@hair_auto_lab</a>`;
+  const igIconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px; margin-right:3px;" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>';
+  const authorLink = `<a href="${safeIgUrl}"${igTargetAttr} onclick="return handleGuideOfficialLink(event, '${safeIgUrl}', 'hair_auto_lab')">${igIconSvg}hair_auto_lab</a>`;
   footer.innerHTML =
-    `<div><b>v${escapeHtmlGuide(ver)}</b> | 제작: ${authorLink} · ${makeLink(ytUrl, '📺 사용법 영상')} · ${makeLink(chatUrl, '💬 질문·소통방')}</div>` +
+    `<div><b>v${escapeHtmlGuide(ver)}</b> | 제작: ${authorLink} · ${makeLink(chatUrl, '💬 질문·소통방')}</div>` +
     `<div style="margin-top:4px; font-size:11px; color:#64748b;">모든 매장·로그인 정보는 내 PC에만 안전하게 보관됩니다 · 자세한 이용 조건은 LICENSE.txt 참고</div>`;
 }
 

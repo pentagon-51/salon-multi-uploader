@@ -36,7 +36,7 @@ chmod +x "2-2. 맥북 프로그램 실행.command" >/dev/null 2>&1 || true
 
 echo ""
 echo "[1/3] 필요한 프로그램 구성 요소를 설치하는 중입니다... (1~3분 소요)"
-PIP_PKGS="playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib"
+PIP_PKGS="playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib imageio-ffmpeg"
 
 "$PYTHON_BIN" -m pip install --upgrade pip >/dev/null 2>&1 || true
 if ! "$PYTHON_BIN" -m pip install --upgrade $PIP_PKGS; then
@@ -60,7 +60,7 @@ fi
 
 echo ""
 echo "[3/3] 설치 완료 최종 확인 중..."
-if ! "$PYTHON_BIN" -c "import playwright, cv2, PIL, pyperclip, googleapiclient"; then
+if ! "$PYTHON_BIN" -c "import playwright, cv2, PIL, pyperclip, googleapiclient, imageio_ffmpeg"; then
   echo ""
   echo "❌ 설치 검증에 실패했습니다. 위 오류 내용을 확인한 뒤 다시 실행해 주세요."
   read -r -p "내용을 확인한 뒤 엔터를 누르면 창이 닫힙니다..."

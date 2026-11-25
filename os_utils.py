@@ -16,7 +16,7 @@ MOD_KEY = "Meta" if sys.platform == "darwin" else "Control"
 BRANCH_NAME = ""
 BRANCH_ADDRESS = ""
 
-ALL_PLATFORM_KEYS = ("yt", "naver", "clip", "tt", "ig", "pin", "threads", "x", "fb", "fb_page")
+ALL_PLATFORM_KEYS = ("yt", "naver", "clip", "ig", "tt", "fb", "fb_page", "pin")
 
 
 def normalize_branch_name(text, profile=None):
@@ -46,8 +46,6 @@ EMPTY_PROFILE_TEMPLATE = {
     "naver_blog_id": "",
     "pinterest_id": "",
     "instagram_id": "",
-    "threads_id": "",
-    "x_id": "",
     "place_search_keyword": "",
     "personal_banned_tags": "",
     "salon_address": "",
@@ -144,7 +142,7 @@ def launch_persistent_chromium(
         "headless": headless,
         "args": launch_args,
         "chromium_sandbox": True,
-        "ignore_default_args": list(CHROME_DISALLOWED_SANDBOX_FLAGS),
+        "ignore_default_args": list(CHROME_DISALLOWED_SANDBOX_FLAGS) + ["--enable-automation"],
     }
     if locale:
         kwargs["locale"] = locale
@@ -179,8 +177,6 @@ PERSISTENT_COOKIE_RULES = (
     ("tiktok_cookies.json", ("tiktok.com",), {"sessionid", "sessionid_ss", "sid_tt", "uid_tt", "uid_tt_ss", "sid_guard"}),
     ("instagram_cookies.json", ("instagram.com",), {"sessionid", "ds_user_id"}),
     ("pinterest_cookies.json", ("pinterest.com",), {"_pinterest_sess", "_auth"}),
-    ("threads_cookies.json", ("threads.com", "threads.net"), {"sessionid", "ds_user_id"}),
-    ("x_cookies.json", ("x.com", "twitter.com"), {"auth_token", "twid"}),
     ("facebook_cookies.json", ("facebook.com",), {"c_user", "xs"}),
 )
 
@@ -245,15 +241,7 @@ def _has_logged_in_session_cookie(filename, matched_cookies, session_names, auth
         has_uid = any(v.isdigit() and len(v) >= 3 for v, _ in active_by_name.get("ds_user_id", []))
         return has_sid and has_uid
 
-    # 3) 쓰레드: threads.com / threads.net 도메인에 sessionid(>=10) + ds_user_id(숫자) 모두 존재하거나 브라우저 실로그인 검증됨
-    if filename == "threads_cookies.json":
-        if auth_verified:
-            return True
-        has_sid = any(len(v) >= 10 for v, _ in active_by_name.get("sessionid", []))
-        has_uid = any(v.isdigit() and len(v) >= 3 for v, _ in active_by_name.get("ds_user_id", []))
-        return has_sid and has_uid
-
-    # 4) 틱톡: 세션 쿠키(sessionid/sessionid_ss/sid_tt) + 계정 식별 쿠키(uid_tt/uid_tt_ss/sid_guard) 모두 존재
+    # 3) 틱톡: 세션 쿠키(sessionid/sessionid_ss/sid_tt) + 계정 식별 쿠키(uid_tt/uid_tt_ss/sid_guard) 모두 존재
     if filename == "tiktok_cookies.json":
         has_sid = any(
             len(v) >= 10
@@ -276,13 +264,7 @@ def _has_logged_in_session_cookie(filename, matched_cookies, session_names, auth
         has_sess = any(len(v) >= 16 for v, _ in active_by_name.get("_pinterest_sess", []))
         return has_auth1 and has_sess
 
-    # 6) 엑스(X): auth_token(>=10) + twid(>=3) 모두 존재 (guest_id/gt/__cf_bm만 있으면 False)
-    if filename == "x_cookies.json":
-        has_tok = any(len(v) >= 10 for v, _ in active_by_name.get("auth_token", []))
-        has_twid = any(len(v) >= 3 for v, _ in active_by_name.get("twid", []))
-        return has_tok and has_twid
-
-    # 7) 페이스북(개인/매장 공용): c_user(숫자 UID) + xs(>=10) 모두 존재해야 실제 로그인 세션
+    # 6) 페이스북(개인/매장 공용): c_user(숫자 UID) + xs(>=10) 모두 존재해야 실제 로그인 세션
     if filename == "facebook_cookies.json":
         has_cuser = any(v.isdigit() and len(v) >= 4 for v, _ in active_by_name.get("c_user", []))
         has_xs = any(len(v) >= 10 for v, _ in active_by_name.get("xs", []))
@@ -476,10 +458,33 @@ def _sanitize_cookie_for_playwright(c):
     return item
 
 
+def has_valid_naver_auth_cookies(context, live_cookies=None):
+    """영구 크롬 프로필 컨텍스트 안에 네이버 핵심 인증 쿠키(NID_AUT, NID_SES)가 모두 유효하게 존재하는지 엄격 확인."""
+    if context is None and live_cookies is None:
+        return False
+    cookies = list(live_cookies) if live_cookies is not None else []
+    if not cookies and context is not None:
+        try:
+            cookies = context.cookies(["https://www.naver.com", "https://blog.naver.com", "https://clipcreators.naver.com"]) or []
+        except Exception:
+            try:
+                cookies = context.cookies() or []
+            except Exception:
+                cookies = []
+    naver_live = [c for c in cookies if _domain_matches(c.get("domain"), ("naver.com",))]
+    if not naver_live and context is not None:
+        try:
+            naver_live = context.cookies(["https://www.naver.com", "https://blog.naver.com", "https://clipcreators.naver.com"]) or []
+        except Exception:
+            naver_live = []
+    return _has_logged_in_session_cookie("naver_cookies.json", naver_live, {"nid_aut", "nid_ses"}, auth_verified=False)
+
+
 def restore_missing_cookies_to_context(context):
     """영구 크롬 프로필(auth_data/chrome_profile)에서 창 종료로 유실된 세션 쿠키(예: 네이버 '로그인 상태 유지'
-    미체크 시 발급되는 expires=-1 쿠키)를 auth_data/*_cookies.json에서 자동 복원.
-    크롬 프로필에 이미 로그인 세션이 살아 있는 플랫폼은 건드리지 않음."""
+    미체크 시 발급되는 expires=-1 쿠키)를 auth_data/*_cookies.json에서 최소 범위로 자동 복원.
+    - 네이버는 컨텍스트 안에 NID_AUT, NID_SES가 이미 모두 유효하면 절대 덮어쓰지 않고 즉시 건너뜀
+    - 누락된 경우에도 이미 살아 있는 쿠키는 덮어쓰지 않고 누락된 쿠키만 보충해 불필요한 새 세션 갱신을 방지"""
     if context is None:
         return []
     try:
@@ -491,7 +496,10 @@ def restore_missing_cookies_to_context(context):
 
     for filename, domains, session_names in PERSISTENT_COOKIE_RULES:
         live_matched = [c for c in live_cookies if _domain_matches(c.get("domain"), domains)]
-        if _has_logged_in_session_cookie(filename, live_matched, session_names, auth_verified=False):
+        if filename == "naver_cookies.json":
+            if has_valid_naver_auth_cookies(context, live_cookies=live_matched):
+                continue
+        elif _has_logged_in_session_cookie(filename, live_matched, session_names, auth_verified=False):
             continue
         cpath = get_auth_file(filename)
         if not is_platform_cookie_authenticated(filename, cpath, auto_clean=False):
@@ -502,11 +510,30 @@ def restore_missing_cookies_to_context(context):
             saved_cookies = data.get("cookies") if isinstance(data, dict) else None
             if not isinstance(saved_cookies, list) or not saved_cookies:
                 continue
+
+            # 이미 컨텍스트에 유효하게 존재하는 (name, domain) 쿠키는 덮어쓰지 않음
+            existing_live_keys = {
+                (str(c.get("name") or "").strip().lower(), str(c.get("domain") or "").lstrip(".").lower())
+                for c in live_matched
+                if _is_cookie_active(c, now_ts=now_ts)
+            }
+            existing_live_names = {k[0] for k in existing_live_keys}
+
             to_add = []
             for c in saved_cookies:
                 if not _domain_matches(c.get("domain"), domains):
                     continue
                 if not _is_cookie_active(c, now_ts=now_ts):
+                    continue
+                cname_low = str(c.get("name") or "").strip().lower()
+                cdom_low = str(c.get("domain") or "").lstrip(".").lower()
+                if filename == "naver_cookies.json":
+                    # 네이버는 누락된 핵심 인증 쿠키(NID_AUT/NID_SES) 및 컨텍스트에 없는 쿠키만 최소 복원
+                    if cname_low in existing_live_names:
+                        continue
+                    if existing_live_names and cname_low not in session_names:
+                        continue
+                elif (cname_low, cdom_low) in existing_live_keys:
                     continue
                 clean_c = _sanitize_cookie_for_playwright(c)
                 if clean_c:
@@ -514,7 +541,7 @@ def restore_missing_cookies_to_context(context):
             if to_add:
                 context.add_cookies(to_add)
                 restored_files.append(filename)
-                print(f"🔄 [세션 복원] auth_data/{filename}의 저장된 로그인 세션을 브라우저 프로필에 자동 복원했습니다.", flush=True)
+                print(f"🔄 [세션 복원] auth_data/{filename}의 누락된 로그인 쿠키({len(to_add)}개)만 최소 복원했습니다.", flush=True)
         except Exception:
             pass
     return restored_files
@@ -1431,6 +1458,106 @@ def prune_blackbox_upload_dir(max_keep=3):
     return prune_blackbox_dir(max_keep=max_keep)
 
 
+import threading as _pw_threading
+
+_FORCE_STOP_KEEP_LOCK = _pw_threading.Lock()
+_FORCE_STOP_KEEP_BROWSER = False
+_HELD_PLAYWRIGHT_SESSIONS = []
+_HELD_PLAYWRIGHT_REFS = []
+
+
+def set_force_stop_keep_browser(enabled):
+    """강제 중지 시 자동화 브라우저 창을 닫지 않고 유지할지 여부를 설정."""
+    global _FORCE_STOP_KEEP_BROWSER
+    with _FORCE_STOP_KEEP_LOCK:
+        _FORCE_STOP_KEEP_BROWSER = bool(enabled)
+
+
+def is_force_stop_keep_browser():
+    """현재 강제 중지로 브라우저 창 유지 상태인지 반환."""
+    with _FORCE_STOP_KEEP_LOCK:
+        return bool(_FORCE_STOP_KEEP_BROWSER)
+
+
+def has_held_playwright_sessions():
+    """강제 중지로 열어둔 채 유지 중인 Playwright 세션/브라우저 참조 존재 여부."""
+    with _FORCE_STOP_KEEP_LOCK:
+        return bool(_HELD_PLAYWRIGHT_SESSIONS or _HELD_PLAYWRIGHT_REFS)
+
+
+class ManagedPlaywrightSession:
+    """sync_playwright() 래퍼:
+    - 일반 종료/오류/단일 플랫폼 건너뛰기 시 Playwright와 브라우저를 정상 종료
+    - 강제 중지(is_force_stop_keep_browser() == True) 시 Playwright 드라이버를 종료하지 않고
+      참조를 보존해 원장님이 멈춘 지점의 브라우저 화면을 그대로 눈으로 확인할 수 있도록 유지"""
+
+    def __init__(self):
+        self._cm = None
+        self.p = None
+
+    def __enter__(self):
+        from playwright.sync_api import sync_playwright
+        self._cm = sync_playwright()
+        self.p = self._cm.__enter__()
+        return self.p
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if is_force_stop_keep_browser():
+            with _FORCE_STOP_KEEP_LOCK:
+                if self._cm is not None:
+                    _HELD_PLAYWRIGHT_SESSIONS.append(self._cm)
+            return False
+        try:
+            if self._cm is not None:
+                return self._cm.__exit__(exc_type, exc_val, exc_tb)
+        except Exception:
+            pass
+        return False
+
+
+def open_playwright_session():
+    """모든 업로더 공용 Playwright 컨텍스트 매니저 (강제 중지 시 창 유지 지원)."""
+    return ManagedPlaywrightSession()
+
+
+def release_held_playwright_sessions(kill_chrome_fn=None):
+    """다음 업로드/로그인 시작 시 직전 강제 중지로 열어둔 브라우저·Playwright 드라이버를 충돌 없이 안전 정리."""
+    with _FORCE_STOP_KEEP_LOCK:
+        global _FORCE_STOP_KEEP_BROWSER
+        _FORCE_STOP_KEEP_BROWSER = False
+        held_cms = list(_HELD_PLAYWRIGHT_SESSIONS)
+        _HELD_PLAYWRIGHT_SESSIONS.clear()
+        _HELD_PLAYWRIGHT_REFS.clear()
+
+    had_held = bool(held_cms)
+
+    # 1) 강제 중지 시 열어둔 자동화 크롬 프로세스를 먼저 안전 종료(SIGTERM -> SIGKILL / Stop-Process)
+    if callable(kill_chrome_fn):
+        try:
+            kill_chrome_fn()
+        except Exception:
+            pass
+
+    # 2) 유지해 두었던 Playwright Node 드라이버 서브프로세스만 스레드 안전하게 정리
+    for cm in held_cms:
+        try:
+            pw_obj = getattr(cm, "_playwright", None)
+            impl = getattr(pw_obj, "_impl_obj", None) if pw_obj is not None else None
+            conn = getattr(impl, "_connection", None) if impl is not None else None
+            transport = getattr(conn, "_transport", None) if conn is not None else None
+            proc = getattr(transport, "_proc", None) if transport is not None else None
+            if proc is not None and proc.poll() is None:
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    cleanup_chrome_profile_locks()
+    return had_held
+
+
 def finalize_playwright_session(
     platform_name,
     mode=None,
@@ -1441,27 +1568,28 @@ def finalize_playwright_session(
     video_obj=None,
     record_dir=None,
     platform_label=None,
+    keep_browser_open=None,
 ):
     """finally 블록 공용 정리기:
     1) 종료 직전 진단 스냅샷(URL/버튼) 확보 및 최신 영구 프로필 쿠키를 auth_data/로 동기화
-    2) 보안상 로그인 모드는 녹화 저장 제외
-    3) page -> context -> browser(선택) 안전 종료(녹화 파일 flush)
-    4) 업로드·테스트 녹화 클립을 임시 세션 폴더 또는 blackbox/(유형별 최신 3개 유지)로 안전 이동"""
+    2) 강제 중지(keep_browser_open / is_force_stop_keep_browser) 시 브라우저 창을 닫지 않고 현재 화면 유지 + 녹화본 안전 복사
+    3) 일반 종료 시 page -> context -> browser 안전 종료 및 녹화 클립을 blackbox/로 안전 이동"""
     label = platform_label or platform_name
     resolved_mode = _resolve_blackbox_mode(mode=mode, login_only=login_only)
     is_login_mode = resolved_mode == "login"
+    should_keep_open = is_force_stop_keep_browser() if keep_browser_open is None else bool(keep_browser_open)
     test_target = _next_test_blackbox_path(platform_name) if (not is_login_mode and get_test_blackbox_dir()) else ""
     target_path = "" if is_login_mode else (test_target or get_blackbox_path(platform_name, mode=resolved_mode))
     rel_target = os.path.relpath(target_path, get_base_dir()).replace("\\", "/") if target_path else ""
 
-    # 페이지가 아직 열려 있다면 닫기 직전 URL·버튼 진단 스냅샷 최신화
+    # 페이지가 아직 열려 있다면 닫기/정지 직전 URL·버튼 진단 스냅샷 최신화
     try:
         if page is not None and not _is_page_closed_safely(page):
             record_platform_diagnostics(platform_name, page=page)
     except Exception:
         pass
 
-    # persistent context 닫기 직전에 최신 쿠키를 auth_data/에 반영해 대시보드 신호등 자동 갱신
+    # persistent context 정리 직전에 최신 쿠키를 auth_data/에 반영해 대시보드 신호등 자동 갱신
     try:
         if context is not None:
             sync_cookies_from_persistent_context(context)
@@ -1478,6 +1606,34 @@ def finalize_playwright_session(
                 vp = v_ref.path()
         except Exception:
             vp = None
+
+    # 강제 중지 시: 브라우저 창을 닫지 않고 그대로 유지하며 녹화본은 안전 복사만 시도
+    if should_keep_open:
+        with _FORCE_STOP_KEEP_LOCK:
+            _HELD_PLAYWRIGHT_REFS.append((page, context, browser))
+        saved_path = None
+        if not is_login_mode and target_path:
+            cand = None
+            if vp and os.path.isfile(vp) and os.path.getsize(vp) > 0:
+                cand = vp
+            elif record_dir and os.path.isdir(record_dir):
+                webms = [
+                    os.path.join(record_dir, f)
+                    for f in os.listdir(record_dir)
+                    if f.lower().endswith(".webm") and os.path.isfile(os.path.join(record_dir, f))
+                ]
+                non_empty = [w for w in webms if os.path.getsize(w) > 0]
+                if non_empty:
+                    cand = max(non_empty, key=lambda x: os.path.getmtime(x))
+            if cand:
+                try:
+                    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                    shutil.copy2(cand, target_path)
+                    saved_path = target_path
+                except Exception:
+                    pass
+        print(f"🛑 [{label}] 강제 중지 — 브라우저 창을 닫지 않고 현재 화면에서 정지했습니다.", flush=True)
+        return saved_path
 
     # page -> context 순서로 닫아야 Playwright가 .webm 트레일러를 정상 기록하고 파일을 닫음
     try:
@@ -1532,6 +1688,33 @@ def finalize_playwright_session(
         time.sleep(0.15)
 
     saved_path = None
+    # 공유 세션(예: 네이버 블로그→클립 2개 탭)으로 record_dir에 여러 .webm 클립이 있는 경우 모두 순서대로 보존
+    if test_target and record_dir and os.path.isdir(record_dir):
+        extra_webms = sorted(
+            [
+                os.path.join(record_dir, f)
+                for f in os.listdir(record_dir)
+                if f.lower().endswith(".webm") and os.path.isfile(os.path.join(record_dir, f)) and os.path.getsize(os.path.join(record_dir, f)) > 0
+            ],
+            key=lambda x: os.path.getmtime(x),
+        )
+        if len(extra_webms) >= 2:
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            for idx_w, wpath in enumerate(extra_webms):
+                dst_w = target_path if idx_w == 0 else _next_test_blackbox_path(f"{platform_name}_{idx_w + 1}")
+                if not dst_w:
+                    continue
+                try:
+                    shutil.move(wpath, dst_w)
+                    saved_path = saved_path or dst_w
+                except Exception:
+                    try:
+                        shutil.copy2(wpath, dst_w)
+                        saved_path = saved_path or dst_w
+                    except Exception:
+                        pass
+            src_video = None
+
     if target_path and src_video and os.path.isfile(src_video) and os.path.getsize(src_video) > 0:
         os.makedirs(os.path.dirname(target_path), exist_ok=True)
         for _ in range(4):
@@ -1711,62 +1894,11 @@ def extract_instagram_id(raw):
     return s
 
 
-def extract_threads_id(raw):
-    """쓰레드(threads.com / threads.net) 전체 URL 또는 @아이디에서 순수 쓰레드 아이디만 자동 추출"""
-    s = str(raw or "").strip()
-    if not s:
-        return ""
-    m_u = re.search(r"threads\.(?:com|net)/@?([A-Za-z0-9._]+)", s, re.IGNORECASE)
-    if m_u:
-        cand = m_u.group(1).strip().lstrip("@")
-        if cand.lower() in ("login", "logout", "search", "activity", "following", "for_you", "settings", "accounts", "post", "t"):
-            return ""
-        return cand
-    if re.search(r"threads\.(?:com|net)", s, re.IGNORECASE):
-        return ""
-    s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
-    s = s.split("/")[0].split("?")[0].strip().lstrip("@")
-    if "@" in s:
-        s = s.split("@", 1)[0].strip()
-    return s
-
-
-def extract_x_id(raw):
-    """엑스(X / twitter.com) 전체 URL 또는 @아이디에서 순수 X 아이디만 자동 추출"""
-    s = str(raw or "").strip()
-    if not s:
-        return ""
-    m_u = re.search(r"(?:x\.com|twitter\.com)/@?([A-Za-z0-9_]+)", s, re.IGNORECASE)
-    if m_u:
-        cand = m_u.group(1).strip().lstrip("@")
-        if cand.lower() in ("home", "explore", "notifications", "messages", "compose", "i", "search", "settings", "login", "intent"):
-            return ""
-        return cand
-    if re.search(r"(?:x\.com|twitter\.com)", s, re.IGNORECASE):
-        return ""
-    s = re.sub(r"^https?://", "", s, flags=re.IGNORECASE).strip("/")
-    s = s.split("/")[0].split("?")[0].strip().lstrip("@")
-    if "@" in s:
-        s = s.split("@", 1)[0].strip()
-    return s
-
-
 _IG_RESERVED_PATHS = {
     "accounts", "explore", "direct", "reels", "reel", "p", "stories", "tv",
     "login", "logout", "signup", "about", "legal", "developer", "developers",
     "emails", "challenge", "session", "api", "create", "notifications",
-    "search", "messages", "home", "web", "lite", "meta", "threads", "nametag",
-}
-_THREADS_RESERVED_PATHS = {
-    "login", "logout", "signup", "search", "activity", "notifications",
-    "following", "for_you", "settings", "accounts", "about", "legal",
-    "privacy", "terms", "help", "create", "insights", "post", "t", "media",
-    "replies", "reposts", "saved", "liked", "home", "web", "meta",
-}
-_X_RESERVED_PATHS = {
-    "home", "explore", "notifications", "messages", "i", "compose", "settings",
-    "search", "login", "logout", "signup", "tos", "privacy", "bookmarks",
-    "lists", "communities", "premium", "jobs", "grok", "verified-choose", "intent",
+    "search", "messages", "home", "web", "lite", "meta", "nametag",
 }
 
 
@@ -1845,152 +1977,13 @@ def extract_instagram_username_from_page(page):
     return ""
 
 
-def extract_threads_username_from_page(page):
-    """로그인된 쓰레드(threads.com / threads.net) 화면의 네비게이션 [프로필] 링크(/@username)에서 본인 아이디 자동 추출.
-    타인 피드 글의 /@username 링크와 혼동되지 않도록 '프로필'/'Profile' 네비게이션 링크만 엄격히 인식."""
-    if page is None:
-        return ""
-    try:
-        if page.is_closed():
-            return ""
-        cur_u = (page.url or "").lower()
-    except Exception:
-        return ""
-    if ("threads.com" not in cur_u and "threads.net" not in cur_u) or "/login" in cur_u or "instagram.com" in cur_u:
-        return ""
-    try:
-        if is_any_locator_visible(
-            page,
-            ':text-is("Instagram으로 계속하기"), :text-is("Continue with Instagram"), '
-            'a:text-is("로그인"), button:text-is("로그인"), a:text-is("Log in"), button:text-is("Log in")',
-        ):
-            return ""
-    except Exception:
-        pass
-
-    try:
-        hrefs = page.evaluate(
-            """() => {
-                const out = [];
-                const pushHref = (a) => {
-                    if (!a) return;
-                    const h = (a.getAttribute('href') || '').trim();
-                    if (h) out.push(h);
-                };
-                const isProfileNavLink = (a) => {
-                    const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
-                    const aria = (a.getAttribute('aria-label') || '').trim().toLowerCase();
-                    const title = (a.getAttribute('title') || '').trim().toLowerCase();
-                    if (txt === '프로필' || txt === 'profile' || aria === '프로필' || aria === 'profile' || title === '프로필' || title === 'profile') {
-                        return true;
-                    }
-                    const labelled = a.querySelectorAll('svg[aria-label], [aria-label]');
-                    for (const el of labelled) {
-                        const la = (el.getAttribute('aria-label') || '').trim().toLowerCase();
-                        if (la === '프로필' || la === 'profile') return true;
-                    }
-                    return false;
-                };
-                const seen = new Set();
-                // 1순위: nav / header / navigation 영역 내부의 [프로필] 링크
-                const navLinks = document.querySelectorAll('nav a[href], header a[href], div[role="navigation"] a[href], aside a[href]');
-                for (const a of navLinks) {
-                    if (seen.has(a)) continue;
-                    seen.add(a);
-                    if (isProfileNavLink(a)) pushHref(a);
-                }
-                // 2순위: threads.com 좌측/하단 아이콘 바(div 래퍼)의 [프로필] 링크
-                for (const a of document.querySelectorAll('a[href*="/@"]')) {
-                    if (seen.has(a)) continue;
-                    seen.add(a);
-                    if (isProfileNavLink(a)) pushHref(a);
-                }
-                return out;
-            }"""
-        )
-    except Exception:
-        hrefs = []
-
-    for h in (hrefs or []):
-        raw_h = str(h or "").strip()
-        m = re.match(r"^(?:https?://(?:www\.)?threads\.(?:com|net))?/@([A-Za-z0-9._]{1,30})/?(?:[?#].*)?$", raw_h, re.IGNORECASE)
-        if not m:
-            continue
-        cand = m.group(1).strip()
-        if cand.lower() in _THREADS_RESERVED_PATHS:
-            continue
-        cleaned = extract_threads_id(cand)
-        if cleaned and cleaned.lower() not in _THREADS_RESERVED_PATHS:
-            return cleaned
-    return ""
-
-
-def extract_x_username_from_page(page):
-    """로그인된 엑스(X) 화면의 좌측 [프로필] 링크(href)에서 username 자동 추출"""
-    if page is None:
-        return ""
-    try:
-        if page.is_closed():
-            return ""
-        cur_u = (page.url or "").lower()
-    except Exception:
-        return ""
-    if ("x.com" not in cur_u and "twitter.com" not in cur_u) or any(k in cur_u for k in ("/i/flow", "/login", "/logout", "/signup")):
-        return ""
-
-    try:
-        hrefs = page.evaluate(
-            """() => {
-                const out = [];
-                const pushHref = (a) => {
-                    if (!a) return;
-                    const h = (a.getAttribute('href') || '').trim();
-                    if (h && h.startsWith('/')) out.push(h);
-                };
-                // 1순위: X 공식 좌측 네비게이션 프로필 링크
-                const primary = document.querySelector('a[data-testid="AppTabBar_Profile_Link"]');
-                pushHref(primary);
-                // 2순위: aria-label 또는 텍스트가 '프로필' / 'Profile'인 nav/header 링크
-                const cands = document.querySelectorAll('nav a[href], header a[href]');
-                for (const a of cands) {
-                    const aria = (a.getAttribute('aria-label') || '').trim().toLowerCase();
-                    const txt = (a.innerText || a.textContent || '').replace(/\\s+/g, ' ').trim().toLowerCase();
-                    if (aria === '프로필' || aria === 'profile' || txt === '프로필' || txt === 'profile') {
-                        pushHref(a);
-                    }
-                }
-                return out;
-            }"""
-        )
-    except Exception:
-        hrefs = []
-
-    for h in (hrefs or []):
-        m = re.match(r"^/([A-Za-z0-9_]{1,20})/?(?:[?#].*)?$", str(h or "").strip())
-        if not m:
-            continue
-        cand = m.group(1).strip()
-        if cand.lower() in _X_RESERVED_PATHS:
-            continue
-        cleaned = extract_x_id(cand)
-        if cleaned and cleaned.lower() not in _X_RESERVED_PATHS:
-            return cleaned
-    return ""
-
-
 def auto_extract_and_save_profile_id(page, platform):
-    """로그인된 인스타/쓰레드/엑스 페이지에서 좌측 [프로필] 링크 username을 각각 독립 추출해 user_profile.json에 자동 저장.
+    """로그인된 인스타그램 페이지에서 좌측 [프로필] 링크 username을 추출해 user_profile.json에 자동 저장.
     새로 저장(또는 갱신)된 경우 추출된 username 문자열 반환, 변동 없으면 '' 반환."""
     plat = str(platform or "").strip().lower()
     if plat in ("ig", "instagram"):
         username = extract_instagram_username_from_page(page)
         field_key = "instagram_id"
-    elif plat in ("threads", "thread"):
-        username = extract_threads_username_from_page(page)
-        field_key = "threads_id"
-    elif plat in ("x", "twitter"):
-        username = extract_x_username_from_page(page)
-        field_key = "x_id"
     else:
         return ""
     if not username:
@@ -2064,8 +2057,6 @@ def load_profile():
                 prof["naver_blog_id"] = extract_naver_blog_id(prof.get("naver_blog_id", ""))
                 prof["pinterest_id"] = extract_pinterest_id(prof.get("pinterest_id", ""))
                 prof["instagram_id"] = extract_instagram_id(prof.get("instagram_id", ""))
-                prof["threads_id"] = extract_threads_id(prof.get("threads_id", ""))
-                prof["x_id"] = extract_x_id(prof.get("x_id", ""))
                 pm = str(prof.get("prompt_mode") or "standard").strip().lower()
                 prof["prompt_mode"] = "custom" if pm == "custom" else "standard"
                 prof["custom_style_guide"] = str(prof.get("custom_style_guide") or "").strip()
@@ -2099,8 +2090,6 @@ def save_profile(data, is_draft=False):
         "naver_blog_id",
         "pinterest_id",
         "instagram_id",
-        "threads_id",
-        "x_id",
         "place_search_keyword",
         "personal_banned_tags",
         "salon_address",
@@ -2121,10 +2110,6 @@ def save_profile(data, is_draft=False):
                 cleaned = extract_pinterest_id(cleaned)
             elif k == "instagram_id":
                 cleaned = extract_instagram_id(cleaned)
-            elif k == "threads_id":
-                cleaned = extract_threads_id(cleaned)
-            elif k == "x_id":
-                cleaned = extract_x_id(cleaned)
             prof[k] = cleaned
 
     if "prompt_mode" in data:
@@ -2284,7 +2269,7 @@ def launch_chromium(playwright_obj, headless=False, args=None):
         "headless": headless,
         "args": launch_args,
         "chromium_sandbox": True,
-        "ignore_default_args": list(CHROME_DISALLOWED_SANDBOX_FLAGS),
+        "ignore_default_args": list(CHROME_DISALLOWED_SANDBOX_FLAGS) + ["--enable-automation"],
     }
     try:
         return playwright_obj.chromium.launch(channel="chrome", **launch_kwargs)
@@ -2446,23 +2431,6 @@ PLATFORM_LOGOUT_CONFIG = {
             "https://kr.pinterest.com",
             "https://www.pinterest.co.kr",
         ),
-    },
-    "threads": {
-        "label": "쓰레드",
-        "cookie_file": "threads_cookies.json",
-        "domains": ("threads.net", "threads.com"),
-        "origins": (
-            "https://www.threads.net",
-            "https://www.threads.com",
-            "https://threads.net",
-            "https://threads.com",
-        ),
-    },
-    "x": {
-        "label": "엑스(X)",
-        "cookie_file": "x_cookies.json",
-        "domains": ("x.com", "twitter.com"),
-        "origins": ("https://x.com", "https://twitter.com"),
     },
     "fb": {
         "label": "페이스북(개인·매장)",

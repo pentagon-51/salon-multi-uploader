@@ -27,7 +27,7 @@ DEFAULT_RELEASE_INFO = {
     "repo_url": PUBLIC_REPO_URL,
     "notion_url": "#",
     "youtube_url": "#",
-    "chat_url": "#",
+    "chat_url": "https://open.kakao.com/o/gixPiVXi",
     "instagram_url": "#",
 }
 
@@ -268,6 +268,56 @@ def refresh_windows_desktop_shortcut(dest_base):
         return False
 
 
+def ensure_runtime_packages(report=None):
+    """기존 배포판 사용자 원클릭 업데이트 시 영상 호환 모듈(imageio-ffmpeg) 미설치면 조용히 자동 설치.
+    오프라인/일시 오류 시 업데이트 전체를 실패시키지 않고 경고만 보고 후 정상 완료."""
+    def _rep(pct, msg):
+        if callable(report):
+            try:
+                report(pct, msg)
+            except Exception:
+                pass
+
+    try:
+        import imageio_ffmpeg  # noqa: F401
+        return {"ok": True, "already_installed": True}
+    except Exception:
+        pass
+
+    _rep(95, "영상 호환 모듈(imageio-ffmpeg) 자동 설치 중...")
+    run_kwargs = {
+        "capture_output": True,
+        "text": True,
+        "timeout": 180,
+    }
+    if sys.platform == "win32":
+        run_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+    py_exe = sys.executable
+    if sys.platform == "win32" and os.path.basename(py_exe).lower() == "pythonw.exe":
+        cand_py = os.path.join(os.path.dirname(py_exe), "python.exe")
+        if os.path.isfile(cand_py):
+            py_exe = cand_py
+
+    cmd = [py_exe, "-m", "pip", "install", "--quiet", "imageio-ffmpeg"]
+    try:
+        proc = subprocess.run(cmd, **run_kwargs)
+        if proc.returncode == 0:
+            _rep(97, "영상 호환 모듈(imageio-ffmpeg) 자동 설치 완료!")
+            return {"ok": True, "installed": True}
+        if sys.platform == "darwin":
+            retry_cmd = [py_exe, "-m", "pip", "install", "--break-system-packages", "--quiet", "imageio-ffmpeg"]
+            proc2 = subprocess.run(retry_cmd, **run_kwargs)
+            if proc2.returncode == 0:
+                _rep(97, "영상 호환 모듈(imageio-ffmpeg) 자동 설치 완료!")
+                return {"ok": True, "installed": True}
+        _rep(97, "⚠️ 영상 호환 모듈(imageio-ffmpeg) 자동 설치를 건너뛰었습니다 (업데이트는 정상 완료).")
+        return {"ok": False, "warning": True}
+    except Exception as e:
+        _rep(97, f"⚠️ 영상 호환 모듈(imageio-ffmpeg) 자동 설치 중 경고({e}) — 업데이트는 정상 완료됩니다.")
+        return {"ok": False, "warning": str(e)}
+
+
 def apply_public_update(branch="main", report=None, target_dir=None, timeout=30):
     """GitHub main 브랜치 ZIP을 임시 폴더에 받아 문법 검사 후 코드 파일만 안전 덮어쓰기 (개인 데이터 100% 보호)"""
     def _report(pct, msg):
@@ -409,6 +459,7 @@ def apply_public_update(branch="main", report=None, target_dir=None, timeout=30)
                         pass
 
         refresh_windows_desktop_shortcut(dest_base)
+        ensure_runtime_packages(report=report)
 
         final_ver = new_version_from_zip or read_local_version()
         _report(100, f"업데이트 완료! (v{final_ver})")

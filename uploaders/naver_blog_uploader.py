@@ -12,9 +12,11 @@ from os_utils import (
     create_blackbox_record_dir,
     is_any_locator_visible,
     save_storage_state_safely,
+    sync_cookies_from_persistent_context,
     wait_for_manual_login,
     wait_for_test_mode_close,
     finalize_playwright_session,
+    open_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
@@ -153,6 +155,249 @@ def set_editor_color(page, editor, use_blue=True):
         pass
     return False
 
+
+def _read_toolbar_font_size(btn_loc):
+    """글자 크기 툴바 버튼의 현재 활성 크기(정수 px, 예: 15/19)를 판독. 판독 불가 시 None 반환."""
+    try:
+        target = btn_loc.first
+        candidates = []
+        for attr in ("data-value", "aria-label", "title"):
+            val = target.get_attribute(attr)
+            if val:
+                candidates.append(val)
+        try:
+            label_el = target.locator('.se-toolbar-label').first
+            if label_el.count() > 0:
+                ltxt = (label_el.inner_text(timeout=300) or "").strip()
+                if ltxt:
+                    candidates.append(ltxt)
+        except Exception:
+            pass
+        try:
+            btxt = (target.inner_text(timeout=300) or "").strip()
+            if btxt:
+                candidates.append(btxt)
+        except Exception:
+            pass
+        for raw in candidates:
+            m = re.search(r'(?:fs)?\b(1[1-9]|2[0-9]|3[0-8])\b(?:px)?', str(raw), re.IGNORECASE)
+            if m:
+                return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def set_editor_font_size(page, editor, size_px=15):
+    """스마트에디터 글자 크기 툴바에서 지정 크기(예: 소제목 19px / 본문 복원 15px)를 선택.
+    - 이미 원하는 크기면 즉시 True 반환(불필요한 클릭 지연 최소화)
+    - 드롭다운에서 15 / 15px / fs15 매칭 후 실제 활성 크기를 검증하고 미반영 시 1회 재시도
+    - 툴바 미발견·팝업 미오픈 시 불필요한 대기 없이 안전하게 False 반환"""
+    target_px = int(size_px)
+    code = f"fs{target_px}"
+    px_str = str(target_px)
+    px_unit = f"{target_px}px"
+    try:
+        btn_sels = (
+            'button[data-name="font-size"], '
+            'button.se-font-size-code-toolbar-button, '
+            '.se-font-size-code-toolbar-button, '
+            '.se-toolbar-item-font-size-code button'
+        )
+        f_btn = find_in_both(page, editor, btn_sels)
+        if f_btn.count() == 0 or not f_btn.first.is_visible():
+            return False
+
+        # 이미 목표 크기(예: 15px)로 설정되어 있으면 클릭 없이 즉시 통과
+        cur_px = _read_toolbar_font_size(f_btn)
+        if cur_px == target_px:
+            return True
+
+        opt_sels = [
+            f'button[data-value="{code}"]',
+            f'button[data-value="{px_str}"]',
+            f'button[data-value="{px_unit}"]',
+            f'button.se-toolbar-option-font-size-code-{code}-button',
+            f'.se-toolbar-option-font-size-code button:text-is("{px_str}")',
+            f'.se-toolbar-option-font-size-code button:text-is("{px_unit}")',
+            f'.se-popup-font-size-code button:text-is("{px_str}")',
+            f'.se-popup-font-size-code button:text-is("{px_unit}")',
+            f'.se-toolbar-option-list button:text-is("{px_str}")',
+            f'.se-toolbar-option-list button:text-is("{px_unit}")',
+            f'li button[data-value="{code}"]',
+            f'li button[data-value="{px_str}"]',
+            f'li button[data-value="{px_unit}"]',
+        ]
+        popup_btn_sel = (
+            '.se-popup-font-size-code button, '
+            '.se-toolbar-option-font-size-code button, '
+            '.se-toolbar-option-list button[data-value^="fs"], '
+            '.se-toolbar-option-list button'
+        )
+
+        def _click_matching_option():
+            for sel in opt_sels:
+                opt = find_in_both(page, editor, sel)
+                if opt.count() > 0 and opt.first.is_visible():
+                    opt.first.click()
+                    return True
+            # 텍스트/속성 정규화 폴백 스캔 (15 / 15px / fs15)
+            pool = find_in_both(page, editor, popup_btn_sel)
+            cnt = min(pool.count(), 24)
+            for i in range(cnt):
+                cand = pool.nth(i)
+                try:
+                    if not cand.is_visible():
+                        continue
+                    dv = (cand.get_attribute("data-value") or "").strip().lower()
+                    cls = (cand.get_attribute("class") or "").strip().lower()
+                    txt = re.sub(r'\s+', '', (cand.inner_text(timeout=200) or "")).lower()
+                    if (
+                        dv in (code, px_str, px_unit)
+                        or f"-{code}-" in cls
+                        or txt in (px_str, px_unit, code)
+                    ):
+                        cand.click()
+                        return True
+                except Exception:
+                    pass
+            return False
+
+        for attempt in range(2):
+            f_btn.first.click()
+            time.sleep(0.14)
+
+            if not _click_matching_option():
+                # 툴바 드롭다운이 열리지 않았거나 옵션을 못 찾은 경우 불필요한 재시도 지연 최소화
+                try:
+                    if (f_btn.first.get_attribute("aria-expanded") or "").lower() == "true":
+                        f_btn.first.click()
+                        time.sleep(0.08)
+                except Exception:
+                    pass
+                if attempt == 0 and target_px == 15 and _read_toolbar_font_size(f_btn) not in (None, target_px):
+                    # 19px 상태에서 15px 복원 드롭다운만 1회 짧게 재시도
+                    time.sleep(0.1)
+                    continue
+                return False
+
+            time.sleep(0.12)
+            after_px = _read_toolbar_font_size(f_btn)
+            if after_px == target_px or after_px is None:
+                return True
+            # 선택 후 툴바 라벨이 목표 크기로 바뀌지 않았으면 1회 재시도
+            time.sleep(0.1)
+    except Exception:
+        pass
+    return False
+
+def _is_align_center_active(btn):
+    """정렬 툴바 버튼의 속성/클래스/라벨로 현재 가운데 정렬 활성 여부를 판별."""
+    try:
+        dname = (btn.get_attribute("data-name") or "").lower()
+        dv = (btn.get_attribute("data-value") or "").lower()
+        cls = (btn.get_attribute("class") or "").lower()
+        al = ((btn.get_attribute("aria-label") or "") + " " + (btn.get_attribute("title") or "")).lower()
+        meta = f"{dname} {dv} {cls} {al}"
+        if any(k in meta for k in ("align-left", "align-right", "align-justify", "왼쪽", "오른쪽", "양쪽")):
+            return False
+        if dv == "center" or "align-center" in dname or "align-center" in cls or "가운데" in al:
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def ensure_editor_center_align(page, editor):
+    """스마트에디터 본문 텍스트 전체(도입부·소제목·문단·마무리 인사)를 가운데 정렬로 유지.
+    - 이미 가운데 정렬이 활성화되어 있으면 클릭 없이 즉시 True 반환(지연 0)
+    - 단일 드롭다운 툴바와 분리형 정렬 버튼 UI 모두 대응하며, 미반영 시 1회 재시도"""
+    try:
+        # 1) 분리형 정렬 버튼(왼쪽/가운데 버튼이 동시에 노출된 경우) 우선 확인
+        sep_left = find_in_both(page, editor, '.se-toolbar button[data-name="align-left"], .se-toolbar button.se-align-left-toolbar-button')
+        sep_center = find_in_both(page, editor, '.se-toolbar button[data-name="align-center"], .se-toolbar button.se-align-center-toolbar-button')
+        if sep_left.count() > 0 and sep_center.count() > 0 and sep_left.first.is_visible() and sep_center.first.is_visible():
+            cbtn = sep_center.first
+            c_cls = (cbtn.get_attribute("class") or "").lower()
+            c_pressed = (cbtn.get_attribute("aria-pressed") or "").lower()
+            if "se-is-selected" in c_cls or "active" in c_cls or c_pressed == "true":
+                return True
+            cbtn.click()
+            time.sleep(0.1)
+            return True
+
+        # 2) 스마트에디터 ONE 표준 정렬 드롭다운 버튼 탐색
+        align_btn_sels = (
+            'button[data-name="align-center"], '
+            'button[data-name="align-left"], '
+            'button[data-name="align-right"], '
+            'button[data-name="align-justify"], '
+            'button[data-name="align"], '
+            'button.se-align-center-toolbar-button, '
+            'button.se-align-left-toolbar-button, '
+            '.se-toolbar-item-align button, '
+            'button.se-align-toolbar-button'
+        )
+        a_btn = find_in_both(page, editor, align_btn_sels)
+        if a_btn.count() == 0 or not a_btn.first.is_visible():
+            return False
+
+        if _is_align_center_active(a_btn.first):
+            return True
+
+        center_opt_sels = [
+            'button[data-value="center"]',
+            'button.se-toolbar-option-align-center-button',
+            '.se-toolbar-option-align button[data-value="center"]',
+            '.se-popup-align button[data-value="center"]',
+            '.se-toolbar-option-list button[data-value="center"]',
+            '.se-toolbar-option-list button[data-name="align-center"]',
+            '.se-popup-align button[data-name="align-center"]',
+            'button[aria-label*="가운데 정렬"]',
+            'button[title*="가운데 정렬"]',
+            '.se-popup-align button:has-text("가운데")',
+            '.se-toolbar-option-list button:has-text("가운데")',
+        ]
+
+        for attempt in range(2):
+            cur_btn = find_in_both(page, editor, align_btn_sels)
+            if cur_btn.count() == 0 or not cur_btn.first.is_visible():
+                return False
+            if _is_align_center_active(cur_btn.first):
+                return True
+
+            cur_btn.first.click()
+            time.sleep(0.12)
+
+            clicked_opt = False
+            for sel in center_opt_sels:
+                opt = find_in_both(page, editor, sel)
+                if opt.count() > 0 and opt.first.is_visible():
+                    opt.first.click()
+                    clicked_opt = True
+                    time.sleep(0.1)
+                    break
+
+            if not clicked_opt:
+                try:
+                    if (cur_btn.first.get_attribute("aria-expanded") or "").lower() == "true":
+                        cur_btn.first.click()
+                        time.sleep(0.06)
+                except Exception:
+                    pass
+                return False
+
+            # 선택 후 실제 가운데 정렬 반영 여부 확인 (미반영 시 1회 재시도)
+            chk_btn = find_in_both(page, editor, align_btn_sels)
+            if chk_btn.count() == 0 or _is_align_center_active(chk_btn.first):
+                return True
+            if attempt == 0:
+                time.sleep(0.08)
+    except Exception:
+        pass
+    return False
+
+
 def _move_cursor_below_inserted_image(page, editor):
     """이미지 삽입 후 캡션창(.se-caption)이나 툴바 포커스를 피해 안전하게 사진 아래 새 텍스트 줄로 커서 이동"""
     try:
@@ -273,6 +518,7 @@ def paste_formatted_body(page, editor, text, selected_images=None):
             has_gif_placeholders = True
     has_media_placeholders = bool(referenced_slot_indices) or has_gif_placeholders
     flushed_remaining = False
+    need_text_center_align = True
 
     def _flush_unplaced_active_media():
         nonlocal flushed_remaining
@@ -298,6 +544,7 @@ def paste_formatted_body(page, editor, text, selected_images=None):
         # 본문에 미디어 마커([미디어 자료N]/[사진 N]/[GIF])가 전혀 없을 때만 하단 구분선(━━━) 직전에 활성 미디어 삽입
         if stripped.startswith("━━━") and (not has_media_placeholders) and len(used_indices) < len(sel_imgs):
             _flush_unplaced_active_media()
+            need_text_center_align = True
 
         # [미디어 자료1]~[미디어 자료10] 또는 [사진 1]~[사진 10] 태그 감지 시 해당 슬롯의 사진/GIF 삽입 (제외 슬롯은 당기지 않고 빈자리로 생략)
         m_slot = media_slot_pattern.match(stripped)
@@ -306,6 +553,7 @@ def paste_formatted_body(page, editor, text, selected_images=None):
             if 0 <= p_idx < len(sel_imgs) and sel_imgs[p_idx] and os.path.exists(sel_imgs[p_idx]):
                 attach_image_in_editor(page, editor, sel_imgs[p_idx])
                 used_indices.add(p_idx)
+                need_text_center_align = True
             continue
 
         # [GIF] 또는 [GIF N] 단독 태그 감지 시 선택된 GIF 파일 삽입 (다른 슬롯 마커에 배정되지 않은 GIF 우선)
@@ -327,7 +575,13 @@ def paste_formatted_body(page, editor, text, selected_images=None):
                         target_g = gif_candidates[g_num]
                 attach_image_in_editor(page, editor, target_g[1])
                 used_indices.add(target_g[0])
+                need_text_center_align = True
             continue
+
+        # 본문 텍스트·URL 입력 직전에 가운데 정렬 유지 확인 (이미 가운데면 클릭 없이 즉시 통과)
+        if need_text_center_align:
+            ensure_editor_center_align(page, editor)
+            need_text_center_align = False
 
         # 단독 URL 줄은 붙여넣기 직후 Enter + 0.8초 대기로 네이버 OG 링크 카드 자동 변환 유도
         if url_pattern.match(stripped):
@@ -336,14 +590,17 @@ def paste_formatted_body(page, editor, text, selected_images=None):
             time.sleep(0.15)
             page.keyboard.press("Enter")
             time.sleep(0.8)
+            need_text_center_align = True
             continue
 
         tokens = re.split(r'(\[\[[^\]]+\]\]|\*\*[^*]+\*\*)', line)
+        line_had_resized_heading = False
         for tok in tokens:
             if not tok:
                 continue
             if tok.startswith("[[") and tok.endswith("]]") and len(tok) > 4:
                 inner = tok[2:-2]
+                resized = set_editor_font_size(page, editor, size_px=19)
                 colored = set_editor_color(page, editor, use_blue=True)
                 page.keyboard.press(f"{MOD_KEY}+b")
                 time.sleep(0.05)
@@ -354,6 +611,9 @@ def paste_formatted_body(page, editor, text, selected_images=None):
                 time.sleep(0.05)
                 if colored:
                     set_editor_color(page, editor, use_blue=False)
+                if resized:
+                    line_had_resized_heading = True
+                    set_editor_font_size(page, editor, size_px=15)
             elif tok.startswith("**") and tok.endswith("**") and len(tok) > 4:
                 inner = tok[2:-2]
                 page.keyboard.press(f"{MOD_KEY}+b")
@@ -371,6 +631,9 @@ def paste_formatted_body(page, editor, text, selected_images=None):
         if idx < len(lines) - 1:
             page.keyboard.press("Enter")
             time.sleep(0.04)
+            # 스마트에디터에서 19px 소제목 줄 직후 Enter 시 19px가 상속되는 경우 즉시 15px 복원 확인
+            if line_had_resized_heading:
+                set_editor_font_size(page, editor, size_px=15)
 
     # 구분선(━━━)이 없는 본문에서도 본문에 미배치된 활성 캡처/GIF가 누락되지 않도록 말미에 보충
     if len(used_indices) < len(sel_imgs):
@@ -526,100 +789,156 @@ def attach_video_in_modal(page, editor, video_path, video_title, video_tags=None
     vbtn = find_in_both(page, editor, 'button[data-name="video"]')
     if vbtn.count() == 0:
         raise Exception("상단 '동영상' 아이콘 없음")
+    print("🎬 [네이버 블로그] 상단 [동영상] 아이콘 클릭 → 동영상 모달 탐색 중...", flush=True)
     vbtn.first.click()
-    time.sleep(2.5)
+
+    add_btn_sels = [
+        '.se-video-uploader-layer button:text-is("동영상 추가")',
+        '.se-video-uploader-layer button:has-text("동영상 추가")',
+        'button:text-is("동영상 추가")',
+        'button:has-text("동영상 추가")',
+        'label:has-text("동영상 추가")',
+        'div[role="button"]:has-text("동영상 추가")',
+        'a:has-text("동영상 추가")',
+        'span:text-is("동영상 추가")',
+        'div[class*="video"] button:has-text("동영상 추가")',
+    ]
+    video_input_sel = (
+        'input[type="file"][accept*="video"], '
+        'input[type="file"][accept*="mp4"], '
+        '.se-video-uploader-layer input[type="file"], '
+        '.se-popup-video input[type="file"]'
+    )
 
     attached = False
-    for sel in ['button:has-text("동영상 추가")', 'label:has-text("동영상 추가")', '.se-video-uploader-layer button:has-text("동영상 추가")', 'div[class*="video"] button:has-text("동영상 추가")']:
-        if attached:
-            break
-        btn = find_in_both(page, editor, sel)
-        if btn.count() > 0:
-            try:
-                with page.expect_file_chooser(timeout=8000) as fc_info:
-                    btn.first.click(force=True)
-                fc_info.value.set_files(video_path)
-                attached = True
-                print("✅ [네이버 블로그] 파일 선택창을 통해 동영상 첨부 성공!")
-            except Exception:
-                pass
+    logged_click_try = False
+    modal_deadline = time.time() + 10.0
 
-    if not attached:
-        for ctx in [editor, page]:
+    # 불필요한 고정 대기 없이 모달의 [동영상 추가] 버튼(또는 비디오 input)이 뜨는 즉시 클릭·첨부
+    while not attached and time.time() < modal_deadline:
+        for sel in add_btn_sels:
             if attached:
                 break
             try:
-                vis_inputs = ctx.locator('input[type="file"][accept*="video"], input[type="file"][accept*="mp4"], .se-video-uploader-layer input[type="file"]')
-                if vis_inputs.count() > 0:
-                    vis_inputs.first.set_input_files(video_path)
+                btn = find_in_both(page, editor, sel)
+                if btn.count() > 0 and btn.first.is_visible():
+                    if not logged_click_try:
+                        print(f"📎 [네이버 블로그] [동영상 추가] 버튼 클릭 시도 ({sel})...", flush=True)
+                        logged_click_try = True
+                    with page.expect_file_chooser(timeout=5000) as fc_info:
+                        btn.first.click(force=True)
+                    fc_info.value.set_files(video_path)
                     attached = True
-                    print("✅ [네이버 블로그] 비디오 전용 input 태그에 첨부 성공!")
+                    print(f"✅ [네이버 블로그] 원본 동영상 파일 첨부 완료! ({os.path.basename(video_path)})", flush=True)
+                    break
             except Exception:
                 pass
+
+        if attached:
+            break
+
+        # 버튼 클릭이 file chooser를 직접 열지 못했거나 input이 먼저 준비된 경우 즉시 input 폴백
+        for ctx in (editor, page):
+            try:
+                vis_inputs = ctx.locator(video_input_sel)
+                if vis_inputs.count() > 0:
+                    if not logged_click_try:
+                        print("📎 [네이버 블로그] 동영상 파일 input 직접 첨부 시도 중...", flush=True)
+                        logged_click_try = True
+                    vis_inputs.first.set_input_files(video_path)
+                    attached = True
+                    print(f"✅ [네이버 블로그] 비디오 전용 input 첨부 완료! ({os.path.basename(video_path)})", flush=True)
+                    break
+            except Exception:
+                pass
+
+        if not attached:
+            time.sleep(0.15)
 
     if not attached:
         raise Exception("동영상 추가 버튼 클릭 및 파일 첨부 실패")
 
-    print("⏳ [네이버 블로그] 동영상 업로드 완료 및 제목 입력칸 활성화 대기 중...")
+    print("⏳ [네이버 블로그] 동영상 업로드·인코딩 및 제목 입력칸 활성화 대기 중...", flush=True)
     safe_v_title = make_safe_video_title(video_title, limit=29)
     title_Selectors = 'input[placeholder*="제목을 입력"], input[placeholder*="동영상 제목"], input[placeholder*="제목"], .se-video-uploader-layer input[type="text"]'
 
-    for _ in range(40):
-        if find_in_both(page, editor, 'text="업로드 완료"').count() > 0:
-            break
-        time.sleep(1.5)
-    time.sleep(1.0)
+    # '업로드 완료' 텍스트가 감지되거나 제목 입력칸이 표시·활성화되면 즉시 다음 단계로 진행 (최대 60초)
+    wait_start = time.time()
+    last_progress_log = wait_start
+    ready_title_in = None
+    while time.time() - wait_start < 60.0:
+        try:
+            t_in_chk = find_in_both(page, editor, title_Selectors)
+            if t_in_chk.count() > 0:
+                cand_in = t_in_chk.first
+                if cand_in.is_visible() and cand_in.get_attribute("disabled") is None:
+                    ready_title_in = cand_in
+                    break
+            if find_in_both(page, editor, 'text="업로드 완료"').count() > 0:
+                break
+        except Exception:
+            pass
+        now_t = time.time()
+        if now_t - last_progress_log >= 10.0:
+            print(f"⏳ [네이버 블로그] 동영상 업로드·인코딩 진행 중... ({int(now_t - wait_start)}초 경과)", flush=True)
+            last_progress_log = now_t
+        time.sleep(0.3)
+
+    print(f"✅ [네이버 블로그] 동영상 업로드 준비 완료 ({time.time() - wait_start:.1f}초) → 제목·태그 입력 진행", flush=True)
 
     title_filled = False
     active_title_in = None
-    for _ in range(20):
-        t_in = find_in_both(page, editor, title_Selectors)
-        if t_in.count() > 0:
-            target_in = t_in.first
+    for attempt in range(25):
+        target_in = ready_title_in if (attempt == 0 and ready_title_in is not None) else None
+        if target_in is None:
+            t_in = find_in_both(page, editor, title_Selectors)
+            if t_in.count() > 0:
+                target_in = t_in.first
+        if target_in is not None:
             try:
                 if target_in.is_visible() and target_in.get_attribute("disabled") is None:
                     active_title_in = target_in
                     target_in.click(force=True)
-                    time.sleep(0.3)
+                    time.sleep(0.12)
                     target_in.fill(safe_v_title)
-                    time.sleep(0.4)
+                    time.sleep(0.15)
                     if not (target_in.input_value() or "").strip():
                         copy_to_clipboard(safe_v_title)
                         page.keyboard.press(f"{MOD_KEY}+v")
-                        time.sleep(0.4)
+                        time.sleep(0.2)
                     page.keyboard.press("End")
                     page.keyboard.press("Space")
                     page.keyboard.press("Backspace")
-                    time.sleep(0.5)
+                    time.sleep(0.15)
                     title_filled = True
-                    print(f"✅ [네이버 블로그] 동영상 필수 제목(30자 이내) 입력 완료: {safe_v_title}")
+                    print(f"✅ [네이버 블로그] 동영상 필수 제목(30자 이내) 입력 완료: {safe_v_title}", flush=True)
                     break
             except Exception:
                 pass
-        time.sleep(1.0)
+        time.sleep(0.3)
 
     if not title_filled:
         copy_to_clipboard(safe_v_title)
         page.keyboard.press(f"{MOD_KEY}+v")
-        time.sleep(0.5)
+        time.sleep(0.25)
 
     if video_tags:
         enter_video_modal_tags(page, editor, video_tags, title_input=active_title_in)
-        time.sleep(0.6)
+        time.sleep(0.25)
 
     done_btn = find_in_both(page, editor, 'button.se-video-uploader-layer-button-submit, button:has-text("완료"), .se-video-uploader-layer button:has-text("완료")')
     done_btn.last.wait_for(state="visible", timeout=30000)
 
-    for _ in range(30):
+    for _ in range(90):
         btn_el = done_btn.last
         if btn_el.get_attribute("disabled") is None and btn_el.get_attribute("aria-disabled") != "true" and "disabled" not in (btn_el.get_attribute("class") or "").lower():
             break
-        time.sleep(1.0)
+        time.sleep(0.3)
 
-    time.sleep(0.8)
+    time.sleep(0.15)
     done_btn.last.click(force=True)
-    print("✅ [네이버 블로그] 동영상 모달창 [완료] 클릭 성공!")
-    time.sleep(3.0)
+    print("✅ [네이버 블로그] 동영상 모달창 [완료] 클릭 성공!", flush=True)
+    time.sleep(1.0)
     return True
 
 def attach_place_map(page, editor, place_name):
@@ -728,7 +1047,74 @@ def is_naver_blog_logged_in(page):
         return True
     return False
 
-def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=None, place_name=None, login_only=False, selected_images=None, stop_checker=None, test_mode=False):
+def split_blog_intro_and_rest(body_text):
+    """블로그 본문에서 첫 번째 [[소제목]] 또는 첫 번째 [미디어 자료1]([사진 1]) 직전까지의
+    도입부와 나머지 본문을 분리. 해당 마커가 전혀 없으면 ('', body_text, False) 반환."""
+    raw = (body_text or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = raw.splitlines()
+    first_media_re = re.compile(
+        r'^\[(?:미디어\s*자료|사진)\s*1(?:\s*[·•\-]?\s*GIF)?\]$',
+        re.IGNORECASE,
+    )
+    split_idx = None
+    for idx, line in enumerate(lines):
+        s = line.strip()
+        if not s:
+            continue
+        if (s.startswith("[[") and s.endswith("]]") and len(s) > 4) or first_media_re.match(s):
+            split_idx = idx
+            break
+    if split_idx is None:
+        return "", raw, False
+    intro = "\n".join(lines[:split_idx]).strip()
+    rest = "\n".join(lines[split_idx:]).strip()
+    return intro, rest, True
+
+
+def split_blog_body_for_closing_video(full_body):
+    """동영상을 '본문 마무리 인사·예약 링크·매장 정보' 직전에 배치하기 위해
+    전체 블로그 본문을 (main_before_video, closing_and_footer) 2영역으로 분리.
+    - 대표사진 → 도입부 → 본문 + [미디어 자료1~5] → [완성 동영상] → 마무리 인사·예약 링크·스마트플레이스 지도"""
+    raw = (full_body or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not raw:
+        return "", ""
+
+    # 1) 하단 공식 구분선(━━━) 기준 본문 영역과 예약 링크·매장 정보 푸터 영역 분리
+    div_m = re.search(r'\n*━{3,}', raw)
+    if div_m:
+        body_part = raw[:div_m.start()].strip()
+        footer_part = raw[div_m.start():].lstrip("\n").strip()
+    else:
+        body_part = raw
+        footer_part = ""
+
+    # 2) 본문 영역 끝부분의 짧은 마무리 인사 단락(미디어/소제목 제외)이 있으면 동영상 아래로 자연 이동
+    closing_cue_re = re.compile(
+        r'(?:감사합니다|감사드립니다|고맙습니다|문의|방문해|기다리|연락|도와드리|이상으로|지금까지|오늘도|좋은\s*하루|행복한\s*하루|찾아주세요|예약|편하게\s*말씀|언제든)'
+    )
+    media_any_re = re.compile(
+        r'\[(?:미디어\s*자료\s*\d+|사진\s*\d+(?:\s*[·•\-]?\s*GIF)?|GIF(?:\s*\d+)?)\]',
+        re.IGNORECASE,
+    )
+    paragraphs = [p.strip() for p in re.split(r'\n\s*\n+', body_part) if p.strip()]
+    closing_para = ""
+    if len(paragraphs) >= 2:
+        last_p = paragraphs[-1]
+        if (
+            len(last_p) <= 160
+            and "[[" not in last_p
+            and not media_any_re.search(last_p)
+            and closing_cue_re.search(last_p)
+        ):
+            closing_para = last_p
+            body_part = "\n\n".join(paragraphs[:-1]).strip()
+
+    tail_chunks = [c for c in (closing_para, footer_part) if c]
+    closing_and_footer = "\n\n".join(tail_chunks).strip()
+    return body_part, closing_and_footer
+
+
+def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=None, place_name=None, login_only=False, selected_images=None, rep_image=None, stop_checker=None, test_mode=False, shared_context=None, keep_context_open=False, shared_record_dir=None):
     prof = load_profile()
     banned_tags = get_effective_banned_tags(prof)
 
@@ -753,13 +1139,173 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
     f_tags = list(dict.fromkeys(raw_tags_clean))[:10]
 
     record_mode = "login" if login_only else "upload"
-    record_dir = create_blackbox_record_dir("네이버블로그", mode=record_mode)
+    uses_external_session = shared_context is not None
+    record_dir = shared_record_dir if uses_external_session else create_blackbox_record_dir("네이버블로그", mode=record_mode)
     browser = None
-    context = None
+    context = shared_context
     page = None
     video_obj = None
 
-    with sync_playwright() as p:
+    def _run_blog_flow(active_ctx):
+        nonlocal page, video_obj
+        page = active_ctx.pages[0] if active_ctx.pages else active_ctx.new_page()
+        video_obj = page.video
+
+        page.goto("https://blog.naver.com/GoBlogWrite.naver", wait_until="domcontentloaded", timeout=45000)
+        time.sleep(3.0)
+
+        device_hint_shown = [False]
+        def _on_naver_tick(pg, tick_idx, elapsed):
+            cur_u = (pg.url or "").lower()
+            if "deviceconfirm" in cur_u and not device_hint_shown[0]:
+                device_hint_shown[0] = True
+                print("ℹ️ [네이버 블로그] 새로운 환경 기기 등록 화면이 보이면 [등록] 또는 [등록안함]을 선택해 주세요.", flush=True)
+
+        if not is_naver_blog_logged_in(page):
+            wait_for_manual_login(
+                page,
+                "네이버 블로그",
+                is_naver_blog_logged_in,
+                timeout_sec=180,
+                on_tick=_on_naver_tick,
+                stop_checker=stop_checker,
+            )
+            save_storage_state_safely(active_ctx, COOKIES_PATH, "네이버 블로그")
+
+        if login_only:
+            save_storage_state_safely(active_ctx, COOKIES_PATH, "네이버 블로그")
+            print("✅ [네이버 블로그] 로그인 점검 및 쿠키 저장 완료!", flush=True)
+            return True
+
+        editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+
+        cb = find_in_both(page, editor, ".se-popup-button-cancel")
+        if cb.count() > 0:
+            cb.first.click()
+            time.sleep(1)
+        hc = find_in_both(page, editor, ".se-help-panel-close-button")
+        if hc.count() > 0:
+            hc.first.click()
+            time.sleep(0.5)
+
+        ta = find_in_both(page, editor, ".se-title-text")
+        ta.first.click()
+        time.sleep(0.3)
+        copy_to_clipboard(final_title)
+        page.keyboard.press(f"{MOD_KEY}+v")
+        time.sleep(0.5)
+        page.keyboard.press("Enter")
+        time.sleep(0.5)
+
+        # 본문 전체 가운데 정렬 적용 (대표사진·본문·동영상·지도 중심축 통일)
+        ensure_editor_center_align(page, editor)
+
+        # 최종 배치: 대표사진 → 도입부 → 본문 + [미디어 자료1~5] → 완성 동영상 → 마무리 인사·예약 링크·스마트플레이스 지도
+        if rep_image and os.path.exists(rep_image):
+            print(f"⭐ [네이버 블로그] 최상단 대표사진을 삽입합니다: {os.path.basename(rep_image)}", flush=True)
+            attach_image_in_editor(page, editor, rep_image)
+            time.sleep(0.5)
+            ensure_editor_center_align(page, editor)
+
+        main_before_video, closing_and_footer = split_blog_body_for_closing_video(f_body)
+        if main_before_video:
+            paste_formatted_body(page, editor, main_before_video, selected_images=selected_images)
+            time.sleep(0.4)
+            page.keyboard.press("Enter")
+            time.sleep(0.3)
+
+        if video_path and os.path.exists(video_path):
+            print("🎬 [네이버 블로그] 본문 마무리 직전에 완성 동영상을 삽입합니다...", flush=True)
+            attach_video_in_modal(page, editor, video_path, final_title, f_tags)
+            page.keyboard.press("ArrowDown")
+            page.keyboard.press("Enter")
+            time.sleep(0.6)
+            ensure_editor_center_align(page, editor)
+
+        if closing_and_footer:
+            paste_formatted_body(page, editor, closing_and_footer, selected_images=[])
+        time.sleep(1.0)
+        page.keyboard.press("Enter")
+        page.keyboard.press("Enter")
+
+        if resolved_place:
+            attach_place_map(page, editor, resolved_place)
+            page.keyboard.press("ArrowDown")
+            page.keyboard.press("Enter")
+
+        pub_btn = find_in_both(page, editor, 'button[class*="publish_btn"]')
+        pub_btn.first.click()
+        time.sleep(1.8)
+
+        if target_cat:
+            select_blog_category(page, editor, target_cat)
+        else:
+            print("ℹ️ [네이버 블로그] 게시판명이 비어 있어 카테고리 선택을 건너뛰고 기본 게시판에 발행합니다.", flush=True)
+        enter_publish_drawer_tags(page, editor, f_tags)
+
+        time.sleep(0.8)
+
+        confirm_btn = find_in_both(page, editor, 'button[class*="confirm_btn"]')
+        if test_mode:
+            aim_res = verify_publish_button_aim(
+                confirm_btn.first if confirm_btn.count() > 0 else confirm_btn,
+                expected_keywords=["발행", "확인", "등록"],
+                platform_name="네이버블로그",
+            )
+            if not aim_res["ok"]:
+                raise RuntimeError(aim_res["message"])
+            save_storage_state_safely(active_ctx, COOKIES_PATH, "네이버 블로그")
+            if keep_context_open:
+                print("🧪 [테스트 모드 - 네이버 블로그] 최종 발행 버튼 조준 검증 통과 → 동일 브라우저 새 탭으로 네이버 클립 테스트를 이어갑니다.", flush=True)
+                return "test_mode_ok"
+            print("🧪 [테스트 모드 - 네이버 블로그] 최종 발행 버튼 조준 검증 통과 (실제 발행 안 함)", flush=True)
+            wait_for_test_mode_close(active_ctx, "네이버 블로그", stop_checker=stop_checker)
+            return "test_mode_ok"
+
+        confirm_btn.first.click()
+        time.sleep(4)
+
+        save_storage_state_safely(active_ctx, COOKIES_PATH, "네이버 블로그")
+        blog_id = (prof.get("naver_blog_id") or "").strip()
+        default_blog_url = f"https://blog.naver.com/{blog_id}" if blog_id else "https://blog.naver.com/"
+        post_url = page.url if ("GoBlogWrite" not in page.url and "postwrite" not in page.url) else default_blog_url
+        return post_url
+
+    if uses_external_session:
+        try:
+            return _run_blog_flow(context)
+        except InterruptedError as ie:
+            record_platform_diagnostics("네이버블로그", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
+            return False
+        except Exception as e:
+            record_platform_diagnostics("네이버블로그", page=page, exc=e)
+            if not (stop_checker and stop_checker()):
+                print(f"⚠️ [네이버 블로그] 멈춤 또는 오류 발생: {e}", flush=True)
+            return False
+        finally:
+            try:
+                if page is not None and not page.is_closed():
+                    record_platform_diagnostics("네이버블로그", page=page)
+            except Exception:
+                pass
+            try:
+                if context is not None:
+                    sync_cookies_from_persistent_context(context)
+            except Exception:
+                pass
+            if not keep_context_open:
+                finalize_playwright_session(
+                    "네이버블로그",
+                    mode=record_mode,
+                    page=page,
+                    context=context,
+                    browser=browser,
+                    video_obj=video_obj,
+                    record_dir=record_dir,
+                    platform_label="네이버 블로그",
+                )
+
+    with open_playwright_session() as p:
         try:
             context = launch_persistent_chromium(
                 p,
@@ -768,106 +1314,7 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
                 record_video_dir=record_dir,
                 record_video_size={"width": 1360, "height": 920},
             )
-            page = context.pages[0] if context.pages else context.new_page()
-            video_obj = page.video
-
-            page.goto("https://blog.naver.com/GoBlogWrite.naver", wait_until="domcontentloaded", timeout=45000)
-            time.sleep(3.0)
-
-            device_hint_shown = [False]
-            def _on_naver_tick(pg, tick_idx, elapsed):
-                cur_u = (pg.url or "").lower()
-                if "deviceconfirm" in cur_u and not device_hint_shown[0]:
-                    device_hint_shown[0] = True
-                    print("ℹ️ [네이버 블로그] 새로운 환경 기기 등록 화면이 보이면 [등록] 또는 [등록안함]을 선택해 주세요.", flush=True)
-
-            if not is_naver_blog_logged_in(page):
-                wait_for_manual_login(
-                    page,
-                    "네이버 블로그",
-                    is_naver_blog_logged_in,
-                    timeout_sec=180,
-                    on_tick=_on_naver_tick,
-                    stop_checker=stop_checker,
-                )
-                save_storage_state_safely(context, COOKIES_PATH, "네이버 블로그")
-
-            if login_only:
-                save_storage_state_safely(context, COOKIES_PATH, "네이버 블로그")
-                print("✅ [네이버 블로그] 로그인 점검 및 쿠키 저장 완료!", flush=True)
-                return True
-
-            editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
-
-            cb = find_in_both(page, editor, ".se-popup-button-cancel")
-            if cb.count() > 0:
-                cb.first.click()
-                time.sleep(1)
-            hc = find_in_both(page, editor, ".se-help-panel-close-button")
-            if hc.count() > 0:
-                hc.first.click()
-                time.sleep(0.5)
-
-            ta = find_in_both(page, editor, ".se-title-text")
-            ta.first.click()
-            time.sleep(0.3)
-            copy_to_clipboard(final_title)
-            page.keyboard.press(f"{MOD_KEY}+v")
-            time.sleep(0.5)
-            page.keyboard.press("Enter")
-            time.sleep(0.5)
-
-            if video_path and os.path.exists(video_path):
-                attach_video_in_modal(page, editor, video_path, final_title, f_tags)
-                page.keyboard.press("ArrowDown")
-                page.keyboard.press("Enter")
-                time.sleep(0.6)
-
-            paste_formatted_body(page, editor, f_body, selected_images=selected_images)
-            time.sleep(1.0)
-            page.keyboard.press("Enter")
-            page.keyboard.press("Enter")
-
-            if resolved_place:
-                attach_place_map(page, editor, resolved_place)
-                page.keyboard.press("ArrowDown")
-                page.keyboard.press("Enter")
-
-            pub_btn = find_in_both(page, editor, 'button[class*="publish_btn"]')
-            pub_btn.first.click()
-            time.sleep(1.8)
-
-            if target_cat:
-                select_blog_category(page, editor, target_cat)
-            else:
-                print("ℹ️ [네이버 블로그] 게시판명이 비어 있어 카테고리 선택을 건너뛰고 기본 게시판에 발행합니다.", flush=True)
-            enter_publish_drawer_tags(page, editor, f_tags)
-
-            time.sleep(0.8)
-
-            confirm_btn = find_in_both(page, editor, 'button[class*="confirm_btn"]')
-            if test_mode:
-                aim_res = verify_publish_button_aim(
-                    confirm_btn.first if confirm_btn.count() > 0 else confirm_btn,
-                    expected_keywords=["발행", "확인", "등록"],
-                    platform_name="네이버블로그",
-                )
-                if not aim_res["ok"]:
-                    raise RuntimeError(aim_res["message"])
-                print("🧪 [테스트 모드 - 네이버 블로그] 최종 발행 버튼 조준 검증 통과 (실제 발행 안 함)", flush=True)
-                save_storage_state_safely(context, COOKIES_PATH, "네이버 블로그")
-                wait_for_test_mode_close(context, "네이버 블로그", stop_checker=stop_checker)
-                return "test_mode_ok"
-
-            confirm_btn.first.click()
-            time.sleep(4)
-
-            save_storage_state_safely(context, COOKIES_PATH, "네이버 블로그")
-            blog_id = (prof.get("naver_blog_id") or "").strip()
-            default_blog_url = f"https://blog.naver.com/{blog_id}" if blog_id else "https://blog.naver.com/"
-            post_url = page.url if ("GoBlogWrite" not in page.url and "postwrite" not in page.url) else default_blog_url
-            return post_url
-
+            return _run_blog_flow(context)
         except InterruptedError as ie:
             record_platform_diagnostics("네이버블로그", page=page, exc=ie, reason="사용자 요청으로 중단/건너뜀")
             return False

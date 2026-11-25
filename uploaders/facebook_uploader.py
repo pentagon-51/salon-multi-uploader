@@ -14,10 +14,12 @@ from os_utils import (
     get_auth_file,
     create_blackbox_record_dir,
     is_any_locator_visible,
+    is_target_closed_error,
     save_storage_state_safely,
     wait_for_manual_login,
     wait_for_test_mode_close,
     finalize_playwright_session,
+    open_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
@@ -454,28 +456,45 @@ def _select_facebook_business_page(page, target_page=""):
         return ""
 
 
+def _is_business_suite_composer_url(url):
+    low = str(url or "").lower()
+    return ("reels_composer" in low) or ("/reels/create" in low)
+
+
 def _is_business_suite_reel_composer_ready(page):
-    """현재 페이지가 메타 비즈니스 스위트 홈(/latest/home)이 아닌 실제 릴스 작성 화면인지 엄격 판별"""
+    """현재 페이지가 메타 비즈니스 스위트 홈(/latest/home)이 아닌 실제 릴스 작성 화면인지 엄격 판별.
+    브라우저/탭이 닫힌 경우(TargetClosedError)는 삼키지 않고 즉시 상위로 전파."""
     if page is None:
         return False
     try:
+        if page.is_closed():
+            raise RuntimeError("Target page, context or browser has been closed")
         cur_url = (page.url or "").lower()
-    except Exception:
+    except Exception as e:
+        if is_target_closed_error(e):
+            raise
         return False
-    if "reels_composer" in cur_url:
+    if _is_business_suite_composer_url(cur_url):
         return True
     if "/latest/home" in cur_url:
         return False
     try:
         if page.locator('input[type="file"][accept*="video"], input[type="file"][accept*="mp4"]').count() > 0:
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        if is_target_closed_error(e):
+            raise
     try:
-        if is_any_locator_visible(page, 'div[role="button"]:has-text("동영상 추가"), button:has-text("동영상 추가"), div[role="button"]:has-text("Add video"), button:has-text("Add video")'):
+        if is_any_locator_visible(
+            page,
+            'div[role="button"]:has-text("동영상 추가"), button:has-text("동영상 추가"), '
+            'div[role="button"]:has-text("Add video"), button:has-text("Add video"), '
+            ':text("게시할 위치"), :text("Post to")',
+        ):
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        if is_target_closed_error(e):
+            raise
     return False
 
 
@@ -490,12 +509,31 @@ def _build_business_suite_reels_composer_url(cur_url):
     return f"https://business.facebook.com/latest/reels_composer{qs}"
 
 
+def _wait_composer_dom_settled(page, timeout_ms=8000):
+    """reels_composer 진입 직후 진행 중인 DOM/네비게이션 안정을 안전하게 대기 (TargetClosedError 즉시 전파)"""
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+    except Exception as e:
+        if is_target_closed_error(e):
+            raise
+    time.sleep(1.2)
+
+
 def _open_business_suite_reel_composer(page):
-    """메타 비즈니스 스위트에서 릴스 만들기 화면으로 확실히 진입.
-    1) [릴스 만들기] 클릭 후 최대 8초간 실제 reels_composer 전환 검증
-    2) 홈 화면에 머물러 있으면 asset_id를 유지한 reels_composer 주소로 직접 이동해 100% 진입 보장"""
+    """메타 비즈니스 스위트에서 릴스 만들기 화면으로 충돌 없이 진입.
+    1) 이미 reels_composer URL이거나 준비된 상태면 중복 page.goto 호출 생략
+    2) [릴스 만들기] 클릭 후 전환·로드 진행 중에는 중복 page.goto를 막고 완료 대기
+    3) 여전히 홈 화면에 머무를 때만 asset_id 유지 reels_composer 직행 이동 (TargetClosedError 즉시 전파)"""
     if _is_business_suite_reel_composer_ready(page):
+        _wait_composer_dom_settled(page)
         return True
+
+    try:
+        initial_url = (page.url or "").lower()
+    except Exception as e:
+        if is_target_closed_error(e):
+            raise
+        initial_url = ""
 
     reel_btn_sels = [
         'a[href*="reels_composer"]',
@@ -520,29 +558,211 @@ def _open_business_suite_reel_composer(page):
                 clicked_sel = sel
                 print(f"🎬 [페이스북(매장)] 릴스 만들기 버튼 클릭 ({sel}) — 작성기 전환 확인 중...", flush=True)
                 break
-        except Exception:
-            pass
+        except Exception as e:
+            if is_target_closed_error(e):
+                raise
 
     if clicked_sel:
-        deadline = time.time() + 8.0
+        deadline = time.time() + 10.0
         while time.time() < deadline:
             if _is_business_suite_reel_composer_ready(page):
                 print("✅ [페이스북(매장)] 릴스 작성기(reels_composer) 전환 확인 완료!", flush=True)
-                time.sleep(1.5)
+                _wait_composer_dom_settled(page)
                 return True
+            try:
+                cur_u = (page.url or "").lower()
+                # 이미 홈을 벗어나 다른 경로/작성기로 전환 중이면 중복 goto 대신 잠시 더 로드 대기
+                if cur_u and cur_u != initial_url and "/latest/home" not in cur_u:
+                    _wait_composer_dom_settled(page, timeout_ms=5000)
+                    if _is_business_suite_reel_composer_ready(page):
+                        print("✅ [페이스북(매장)] 릴스 작성기(reels_composer) 전환 확인 완료!", flush=True)
+                        return True
+            except Exception as e:
+                if is_target_closed_error(e):
+                    raise
             time.sleep(0.5)
         print("↪ [페이스북(매장)] 버튼 클릭 후 홈 화면 유지 감지 → reels_composer 주소로 직접 이동합니다.", flush=True)
 
-    # asset_id / business_id를 유지한 채 reels_composer 직접 이동으로 100% 진입 보장
-    composer_url = _build_business_suite_reels_composer_url(page.url or "")
-    page.goto(composer_url, wait_until="domcontentloaded", timeout=45000)
-    deadline2 = time.time() + 8.0
+    # 직행 이동 직전 다시 한번 이미 reels_composer에 도달했는지 확인하여 중복 page.goto 충돌 방지
+    if _is_business_suite_reel_composer_ready(page):
+        _wait_composer_dom_settled(page)
+        return True
+
+    try:
+        cur_before_goto = page.url or ""
+    except Exception as e:
+        if is_target_closed_error(e):
+            raise
+        cur_before_goto = ""
+
+    if _is_business_suite_composer_url(cur_before_goto):
+        _wait_composer_dom_settled(page)
+        return True
+
+    # asset_id / business_id를 유지한 채 reels_composer 직접 이동으로 진입 보장
+    composer_url = _build_business_suite_reels_composer_url(cur_before_goto)
+    try:
+        page.goto(composer_url, wait_until="domcontentloaded", timeout=45000)
+    except Exception as nav_err:
+        if is_target_closed_error(nav_err):
+            raise
+        nav_msg = str(nav_err).lower()
+        if any(k in nav_msg for k in ("interrupted by another navigation", "err_aborted", "navigation")):
+            # 진행 중이던 기존 네비게이션과 겹친 경우 현재 페이지 안정화 후 준비 상태 재확인
+            _wait_composer_dom_settled(page, timeout_ms=6000)
+            if _is_business_suite_reel_composer_ready(page):
+                return True
+        else:
+            raise
+
+    deadline2 = time.time() + 10.0
     while time.time() < deadline2:
         if _is_business_suite_reel_composer_ready(page):
-            time.sleep(1.5)
+            _wait_composer_dom_settled(page)
             return True
         time.sleep(0.5)
     return _is_business_suite_reel_composer_ready(page)
+
+
+def _uncheck_instagram_crosspost(page):
+    """메타 비즈니스 스위트 reels_composer 상단 '게시할 위치(Post to)'에서
+    페이스북 페이지 외에 인스타그램 계정이 함께 체크되어 있으면 인스타그램 항목만 안전하게 체크 해제"""
+    if page is None:
+        return False
+
+    def _try_uncheck_visible_ig_checkboxes():
+        """현재 화면에 노출된 체크박스 목록에서 페이스북이 체크된 상태를 유지한 채 인스타그램 체크박스만 해제"""
+        try:
+            items = page.evaluate(
+                """() => {
+                    const boxes = Array.from(document.querySelectorAll('input[type="checkbox"], [role="checkbox"]'));
+                    const visible = [];
+                    for (let i = 0; i < boxes.length; i++) {
+                        const el = boxes[i];
+                        const r = el.getBoundingClientRect();
+                        if (!r || r.width < 4 || r.height < 4) continue;
+                        const st = window.getComputedStyle(el);
+                        if (st && (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity || '1') === 0)) continue;
+                        const isChecked = el.tagName === 'INPUT'
+                            ? Boolean(el.checked)
+                            : (el.getAttribute('aria-checked') === 'true');
+                        const disabled = Boolean(el.disabled) || el.getAttribute('aria-disabled') === 'true';
+                        let rowText = (el.getAttribute('aria-label') || '').trim();
+                        let hasIgIcon = false;
+                        let hasFbIcon = false;
+                        let cur = el;
+                        for (let d = 0; d < 5 && cur; d++) {
+                            const t = (cur.innerText || cur.textContent || '').replace(/\\s+/g, ' ').trim();
+                            if (t && t.length <= 120) {
+                                rowText = (rowText + ' ' + t).trim();
+                            }
+                            const html = (cur.innerHTML || '').toLowerCase();
+                            const imgs = cur.querySelectorAll('img, svg, i, [aria-label]');
+                            imgs.forEach(node => {
+                                const al = ((node.getAttribute('aria-label') || '') + ' ' + (node.getAttribute('alt') || '') + ' ' + (node.getAttribute('title') || '')).toLowerCase();
+                                if (al.includes('instagram') || al.includes('인스타그램')) hasIgIcon = true;
+                                if (al.includes('facebook') || al.includes('페이스북')) hasFbIcon = true;
+                            });
+                            if (html.includes('instagram')) hasIgIcon = true;
+                            if (t.length >= 2 && t.length <= 80 && d >= 1) break;
+                            cur = cur.parentElement;
+                        }
+                        const low = rowText.toLowerCase();
+                        const isIg = hasIgIcon || low.includes('instagram') || low.includes('인스타그램') || /(^|\\s)인스타(\\s|$)/.test(low);
+                        const isFb = hasFbIcon || low.includes('facebook') || low.includes('페이스북');
+                        visible.push({ idx: i, isChecked, disabled, isIg, isFb, rowText: rowText.slice(0, 80) });
+                    }
+                    return visible;
+                }"""
+            )
+            if not items:
+                return False
+
+            checked_items = [it for it in items if it.get("isChecked")]
+            if len(checked_items) < 2:
+                return False
+
+            ig_targets = [it for it in checked_items if it.get("isIg") and not it.get("isFb") and not it.get("disabled")]
+            if not ig_targets:
+                return False
+
+            # 페이스북 페이지가 최소 1개 이상 체크 상태로 남도록 보장
+            remaining_after = len(checked_items) - len(ig_targets)
+            if remaining_after < 1:
+                return False
+
+            all_boxes = page.locator('input[type="checkbox"], [role="checkbox"]')
+            unchecked_any = False
+            for target in ig_targets:
+                box = all_boxes.nth(target["idx"])
+                try:
+                    box.scroll_into_view_if_needed()
+                    box.click(force=True)
+                    time.sleep(0.5)
+                    unchecked_any = True
+                    print(f"🧹 [페이스북(매장)] 인스타그램 중복 게시 자동 체크 해제 완료 ({target.get('rowText') or 'Instagram'})", flush=True)
+                except Exception:
+                    pass
+            return unchecked_any
+        except Exception:
+            return False
+
+    try:
+        # 1) 화면에 바로 펼쳐진 '게시할 위치(Post to)' 체크박스 먼저 확인
+        if _try_uncheck_visible_ig_checkboxes():
+            return True
+
+        # 2) '게시할 위치' / 'Post to' 드롭다운이 접혀 있는 UI라면 열어서 확인 후 안전하게 닫기
+        dropdown_opened = False
+        trigger_sels = [
+            'div[role="button"][aria-haspopup="listbox"]',
+            'div[role="combobox"]',
+            'button[aria-haspopup="listbox"]',
+            'div[role="button"]:has-text("Instagram")',
+            'div[role="button"]:has-text("인스타그램")',
+        ]
+        for tsel in trigger_sels:
+            try:
+                loc = page.locator(tsel)
+                cnt = min(loc.count(), 10)
+                for i in range(cnt):
+                    cand = loc.nth(i)
+                    if not cand.is_visible(timeout=350):
+                        continue
+                    near_post_to = cand.evaluate(
+                        """(el) => {
+                            let cur = el;
+                            for (let d = 0; d < 5 && cur; d++) {
+                                const txt = (cur.innerText || cur.textContent || '').replace(/\\s+/g, ' ');
+                                if (/(게시할\\s*위치|Post\\s*to|게시\\s*위치)/i.test(txt)) return true;
+                                cur = cur.parentElement;
+                            }
+                            return false;
+                        }"""
+                    )
+                    if not near_post_to:
+                        continue
+                    cand.scroll_into_view_if_needed()
+                    cand.click(force=True)
+                    dropdown_opened = True
+                    time.sleep(0.8)
+                    break
+                if dropdown_opened:
+                    break
+            except Exception:
+                pass
+
+        if dropdown_opened:
+            res = _try_uncheck_visible_ig_checkboxes()
+            try:
+                page.keyboard.press("Escape")
+                time.sleep(0.4)
+            except Exception:
+                pass
+            return res
+    except Exception as e:
+        print(f"ℹ️ [페이스북(매장)] 인스타그램 중복 게시 확인 건너뜀({e})", flush=True)
+    return False
 
 
 def upload_to_facebook_personal(body="", tags=None, video_path=None, login_only=False, stop_checker=None, test_mode=False):
@@ -561,7 +781,7 @@ def upload_to_facebook_personal(body="", tags=None, video_path=None, login_only=
     page = None
     video_obj = None
 
-    with sync_playwright() as p:
+    with open_playwright_session() as p:
         try:
             context = launch_persistent_chromium(
                 p,
@@ -689,7 +909,7 @@ def upload_to_facebook_page(body="", tags=None, video_path=None, page_name="", l
     page = None
     video_obj = None
 
-    with sync_playwright() as p:
+    with open_playwright_session() as p:
         try:
             context = launch_persistent_chromium(
                 p,
@@ -728,9 +948,10 @@ def upload_to_facebook_page(body="", tags=None, video_path=None, page_name="", l
             _select_facebook_business_page(page, target_page)
             dismiss_facebook_popups(page)
 
-            # 2단계: 메타 비즈니스 스위트 릴스 만들기 화면 진입
+            # 2단계: 메타 비즈니스 스위트 릴스 만들기 화면 진입 및 인스타그램 중복 게시 체크 해제
             _open_business_suite_reel_composer(page)
             dismiss_facebook_popups(page)
+            _uncheck_instagram_crosspost(page)
 
             # 3단계: 원본 .mp4 영상 첨부
             if not _attach_video_to_composer(page, video_path):

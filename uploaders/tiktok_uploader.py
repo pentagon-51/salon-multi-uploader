@@ -15,6 +15,7 @@ from os_utils import (
     wait_for_manual_login,
     wait_for_test_mode_close,
     finalize_playwright_session,
+    open_playwright_session,
     launch_persistent_chromium,
     record_platform_diagnostics,
     verify_publish_button_aim,
@@ -150,7 +151,187 @@ def _is_tiktok_caption_applied(caption_box, expected_caption, video_path=""):
     return True
 
 
-def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=None, draft=False, login_only=False, stop_checker=None, test_mode=False):
+def _apply_tiktok_cover_image(page, cover_image):
+    """틱톡 업로드 화면에서 [커버 편집] -> [표지 업로드]로 대표사진(.jpg/.jpeg/.png)을 자동 적용"""
+    if not cover_image or not os.path.isfile(cover_image):
+        return False
+    ext = os.path.splitext(cover_image)[1].lower()
+    if ext not in (".jpg", ".jpeg", ".png"):
+        return False
+
+    try:
+        print(f"🖼️ [틱톡] 대표사진 커버 자동 적용 시도 중... ({os.path.basename(cover_image)})", flush=True)
+        # 1) [커버 편집] / [Edit cover] 버튼 클릭
+        edit_btn_sels = [
+            'button:has-text("커버 편집")',
+            'div[role="button"]:has-text("커버 편집")',
+            'span:text-is("커버 편집")',
+            'button:has-text("표지 편집")',
+            'div[role="button"]:has-text("표지 편집")',
+            'span:text-is("표지 편집")',
+            'button:has-text("Edit cover")',
+            'div[role="button"]:has-text("Edit cover")',
+            'span:text-is("Edit cover")',
+        ]
+        edit_btn = None
+        for sel in edit_btn_sels:
+            try:
+                cand = page.locator(sel).first
+                if cand.count() > 0 and cand.is_visible(timeout=1200):
+                    edit_btn = cand
+                    break
+            except Exception:
+                pass
+
+        if edit_btn is None:
+            print("ℹ️ [틱톡] [커버 편집] 버튼을 찾지 못해 기본 커버로 진행합니다.", flush=True)
+            return False
+
+        edit_btn.scroll_into_view_if_needed()
+        edit_btn.click(force=True)
+        time.sleep(1.4)
+
+        # 2) 모달 내 [표지 업로드] / [Upload cover] 탭·버튼 클릭 후 파일 업로드
+        upload_tab_sels = [
+            'div[role="dialog"] button:has-text("표지 업로드")',
+            'div[role="dialog"] div[role="tab"]:has-text("표지 업로드")',
+            'div[role="dialog"] span:text-is("표지 업로드")',
+            'div[role="dialog"] button:has-text("커버 업로드")',
+            'div[role="dialog"] div[role="tab"]:has-text("커버 업로드")',
+            'div[role="dialog"] span:text-is("커버 업로드")',
+            'div[role="dialog"] button:has-text("Upload cover")',
+            'div[role="dialog"] div[role="tab"]:has-text("Upload cover")',
+            'div[role="dialog"] span:text-is("Upload cover")',
+            '[class*="modal" i] button:has-text("표지 업로드")',
+            '[class*="modal" i] div[role="tab"]:has-text("표지 업로드")',
+            '[class*="modal" i] span:text-is("표지 업로드")',
+            '[class*="modal" i] button:has-text("Upload cover")',
+            '[class*="modal" i] div[role="tab"]:has-text("Upload cover")',
+            'button:has-text("표지 업로드")',
+            'div[role="tab"]:has-text("표지 업로드")',
+            'span:text-is("표지 업로드")',
+            'button:has-text("Upload cover")',
+            'div[role="tab"]:has-text("Upload cover")',
+            'span:text-is("Upload cover")',
+        ]
+        uploaded_file = False
+        for tsel in upload_tab_sels:
+            try:
+                tab = page.locator(tsel).first
+                if tab.count() > 0 and tab.is_visible(timeout=800):
+                    tab.click(force=True)
+                    time.sleep(0.9)
+                    break
+            except Exception:
+                pass
+
+        # 2-1) 이미지 전용 input[type="file"] 직접 주입 우선 시도
+        img_input_sels = [
+            'div[role="dialog"] input[type="file"][accept*="image"]',
+            '[class*="modal" i] input[type="file"][accept*="image"]',
+            'input[type="file"][accept*="image"]',
+            'div[role="dialog"] input[type="file"]',
+            '[class*="modal" i] input[type="file"]',
+        ]
+        for isel in img_input_sels:
+            try:
+                fin = page.locator(isel).last
+                if fin.count() > 0:
+                    fin.set_input_files(cover_image)
+                    uploaded_file = True
+                    time.sleep(2.0)
+                    break
+            except Exception:
+                pass
+
+        # 2-2) input이 숨겨져 있거나 동적 생성되는 경우 file chooser로 업로드
+        if not uploaded_file:
+            chooser_btn_sels = [
+                'div[role="dialog"] button:has-text("표지 업로드")',
+                'div[role="dialog"] button:has-text("사진 업로드")',
+                'div[role="dialog"] button:has-text("이미지 업로드")',
+                'div[role="dialog"] button:has-text("Upload")',
+                'div[role="dialog"] div[role="button"]:has-text("업로드")',
+                '[class*="modal" i] button:has-text("업로드")',
+                '[class*="modal" i] button:has-text("Upload")',
+            ]
+            for bsel in chooser_btn_sels:
+                try:
+                    btn = page.locator(bsel).last
+                    if btn.count() > 0 and btn.is_visible(timeout=600):
+                        with page.expect_file_chooser(timeout=4000) as fc_info:
+                            btn.click(force=True)
+                        fc_info.value.set_files(cover_image)
+                        uploaded_file = True
+                        time.sleep(2.0)
+                        break
+                except Exception:
+                    pass
+
+        if not uploaded_file:
+            print("⚠️ [틱톡] 커버 이미지 파일 입력칸을 찾지 못해 모달을 닫고 기본 커버로 진행합니다.", flush=True)
+            try:
+                page.keyboard.press("Escape")
+                time.sleep(0.5)
+            except Exception:
+                pass
+            return False
+
+        # 3) 모달 내 [확인] / [Confirm] / [저장] / [Save] 버튼 클릭
+        confirm_sels = [
+            'div[role="dialog"] button:text-is("확인")',
+            'div[role="dialog"] button:text-is("Confirm")',
+            'div[role="dialog"] button:text-is("저장")',
+            'div[role="dialog"] button:text-is("Save")',
+            '[class*="modal" i] button:text-is("확인")',
+            '[class*="modal" i] button:text-is("Confirm")',
+            '[class*="modal" i] button:text-is("저장")',
+            '[class*="modal" i] button:text-is("Save")',
+            'div[role="dialog"] button:has-text("확인")',
+            'div[role="dialog"] button:has-text("Confirm")',
+            'div[role="dialog"] button:has-text("저장")',
+            'div[role="dialog"] button:has-text("Save")',
+            '[class*="modal" i] button:has-text("확인")',
+            '[class*="modal" i] button:has-text("Confirm")',
+        ]
+        confirmed = False
+        for csel in confirm_sels:
+            try:
+                cbtn = page.locator(csel).last
+                if cbtn.count() > 0 and cbtn.is_visible(timeout=1200):
+                    for _ in range(10):
+                        if not cbtn.is_disabled():
+                            break
+                        time.sleep(0.4)
+                    cbtn.click(force=True)
+                    confirmed = True
+                    time.sleep(1.5)
+                    break
+            except Exception:
+                pass
+
+        if confirmed:
+            print("✅ [틱톡] 대표사진 커버 업로드 및 적용 완료!", flush=True)
+            return True
+
+        print("⚠️ [틱톡] 커버 모달 [확인/저장] 버튼을 찾지 못해 모달을 닫고 진행합니다.", flush=True)
+        try:
+            page.keyboard.press("Escape")
+            time.sleep(0.5)
+        except Exception:
+            pass
+        return False
+    except Exception as e:
+        print(f"⚠️ [틱톡] 대표사진 커버 적용 건너뜀({e}) — 기본 커버로 계속 진행합니다.", flush=True)
+        try:
+            page.keyboard.press("Escape")
+            time.sleep(0.5)
+        except Exception:
+            pass
+        return False
+
+
+def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=None, cover_image=None, draft=False, login_only=False, stop_checker=None, test_mode=False):
     if not login_only and (not video_path or not os.path.exists(video_path)):
         print("⚠️ [틱톡] 업로드할 영상 파일이 없습니다:", video_path, flush=True)
         return False
@@ -173,7 +354,7 @@ def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=N
     page = None
     video_obj = None
 
-    with sync_playwright() as p:
+    with open_playwright_session() as p:
         try:
             context = launch_persistent_chromium(
                 p,
@@ -255,23 +436,77 @@ def upload_to_tiktok(title="", body="", tags=None, video_path=None, place_name=N
                 time.sleep(0.6)
                 _paste_tiktok_caption()
 
+            if cover_image:
+                _apply_tiktok_cover_image(page, cover_image)
+
             try:
                 target_place = (place_name if place_name is not None else get_place_search_keyword(prof)).strip()
                 if target_place:
-                    page.evaluate("window.scrollBy(0, 350)"); time.sleep(1.0)
-                    loc_input = page.locator('input[placeholder*="위치"], input[placeholder*="장소"], input[placeholder*="Location"], input[placeholder*="Search locations"]').first
-                    if loc_input.count() == 0:
-                        loc_input = page.locator('div:has-text("위치")').locator('input').first
-                    if loc_input.count() > 0 and loc_input.is_visible():
-                        loc_input.click(force=True); time.sleep(0.5)
+                    page.evaluate("window.scrollBy(0, 350)"); time.sleep(0.8)
+                    loc_sels = [
+                        'input[placeholder*="위치 검색"]',
+                        'input[placeholder*="위치"]',
+                        'input[placeholder*="Location" i]',
+                        'input[placeholder*="Search locations" i]',
+                        'input[placeholder*="장소"]',
+                    ]
+                    loc_input = None
+                    for lsel in loc_sels:
+                        try:
+                            cand = page.locator(lsel).first
+                            if cand.count() > 0 and cand.is_visible(timeout=1000):
+                                loc_input = cand
+                                break
+                        except Exception:
+                            pass
+                    if loc_input is None:
+                        try:
+                            fb_in = page.locator('div:has-text("위치")').locator('input').first
+                            if fb_in.count() > 0 and fb_in.is_visible(timeout=800):
+                                loc_input = fb_in
+                        except Exception:
+                            pass
+                    if loc_input is not None:
+                        loc_input.scroll_into_view_if_needed()
+                        loc_input.click(force=True); time.sleep(0.4)
                         page.keyboard.press(f"{MOD_KEY}+a"); page.keyboard.press("Backspace")
-                        loc_input.fill(target_place); time.sleep(2.5)
+                        loc_input.fill(target_place)
+                        time.sleep(2.2)
+
+                        opt_sel = 'div[role="option"], li[role="option"], div[class*="option" i]'
+                        try:
+                            page.locator(opt_sel).first.wait_for(state="visible", timeout=3500)
+                        except Exception:
+                            pass
+
                         loc_kw = target_place.split()[0]
-                        place_item = page.locator(f'div[role="option"]:has-text("{loc_kw}"), li[role="option"]:has-text("{loc_kw}"), span:has-text("{target_place}")').first
-                        if place_item.count() > 0 and place_item.is_visible():
-                            place_item.click(force=True)
-                        time.sleep(1.0)
-            except Exception: pass
+                        place_picked = False
+                        for psel in [
+                            f'div[role="option"]:has-text("{target_place}")',
+                            f'li[role="option"]:has-text("{target_place}")',
+                            f'div[class*="option" i]:has-text("{target_place}")',
+                            f'div[role="option"]:has-text("{loc_kw}")',
+                            f'li[role="option"]:has-text("{loc_kw}")',
+                            f'div[class*="option" i]:has-text("{loc_kw}")',
+                            'div[role="option"]',
+                            'li[role="option"]',
+                            'div[class*="option" i]',
+                        ]:
+                            try:
+                                p_item = page.locator(psel).first
+                                if p_item.count() > 0 and p_item.is_visible(timeout=600):
+                                    p_item.scroll_into_view_if_needed()
+                                    p_item.click(force=True)
+                                    place_picked = True
+                                    print(f"📍 [틱톡] 위치('{target_place}') 선택 완료!", flush=True)
+                                    time.sleep(0.9)
+                                    break
+                            except Exception:
+                                pass
+                        if not place_picked:
+                            print(f"ℹ️ [틱톡] 위치('{target_place}') 드롭다운 결과를 찾지 못해 건너뛰고 진행합니다.", flush=True)
+            except Exception as loc_err:
+                print(f"ℹ️ [틱톡] 위치 검색 건너뜀({loc_err})", flush=True)
 
             try:
                 page.evaluate("window.scrollBy(0, 300)"); time.sleep(1.0)

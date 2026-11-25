@@ -111,14 +111,14 @@ echo [2/5] Python 3.10+ 확인 완료: "%PYTHON_EXE%"
 echo.
 echo [3/5] 필수 모듈 및 자동화 브라우저(Chromium) 엔진 설치 중...
 "%PYTHON_EXE%" -m pip install --upgrade pip
-"%PYTHON_EXE%" -m pip install --upgrade playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib
+"%PYTHON_EXE%" -m pip install --upgrade playwright opencv-python pillow pyperclip google-api-python-client google-auth-oauthlib imageio-ffmpeg
 if errorlevel 1 goto :INSTALL_FAIL
 "%PYTHON_EXE%" -m playwright install chromium
 if errorlevel 1 goto :INSTALL_FAIL
 
 echo.
 echo [4/5] 설치 완료 2차 검증 중...
-"%PYTHON_EXE%" -c "import playwright, cv2, PIL, pyperclip, googleapiclient"
+"%PYTHON_EXE%" -c "import playwright, cv2, PIL, pyperclip, googleapiclient, imageio_ffmpeg"
 if errorlevel 1 goto :INSTALL_FAIL
 
 echo.
