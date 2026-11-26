@@ -3881,9 +3881,18 @@ function saveCurrentHistory() {
     };
   });
 
+  const selectedPlatforms = PLATFORM_META
+    .filter(p => {
+      const box = document.querySelector(`.platform-box[data-platform="${p.key}"]`);
+      const chk = document.getElementById(p.chkId);
+      return Boolean(chk && chk.checked && (!box || !box.classList.contains('plat-hidden')));
+    })
+    .map(p => p.key);
+
   const payload = {
     history_id: activeHistoryId || '',
     video_name: currentVideoName || '',
+    selected_platforms: selectedPlatforms,
     ai_video_type: getSelectedAiVideoType(),
     ai_memo_concern: getVal('aiMemoConcern'),
     ai_memo_technique: getVal('aiMemoTechnique'),
@@ -4074,7 +4083,26 @@ function restoreHistory(id) {
 
     fillFormFields(d.record);
     const donePlatforms = Array.isArray(d.record.uploaded_platforms) ? d.record.uploaded_platforms : [];
-    applyUploadedPlatformsUI(donePlatforms, { autoUncheck: true, resetChecksForUnuploaded: true });
+    const hasSavedSelection = Array.isArray(d.record.selected_platforms);
+    const savedSelectedSet = new Set(hasSavedSelection ? d.record.selected_platforms : []);
+    applyUploadedPlatformsUI(donePlatforms, {
+      autoUncheck: true,
+      resetChecksForUnuploaded: !hasSavedSelection
+    });
+    if (hasSavedSelection) {
+      const doneSet = new Set(donePlatforms);
+      const enabledSet = new Set(currentEnabledPlatforms || []);
+      PLATFORM_META.forEach(p => {
+        const chk = document.getElementById(p.chkId);
+        if (!chk) return;
+        if (doneSet.has(p.key)) {
+          chk.checked = false;
+        } else {
+          const isEnabled = (enabledSet.size === 0 || enabledSet.has(p.key));
+          chk.checked = isEnabled && savedSelectedSet.has(p.key);
+        }
+      });
+    }
     syncPreviewCardsVisibility();
     currentVideoName = d.record.video_name || "";
     extractedThumbs = [];

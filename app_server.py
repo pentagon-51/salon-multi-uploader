@@ -5286,6 +5286,8 @@ def build_history_record(raw_data, video_name='', source_text=None):
         'video_name': os.path.basename(video_name) if video_name else '',
         'uploaded_platforms': _normalize_uploaded_platforms(src.get('uploaded_platforms')),
     }
+    if 'selected_platforms' in src and isinstance(src.get('selected_platforms'), list):
+        rec['selected_platforms'] = _normalize_uploaded_platforms(src.get('selected_platforms'))
     if 'saved_gifs' in src:
         rec['saved_gifs'] = _normalize_saved_gifs(src.get('saved_gifs'))
     if 'saved_slots' in src:
@@ -5315,6 +5317,8 @@ def save_history_record(rec, update_id=''):
         return {'saved': False, 'updated': False, 'duplicate': False, 'empty': True, 'id': ''}
 
     uid = str(update_id or '').strip()
+    has_selected_platforms_key = isinstance(rec, dict) and ('selected_platforms' in rec) and isinstance(rec.get('selected_platforms'), list)
+    incoming_selected_plats = _normalize_uploaded_platforms(rec.get('selected_platforms')) if has_selected_platforms_key else None
     has_saved_gifs_key = isinstance(rec, dict) and ('saved_gifs' in rec)
     incoming_gifs = _normalize_saved_gifs(rec.get('saved_gifs')) if has_saved_gifs_key else None
     has_saved_slots_key = isinstance(rec, dict) and ('saved_slots' in rec)
@@ -5354,6 +5358,10 @@ def save_history_record(rec, update_id=''):
                 elif not updated.get('video_name'):
                     updated['video_name'] = ''
                 updated['uploaded_platforms'] = merged_plats
+                if has_selected_platforms_key:
+                    updated['selected_platforms'] = incoming_selected_plats
+                elif isinstance(existing.get('selected_platforms'), list):
+                    updated['selected_platforms'] = _normalize_uploaded_platforms(existing.get('selected_platforms'))
                 for k in HISTORY_FIELDS:
                     if k in rec:
                         updated[k] = rec[k]
@@ -5398,6 +5406,12 @@ def save_history_record(rec, update_id=''):
                 need_enrich = False
                 old_gif_names = {g['filename'] for g in _normalize_saved_gifs(existing.get('saved_gifs'))}
                 old_media_names = {s['filename'] for s in _normalize_saved_slots(existing.get('saved_slots')) if s.get('filename')}
+                if has_selected_platforms_key and (
+                    (not isinstance(existing.get('selected_platforms'), list))
+                    or incoming_selected_plats != _normalize_uploaded_platforms(existing.get('selected_platforms'))
+                ):
+                    existing['selected_platforms'] = incoming_selected_plats
+                    need_enrich = True
                 if has_saved_gifs_key and incoming_gifs != _normalize_saved_gifs(existing.get('saved_gifs')):
                     existing['saved_gifs'] = incoming_gifs
                     need_enrich = True
@@ -5453,6 +5467,8 @@ def save_history_record(rec, update_id=''):
             suffix += 1
         rec['id'] = cand_id
         rec['uploaded_platforms'] = _normalize_uploaded_platforms(rec.get('uploaded_platforms'))
+        if has_selected_platforms_key:
+            rec['selected_platforms'] = incoming_selected_plats
         rec['saved_gifs'] = incoming_gifs if has_saved_gifs_key else []
         rec['saved_slots'] = incoming_slots if has_saved_slots_key else []
 
@@ -5944,6 +5960,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     'saved': bool(h_res.get('saved')),
                     'updated': bool(h_res.get('updated')),
                     'saved_slots': saved_slots,
+                    'selected_platforms': rec.get('selected_platforms') if 'selected_platforms' in rec else None,
                     'msg': '현재 본문과 미디어(대표사진·GIF·슬롯 상태)가 지난 기록에 저장되었습니다.',
                 })
             except Exception as e:
@@ -5959,6 +5976,8 @@ class AppHandler(BaseHTTPRequestHandler):
             if not r: return self.send_json({'success': False, 'error': '없음'})
             r = {k: (normalize_branch_name(v) if isinstance(v, str) else v) for k, v in r.items()}
             r['uploaded_platforms'] = _normalize_uploaded_platforms(r.get('uploaded_platforms'))
+            if isinstance(r.get('selected_platforms'), list):
+                r['selected_platforms'] = _normalize_uploaded_platforms(r.get('selected_platforms'))
             r['saved_gifs'] = _normalize_saved_gifs(r.get('saved_gifs'))
             r['saved_slots'] = _normalize_saved_slots(r.get('saved_slots'))
             restored_gifs = restore_saved_gifs_to_thumbs(r.get('saved_gifs'))
