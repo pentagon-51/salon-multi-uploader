@@ -90,18 +90,54 @@ def get_chrome_profile_dir():
 
 
 def cleanup_chrome_profile_locks():
-    """이전 강제 종료로 남을 수 있는 auth_data/chrome_profile 내 Singleton* 잠금 파일 안전 삭제"""
+    """이전 강제 종료로 남을 수 있는 auth_data/chrome_profile 내 Singleton* / lockfile 잠금 파일 안전 삭제"""
     profile_dir = get_chrome_profile_dir()
     removed = []
-    for fname in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
-        fp = os.path.join(profile_dir, fname)
+    lock_candidates = [
+        os.path.join(profile_dir, "SingletonLock"),
+        os.path.join(profile_dir, "SingletonCookie"),
+        os.path.join(profile_dir, "SingletonSocket"),
+        os.path.join(profile_dir, "lockfile"),
+        os.path.join(profile_dir, "Default", "LOCK"),
+    ]
+    for fp in lock_candidates:
         if os.path.lexists(fp):
             try:
                 os.remove(fp)
-                removed.append(fname)
+                removed.append(os.path.basename(fp))
             except Exception:
                 pass
     return removed
+
+
+def wait_chrome_profile_unlock(timeout_sec=3.5):
+    """Windows 환경에서 직전 크롬 종료 후 영구 프로필(auth_data/chrome_profile) 파일 잠금 해제를 안전 대기.
+    잠금 파일이 프로세스에 의해 점유 중(PermissionError/OSError)이면 최대 timeout_sec 동안 0.3초 간격으로 재시도."""
+    if sys.platform != "win32":
+        cleanup_chrome_profile_locks()
+        return True
+    profile_dir = get_chrome_profile_dir()
+    lock_candidates = [
+        os.path.join(profile_dir, "SingletonLock"),
+        os.path.join(profile_dir, "SingletonCookie"),
+        os.path.join(profile_dir, "SingletonSocket"),
+        os.path.join(profile_dir, "lockfile"),
+    ]
+    deadline = time.time() + max(0.5, float(timeout_sec))
+    while True:
+        still_locked = False
+        for fp in lock_candidates:
+            if not os.path.lexists(fp):
+                continue
+            try:
+                os.remove(fp)
+            except Exception:
+                still_locked = True
+        if not still_locked:
+            return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.3)
 
 
 CHROME_DISALLOWED_SANDBOX_FLAGS = (
@@ -134,7 +170,7 @@ def launch_persistent_chromium(
     chromium_sandbox=True 및 ignore_default_args로 크롬 상단 '--no-sandbox' 경고 배너를 원천 제거.
     restore_saved_cookies=True 시 크롬 종료로 사라진 세션 쿠키(expires=-1, 네이버 '로그인 상태 유지' 미체크 등)를
     auth_data/*_cookies.json에서 자동 복원해 통합 로그인과 개별 업로더 간 세션을 100% 일치시킴."""
-    cleanup_chrome_profile_locks()
+    wait_chrome_profile_unlock(timeout_sec=3.5)
     launch_args = _sanitize_chromium_args(args)
 
     kwargs = {
@@ -1611,11 +1647,12 @@ def release_held_playwright_sessions(kill_chrome_fn=None):
         except Exception:
             pass
 
-    # 3) Windows 환경에서는 직전 크롬 종료 후 영구 프로필 파일 잠금 해제가 지연될 수 있어 1.8초 안전 대기
+    # 3) Windows 환경에서는 직전 크롬 종료 후 영구 프로필 파일 잠금 해제가 지연될 수 있어 안전 대기 후 잠금 정리
     if sys.platform == "win32" and (had_held or callable(kill_chrome_fn)):
-        time.sleep(1.8)
-
-    cleanup_chrome_profile_locks()
+        time.sleep(1.5)
+        wait_chrome_profile_unlock(timeout_sec=3.0)
+    else:
+        cleanup_chrome_profile_locks()
     return had_held
 
 
@@ -1712,6 +1749,10 @@ def finalize_playwright_session(
             browser.close()
     except Exception:
         pass
+    # Windows 환경에서는 브라우저 종료 직후 크롬 프로필 파일 핸들 해제에 수백 ms~1초가 걸릴 수 있어 충돌 방지 대기
+    if sys.platform == "win32" and (context is not None or browser is not None):
+        time.sleep(0.8)
+        wait_chrome_profile_unlock(timeout_sec=2.5)
 
     if is_login_mode:
         if record_dir and os.path.isdir(record_dir):

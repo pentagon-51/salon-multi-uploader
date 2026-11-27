@@ -286,45 +286,167 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
             except Exception:
                 pass
 
-            for _ in range(2):
-                for nxt in ["다음", "Next"]:
-                    try:
-                        n_btn = page.locator(f'div[role="button"]:has-text("{nxt}"), button:has-text("{nxt}")').first
-                        if n_btn.is_visible(timeout=4000):
-                            n_btn.click(); time.sleep(2)
-                            break
-                    except Exception:
-                        pass
-
-            cap_box = page.locator('div[aria-label="문구를 입력하세요..."], div[aria-label="Write a caption..."], div[role="textbox"]').first
-            cap_box.wait_for(state="visible", timeout=10000)
-            cap_box.click(); time.sleep(0.5)
-            copy_to_clipboard(full_caption)
-            page.keyboard.press(f"{MOD_KEY}+v")
-            time.sleep(1.5)
-
-            try:
-                if target_place:
-                    loc_input = page.locator('input[placeholder*="위치"], input[placeholder*="location"], input[name="queryBox"]').first
-                    if loc_input.is_visible(timeout=3000):
-                        loc_input.click(); time.sleep(0.6)
-                        page.keyboard.insert_text(target_place); time.sleep(2.0)
-                        loc_kw = target_place.split()[0]
-                        loc_choice = page.locator(f'button:has-text("{loc_kw}"), div[role="button"]:has-text("{loc_kw}")').first
-                        if loc_choice.is_visible(timeout=3000):
-                            loc_choice.click(); time.sleep(1.0)
-            except Exception:
-                pass
-
-            share_btn = None
-            for sh in ["공유하기", "Share"]:
+            def _get_active_ig_dialog():
+                dlgs = page.locator('div[role="dialog"]')
                 try:
-                    cand = page.locator(f'div[role="button"]:has-text("{sh}"), button:has-text("{sh}")').first
-                    if cand.is_visible(timeout=4000):
-                        share_btn = cand
-                        break
+                    if dlgs.count() > 0:
+                        return dlgs.last
                 except Exception:
                     pass
+                return page
+
+            def _is_back_or_close_control(el):
+                """모달 좌상단 뒤로가기(←)·닫기(×) 오클릭 원천 차단 판별"""
+                try:
+                    al = (el.get_attribute("aria-label") or "").strip().lower()
+                    if any(k in al for k in ("뒤로", "back", "닫기", "close", "이전", "previous")):
+                        return True
+                    if el.locator('svg[aria-label*="뒤로"], svg[aria-label*="Back"], svg[aria-label*="닫기"], svg[aria-label*="Close"]').count() > 0:
+                        return True
+                except Exception:
+                    pass
+                return False
+
+            def _safe_scroll_into_view(el, timeout_ms=2000):
+                """Windows 125%/150% 디스플레이 배율에서도 요소가 뷰포트 밖으로 밀리지 않도록 안전 스크롤"""
+                try:
+                    el.scroll_into_view_if_needed(timeout=timeout_ms)
+                except Exception:
+                    pass
+
+            def _is_settings_or_toggle_row(el):
+                """하단 고급 설정·Facebook/Threads 공유 토글 영역의 버튼인지 DOM 구조로 판별"""
+                try:
+                    return bool(el.evaluate(
+                        """(node) => {
+                            let cur = node;
+                            for (let i = 0; i < 4 && cur; i++) {
+                                if (cur.querySelector && cur.querySelector('input[type="checkbox"], input[role="switch"], [role="switch"]')) {
+                                    return true;
+                                }
+                                cur = cur.parentElement;
+                            }
+                            return false;
+                        }"""
+                    ))
+                except Exception:
+                    return False
+
+            def _find_modal_header_action_btn(exact_labels, timeout_ms=2500):
+                """인스타그램 작성 모달 우측 상단 헤더 액션 버튼(다음/공유하기)만 정확 텍스트(:text-is)와
+                DOM 컨테이너 + 비율 기반 위치(DPI 125%/150% 무관)로 안전 탐색.
+                하단 'Facebook에 공유하기' 토글이나 좌상단 뒤로가기(←) 버튼 오클릭을 엄격히 차단."""
+                dlg = _get_active_ig_dialog()
+                dlg_box = None
+                try:
+                    if dlg is not page:
+                        dlg_box = dlg.bounding_box()
+                except Exception:
+                    dlg_box = None
+
+                for lbl in exact_labels:
+                    sel = f'div[role="button"]:text-is("{lbl}"), button:text-is("{lbl}")'
+                    for scope in ([dlg, page] if dlg is not page else [page]):
+                        try:
+                            pool = scope.locator(sel)
+                            cnt = min(pool.count(), 6)
+                        except Exception:
+                            cnt = 0
+                        for idx in range(cnt):
+                            cand = pool.nth(idx)
+                            try:
+                                if not cand.is_visible(timeout=min(timeout_ms, 1200)):
+                                    continue
+                                if _is_back_or_close_control(cand) or _is_settings_or_toggle_row(cand):
+                                    continue
+                                if dlg_box and dlg_box.get("width", 0) > 100 and dlg_box.get("height", 0) > 100:
+                                    cbox = cand.bounding_box()
+                                    if cbox:
+                                        cx = cbox["x"] + cbox["width"] / 2.0
+                                        cy = cbox["y"] + cbox["height"] / 2.0
+                                        # 고정 픽셀 대신 모달 비율(DPI 배율 무관)로 좌측 절반(← 뒤로가기) 및 하단 본문/고급 설정 제외
+                                        if cx < dlg_box["x"] + dlg_box["width"] * 0.5:
+                                            continue
+                                        if cy > dlg_box["y"] + dlg_box["height"] * 0.25:
+                                            continue
+                                return cand
+                            except Exception:
+                                continue
+                return None
+
+            for step_i in range(2):
+                n_btn = _find_modal_header_action_btn(["다음", "Next"], timeout_ms=2500)
+                if n_btn is not None:
+                    try:
+                        _safe_scroll_into_view(n_btn)
+                        n_btn.click(timeout=3500)
+                        time.sleep(1.8)
+                    except Exception as nxt_err:
+                        print(f"ℹ️ [인스타그램] 다음 단계 클릭 재시도({step_i + 1}): {nxt_err}", flush=True)
+
+            dlg_cap = _get_active_ig_dialog()
+            cap_box = dlg_cap.locator('div[aria-label="문구를 입력하세요..."], div[aria-label="Write a caption..."], div[role="textbox"]').first
+            cap_box.wait_for(state="visible", timeout=10000)
+            _safe_scroll_into_view(cap_box)
+            cap_box.click(timeout=3000); time.sleep(0.5)
+            copy_to_clipboard(full_caption)
+            page.keyboard.press(f"{MOD_KEY}+v")
+            time.sleep(1.2)
+            print("✍️ [인스타그램] 캡션·해시태그 입력 완료", flush=True)
+
+            # 위치 추가: 모달 내부 위치 입력칸·드롭다운만 짧은 타임아웃(2.5초) + scroll_into_view_if_needed로 처리
+            try:
+                if target_place:
+                    dlg_loc = _get_active_ig_dialog()
+                    loc_input = dlg_loc.locator('input[placeholder*="위치"], input[placeholder*="location"], input[name="queryBox"], input[name="creation-location-input"]').first
+                    if loc_input.is_visible(timeout=2500):
+                        _safe_scroll_into_view(loc_input)
+                        loc_input.click(timeout=2500)
+                        time.sleep(0.4)
+                        loc_input.fill(target_place, timeout=2500)
+                        time.sleep(1.8)
+                        loc_box = None
+                        try:
+                            loc_box = loc_input.bounding_box()
+                        except Exception:
+                            loc_box = None
+                        loc_kw = target_place.split()[0]
+                        loc_pool = dlg_loc.locator(f'div[role="button"]:has-text("{loc_kw}"), button:has-text("{loc_kw}")')
+                        loc_clicked = False
+                        for li in range(min(loc_pool.count(), 8)):
+                            cand_loc = loc_pool.nth(li)
+                            try:
+                                if not cand_loc.is_visible(timeout=600):
+                                    continue
+                                if _is_back_or_close_control(cand_loc) or _is_settings_or_toggle_row(cand_loc):
+                                    continue
+                                ctxt = re.sub(r"\s+", " ", (cand_loc.inner_text(timeout=500) or "")).strip()
+                                if not ctxt or len(ctxt) > 120:
+                                    continue
+                                if any(bad in ctxt for bad in ("공유하기", "Share", "고급 설정", "Advanced settings", "다음", "Next")):
+                                    continue
+                                if loc_box:
+                                    cbox = cand_loc.bounding_box()
+                                    if cbox and cbox["y"] < loc_box["y"] + loc_box["height"] - 4:
+                                        continue
+                                _safe_scroll_into_view(cand_loc)
+                                cand_loc.click(timeout=2500)
+                                loc_clicked = True
+                                time.sleep(0.8)
+                                print(f"📍 [인스타그램] 위치 선택 완료: {ctxt[:40]}", flush=True)
+                                break
+                            except Exception:
+                                continue
+                        if not loc_clicked:
+                            print("ℹ️ [인스타그램] 위치 드롭다운 후보 미감지 — 위치 선택을 건너뛰고 공유 단계로 진행합니다.", flush=True)
+            except Exception as loc_err:
+                print(f"ℹ️ [인스타그램] 위치 추가 건너뜀: {loc_err}", flush=True)
+
+            # 최종 [공유하기] 버튼: 모달 우측 상단 헤더의 정확 일치(:text-is) 버튼만 탐색 (하단 공유 토글·좌상단 ← 뒤로가기 차단)
+            share_btn = _find_modal_header_action_btn(["공유하기", "Share"], timeout_ms=2500)
+            if share_btn is not None:
+                _safe_scroll_into_view(share_btn)
+                print("🎯 [인스타그램] 모달 우측 상단 [공유하기] 버튼 탐색 완료", flush=True)
 
             if test_mode:
                 aim_res = verify_publish_button_aim(
@@ -340,7 +462,7 @@ def upload_to_instagram(body="", tags=None, video_path=None, is_draft=True, logi
                 return "test_mode_ok"
 
             if share_btn is not None:
-                share_btn.click()
+                share_btn.click(timeout=5000)
             for _ in range(20):
                 time.sleep(1.5)
                 if page.locator('text="게시물이 공유되었습니다"').count() > 0 or page.locator('text="Your post has been shared"').count() > 0:

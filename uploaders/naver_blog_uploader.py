@@ -111,9 +111,33 @@ def build_full_body(body, profile=None):
         return clean_text
     return clean_text + f"{nl}{nl}{nl}━━━━━━━━━━{nl}{nl}" + f"{nl}{nl}".join(footer_parts)
 
+def _resolve_blog_editor(page):
+    """네이버 블로그 스마트에디터 프레임(#mainFrame 또는 PostWriteForm 프레임)을 안전하게 탐색.
+    프레임 미존재·분리 상태에서도 예외 없이 page 폴백 반환."""
+    try:
+        if page.locator("#mainFrame").count() > 0:
+            return page.frame_locator("#mainFrame")
+    except Exception:
+        pass
+    try:
+        for fr in page.frames:
+            fu = (fr.url or "").lower()
+            if fr != page.main_frame and ("postwrite" in fu or "editor" in fu):
+                return fr
+    except Exception:
+        pass
+    return page
+
+
 def find_in_both(page, editor, selector):
-    loc_ed = editor.locator(selector)
-    return loc_ed if loc_ed.count() > 0 else page.locator(selector)
+    if editor is not None and editor is not page:
+        try:
+            loc_ed = editor.locator(selector)
+            if loc_ed.count() > 0:
+                return loc_ed
+        except Exception:
+            pass
+    return page.locator(selector)
 
 def set_editor_color(page, editor, use_blue=True):
     try:
@@ -1037,11 +1061,34 @@ def select_blog_category(page, editor, cat):
     return False
 
 def is_naver_blog_logged_in(page):
-    """네이버 로그인 화면(nid.naver.com)을 벗어나 블로그 에디터/블로그 영역에 진입했는지 판별"""
-    url = (page.url or "").lower()
+    """네이버 로그인 화면(nid.naver.com)을 벗어나 블로그 에디터/블로그 영역에 진입했는지 판별.
+    GoBlogWrite.naver URL이 유지된 채 #mainFrame 내부에 스마트에디터가 이미 로드된 경우에도 즉시 로그인 완료로 인식."""
+    try:
+        url = (page.url or "").lower()
+    except Exception:
+        return False
     if "nid.naver.com" in url or "nidlogin" in url:
         return False
-    if is_any_locator_visible(page, 'input#id, input#pw'):
+    # 1순위: 스마트에디터 DOM 또는 PostWriteForm 자식 프레임이 이미 로드되었으면 즉시 로그인 완료 판정
+    try:
+        for fr in page.frames:
+            fu = (fr.url or "").lower()
+            if "nid.naver.com" in fu or "nidlogin" in fu:
+                return False
+            if "postwrite" in fu or "se_editor" in fu:
+                return True
+    except Exception:
+        pass
+    try:
+        ed = _resolve_blog_editor(page)
+        for sel in (".se-title-text", ".se-main-container", ".se-documentTitle", ".se-toolbar", 'button[class*="publish_btn"]'):
+            loc = find_in_both(page, ed, sel)
+            if loc.count() > 0:
+                return True
+    except Exception:
+        pass
+    # 2순위: 명시적 로그인 입력창이 보이면 비로그인
+    if is_any_locator_visible(page, 'input#id[name="id"], input#pw[name="pw"], form#frmNIDLogin'):
         return False
     if "blog.naver.com" in url and ("postwrite" in url or "redirect=write" in url or "goblogwrite" not in url):
         return True
@@ -1148,11 +1195,32 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
 
     def _run_blog_flow(active_ctx):
         nonlocal page, video_obj
-        page = active_ctx.pages[0] if active_ctx.pages else active_ctx.new_page()
+        live_pages = []
+        try:
+            live_pages = [pg for pg in list(active_ctx.pages) if not pg.is_closed()]
+        except Exception:
+            live_pages = []
+        page = live_pages[0] if live_pages else active_ctx.new_page()
+        try:
+            page.bring_to_front()
+        except Exception:
+            pass
         video_obj = page.video
 
+        print("🌐 [네이버 블로그] 글쓰기 페이지(GoBlogWrite.naver)로 이동 중...", flush=True)
         page.goto("https://blog.naver.com/GoBlogWrite.naver", wait_until="domcontentloaded", timeout=45000)
-        time.sleep(3.0)
+        # GoBlogWrite.naver → PostWriteForm 리다이렉트·#mainFrame 마운트가 2~5초 걸릴 수 있어
+        # 로그인 대기(180초) 진입 전 최대 5초간 0.5초 간격으로 즉시 진입 여부를 먼저 확인
+        settle_deadline = time.time() + 5.0
+        while time.time() < settle_deadline:
+            if callable(stop_checker) and stop_checker():
+                raise InterruptedError("사용자 강제 중지 요청")
+            cur_u = (page.url or "").lower()
+            if "nid.naver.com" in cur_u or "nidlogin" in cur_u:
+                break
+            if is_naver_blog_logged_in(page):
+                break
+            time.sleep(0.5)
 
         device_hint_shown = [False]
         def _on_naver_tick(pg, tick_idx, elapsed):
@@ -1162,6 +1230,7 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
                 print("ℹ️ [네이버 블로그] 새로운 환경 기기 등록 화면이 보이면 [등록] 또는 [등록안함]을 선택해 주세요.", flush=True)
 
         if not is_naver_blog_logged_in(page):
+            print(f"🔎 [네이버 블로그] 에디터 미진입(현재 URL: {page.url}) — 로그인 확인 대기 시작", flush=True)
             wait_for_manual_login(
                 page,
                 "네이버 블로그",
@@ -1177,6 +1246,8 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
             print("✅ [네이버 블로그] 로그인 점검 및 쿠키 저장 완료!", flush=True)
             return True
 
+        print(f"✅ [네이버 블로그] 글쓰기 화면 진입 확인 ({page.url}) — 에디터 프레임 및 제목 입력칸 탐색 시작...", flush=True)
+
         def _dismiss_blog_editor_popups(pg, ed):
             """네이버 블로그 스마트에디터 진입 시 뜨는 임시저장 복구('작성 중인 글이 있습니다') 및 도움말·안내 팝업 안전 닫기"""
             popup_cancel_sels = [
@@ -1190,6 +1261,10 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
                 try:
                     loc = find_in_both(pg, ed, sel)
                     if loc.count() > 0 and loc.first.is_visible(timeout=400):
+                        try:
+                            loc.first.scroll_into_view_if_needed(timeout=1500)
+                        except Exception:
+                            pass
                         loc.first.click(timeout=2500)
                         time.sleep(0.4)
                 except Exception:
@@ -1202,40 +1277,69 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
                     if ("작성 중인 글" in txt) or ("임시저장" in txt):
                         cancel_btn = find_in_both(pg, ed, '.se-popup-alert button:has-text("취소"), .se-popup-container button:has-text("취소")')
                         if cancel_btn.count() > 0 and cancel_btn.first.is_visible(timeout=300):
+                            try:
+                                cancel_btn.first.scroll_into_view_if_needed(timeout=1500)
+                            except Exception:
+                                pass
                             cancel_btn.first.click(timeout=2500)
                             time.sleep(0.5)
             except Exception:
                 pass
 
-        editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+        editor = _resolve_blog_editor(page)
+        title_sel = ".se-title-text, .se-documentTitle .se-text-paragraph, .se-placeholder:has-text('제목')"
         title_clicked = False
         last_title_err = None
         for attempt in (1, 2):
-            editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+            editor = _resolve_blog_editor(page)
             _dismiss_blog_editor_popups(page, editor)
 
             wait_limit = 15.0 if attempt == 1 else 22.0
-            deadline = time.time() + wait_limit
+            start_wait = time.time()
+            deadline = start_wait + wait_limit
+            last_diag_ts = start_wait
             ta = None
             while time.time() < deadline:
                 if callable(stop_checker) and stop_checker():
                     raise RuntimeError("사용자 강제 중지 요청")
-                editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+                editor = _resolve_blog_editor(page)
                 _dismiss_blog_editor_popups(page, editor)
-                cand = find_in_both(page, editor, ".se-title-text")
+                cand = find_in_both(page, editor, title_sel)
                 try:
                     if cand.count() > 0 and cand.first.is_visible(timeout=500):
                         ta = cand
                         break
                 except Exception:
                     pass
-                time.sleep(0.6)
+                now_t = time.time()
+                if now_t - last_diag_ts >= 5.0:
+                    last_diag_ts = now_t
+                    has_mf = False
+                    try:
+                        has_mf = page.locator("#mainFrame").count() > 0
+                    except Exception:
+                        pass
+                    print(
+                        f"⏳ [네이버 블로그] 제목 입력칸 대기 중 ({int(now_t - start_wait)}초/{int(wait_limit)}초 · 시도 {attempt}/2 · #mainFrame={has_mf} · 프레임={len(page.frames)}개 · URL={page.url})",
+                        flush=True,
+                    )
+                time.sleep(0.5)
 
             if ta is not None:
                 try:
+                    # Windows에서 크롬 창이 백그라운드로 밀려 #mainFrame 포커스가 빠지는 현상 방지
+                    try:
+                        page.bring_to_front()
+                    except Exception:
+                        pass
                     _dismiss_blog_editor_popups(page, editor)
-                    ta.first.click(timeout=10000)
+                    try:
+                        ta.first.scroll_into_view_if_needed(timeout=2000)
+                    except Exception:
+                        pass
+                    ta.first.click(timeout=6000)
                     title_clicked = True
+                    print("✍️ [네이버 블로그] 제목 입력칸(.se-title-text) 활성화 완료 — 제목·본문 입력을 진행합니다.", flush=True)
                     break
                 except Exception as click_err:
                     last_title_err = click_err
@@ -1243,10 +1347,16 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
                 last_title_err = TimeoutError(f"네이버 블로그 제목 입력칸(.se-title-text) 대기 타임아웃 ({int(wait_limit)}초)")
 
             if attempt == 1:
-                print("⚠️ [네이버 블로그] 제목 입력칸(.se-title-text) 로딩 지연 — 글쓰기 페이지를 1회 새로고침 후 재시도합니다...", flush=True)
+                print("⚠️ [네이버 블로그] 제목 입력칸(.se-title-text) 로딩 지연 — 글쓰기 페이지를 1회 새로고침(실패 시 새 탭 폴백) 후 재시도합니다...", flush=True)
                 try:
                     page.reload(wait_until="domcontentloaded", timeout=45000)
                 except Exception:
+                    try:
+                        page = active_ctx.new_page()
+                        page.bring_to_front()
+                        video_obj = page.video
+                    except Exception:
+                        pass
                     page.goto("https://blog.naver.com/GoBlogWrite.naver", wait_until="domcontentloaded", timeout=45000)
                 time.sleep(3.0)
 
@@ -1272,6 +1382,10 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
 
         main_before_video, closing_and_footer = split_blog_body_for_closing_video(f_body)
         if main_before_video:
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
             paste_formatted_body(page, editor, main_before_video, selected_images=selected_images)
             time.sleep(0.4)
             page.keyboard.press("Enter")

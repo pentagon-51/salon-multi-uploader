@@ -60,6 +60,7 @@ from os_utils import (
     finalize_playwright_session,
     create_blackbox_record_dir,
     has_valid_facebook_auth_cookies,
+    wait_chrome_profile_unlock,
 )
 
 BASE_DIR = get_base_dir()
@@ -1104,6 +1105,8 @@ def _cleanup_paused_stop_browser_if_needed():
         return False
     log('🧹 [사전 정리] 직전 강제 중지로 열어둔 자동화 브라우저 창을 안전하게 닫고 새 작업을 시작합니다...')
     release_held_playwright_sessions(kill_chrome_fn=_kill_automation_chrome)
+    if sys.platform == 'win32':
+        wait_chrome_profile_unlock(timeout_sec=3.0)
     with STATE_LOCK:
         STATE['browser_left_open_by_stop'] = False
     return True
@@ -4375,6 +4378,7 @@ def worker_publish(payload):
         payload.get('naver_rep_image'),
     )
 
+    # 표준 실행 순서 (AI_RULES.md 기준 · 테스트 모드/실업로드 모두 강제 고정)
     platform_order = [
         ('yt', '유튜브 쇼츠', '유튜브', 'use_yt'),
         ('naver', '네이버 블로그', '네이버블로그', 'use_naver'),
@@ -4386,6 +4390,9 @@ def worker_publish(payload):
         ('pin', '핀터레스트', '핀터레스트', 'use_pin'),
     ]
     selected_platforms = [(k, lbl, bbn) for k, lbl, bbn, flag in platform_order if payload.get(flag)]
+    ordered_platform_keys = [k for k, _, _ in selected_platforms]
+    if selected_platforms:
+        log('📋 [표준 실행 순서] ' + ' → '.join(lbl for _, lbl, _ in selected_platforms))
     platform_records = {}
     platform_last_msgs = {}
     top_level_exc = None
@@ -4554,8 +4561,8 @@ def worker_publish(payload):
                 if ctx_obj is None:
                     return False
                 try:
-                    _ = ctx_obj.pages
-                    return True
+                    pages = list(ctx_obj.pages)
+                    return any(not pg.is_closed() for pg in pages) if pages else True
                 except Exception:
                     return False
 
@@ -4648,13 +4655,13 @@ def worker_publish(payload):
                         log(f'⚠️ [네이버 클립] 오류: {e}')
                 _finish_platform('clip', '네이버 클립', '네이버클립', c_ok, exc_obj=c_exc, err_tb=c_tb)
 
-            # 네이버 블로그 + 네이버 클립 연속 실행 시 동일 크롬 세션(새 탭 전환) 재사용으로 중복 로그인 이력 방지
-            if payload.get('use_naver') and payload.get('use_clip'):
+            # 네이버 블로그 + 네이버 클립 연속 실행 시 표준 순서(naver → clip)로 동일 크롬 세션(새 탭 전환) 재사용
+            if 'naver' in ordered_platform_keys and 'clip' in ordered_platform_keys:
                 shared_naver_rec_dir = create_blackbox_record_dir('네이버블로그클립', mode='upload')
                 shared_naver_ctx = None
                 with open_playwright_session() as naver_pw:
                     try:
-                        log('🔗 [네이버 세션 공유] 블로그 → 클립 연속 실행을 단일 브라우저 세션으로 통합 진행합니다.')
+                        log('🔗 [네이버 세션 공유] 표준 순서(네이버 블로그 → 네이버 클립)로 단일 브라우저 세션을 통합 진행합니다.')
                         shared_naver_ctx = launch_persistent_chromium(
                             naver_pw,
                             headless=False,
@@ -4668,6 +4675,7 @@ def worker_publish(payload):
                             shared_rec_dir=shared_naver_rec_dir,
                         )
                         if not _is_stop_requested(my_run_id):
+                            time.sleep(1.2 if sys.platform == 'win32' else 0.8)
                             if _is_shared_ctx_alive(shared_naver_ctx):
                                 _run_naver_clip_step(
                                     shared_ctx=shared_naver_ctx,
@@ -4675,12 +4683,14 @@ def worker_publish(payload):
                                 )
                             else:
                                 # 블로그 단계 건너뛰기/창 닫힘 등으로 공유 컨텍스트가 닫힌 경우 클립 단독 세션으로 안전 폴백
+                                log('ℹ️ [네이버 세션 공유] 공유 브라우저가 닫혀 네이버 클립을 독립 세션으로 안전 전환합니다.')
                                 _run_naver_clip_step(shared_ctx=None, shared_rec_dir=None)
                     finally:
                         last_pg = None
                         try:
                             if _is_shared_ctx_alive(shared_naver_ctx) and shared_naver_ctx.pages:
-                                last_pg = shared_naver_ctx.pages[-1]
+                                open_pgs = [pg for pg in list(shared_naver_ctx.pages) if not pg.is_closed()]
+                                last_pg = open_pgs[-1] if open_pgs else shared_naver_ctx.pages[-1]
                         except Exception:
                             last_pg = None
                         finalize_playwright_session(
@@ -4692,11 +4702,11 @@ def worker_publish(payload):
                             platform_label='네이버 블로그·클립',
                         )
             else:
-                if payload.get('use_naver'):
+                if 'naver' in ordered_platform_keys:
                     _run_naver_blog_step(shared_ctx=None, keep_open=False, shared_rec_dir=None)
                 if _is_stop_requested(my_run_id):
                     break
-                if payload.get('use_clip'):
+                if 'clip' in ordered_platform_keys:
                     _run_naver_clip_step(shared_ctx=None, shared_rec_dir=None)
 
             if _is_stop_requested(my_run_id):

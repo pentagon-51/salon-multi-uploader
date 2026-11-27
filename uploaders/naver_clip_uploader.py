@@ -427,9 +427,18 @@ def upload_to_naver_clip(title="", body="", tags=None, video_path=None, place_na
                 page.bring_to_front()
             except Exception:
                 pass
-            print("🔗 [네이버 클립] 네이버 블로그와 동일한 브라우저 세션(새 탭)으로 이어서 진행합니다.", flush=True)
+            print("🔗 [네이버 클립] 네이버 블로그와 동일한 브라우저 세션(새 탭)으로 전환해 이어서 진행합니다.", flush=True)
         else:
-            page = active_ctx.pages[0] if active_ctx.pages else active_ctx.new_page()
+            live_pages = []
+            try:
+                live_pages = [pg for pg in list(active_ctx.pages) if not pg.is_closed()]
+            except Exception:
+                live_pages = []
+            page = live_pages[0] if live_pages else active_ctx.new_page()
+            try:
+                page.bring_to_front()
+            except Exception:
+                pass
         video_obj = page.video
 
         page.goto("https://clipcreators.naver.com/web", wait_until="domcontentloaded", timeout=45000)

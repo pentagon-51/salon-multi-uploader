@@ -3890,6 +3890,7 @@ function startUpload(overrideTargets = null, opts = {}) {
   const bodyThumbs = extractedThumbs.slice(1, 6);
   let payload = {
     test_mode: testMode,
+    execution_order: PLATFORM_META.map(p => p.key).filter(k => isEnabled(k, PLATFORM_META.find(m => m.key === k).chkId)),
     save_history: false,
     history_id: testMode ? '' : (activeHistoryId || ''),
     video_name: currentVideoName, source_text: getVal('sourceText'),
