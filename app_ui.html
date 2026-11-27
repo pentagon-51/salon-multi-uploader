@@ -828,7 +828,7 @@
               3) 다운로드한 JSON 파일 이름을 <code>client_secret.json</code>으로 바꿔 <code>auth_data/client_secret.json</code>에 넣으세요. (하루 최대 6건 무료 · 초과 시 과금 없음)
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <button type="button" class="btn-main" id="btnYtOAuthConnect" onclick="startYoutubeOAuthConnect(this)" disabled style="padding:8px 14px; font-size:12.5px; opacity:0.5;">🔑 지금 구글 계정 인증하기</button>
+              <button type="button" class="btn-tool" id="btnYtOAuthConnect" onclick="startYoutubeOAuthConnect(this)" disabled style="padding:8px 14px; font-size:12.5px; font-weight:700; border-radius:7px; background:#f3f4f6; color:#9ca3af; border:1px solid #e5e7eb; cursor:not-allowed; opacity:0.85;">🔑 지금 구글 계정 인증하기</button>
               <span id="ytOAuthConnectHint" style="font-size:11.5px; color:#6b7280;">먼저 auth_data/client_secret.json 파일을 넣고 [🔄 상태 새로고침]을 눌러주세요.</span>
             </div>
           </div>
@@ -2749,13 +2749,18 @@ function refreshSetupStatus(deep = false, force = false) {
     const ytAuthBtn = document.getElementById('btnYtOAuthConnect');
     const ytAuthHint = document.getElementById('ytOAuthConnectHint');
     if (ytAuthBtn) {
+      ytAuthBtn.style.padding = '8px 14px';
+      ytAuthBtn.style.fontSize = '12.5px';
+      ytAuthBtn.style.fontWeight = '700';
+      ytAuthBtn.style.borderRadius = '7px';
       if (!st.has_client_secret) {
         ytAuthBtn.disabled = true;
         ytAuthBtn.innerText = '🔑 지금 구글 계정 인증하기';
-        ytAuthBtn.style.background = '';
-        ytAuthBtn.style.color = '';
-        ytAuthBtn.style.border = '';
-        ytAuthBtn.style.opacity = '0.5';
+        ytAuthBtn.style.background = '#f3f4f6';
+        ytAuthBtn.style.color = '#9ca3af';
+        ytAuthBtn.style.border = '1px solid #e5e7eb';
+        ytAuthBtn.style.cursor = 'not-allowed';
+        ytAuthBtn.style.opacity = '0.85';
         ytAuthBtn.title = '먼저 auth_data/client_secret.json 파일을 등록해 주세요';
         if (ytAuthHint) ytAuthHint.innerText = '먼저 auth_data/client_secret.json 파일을 넣고 [🔄 상태 새로고침]을 눌러주세요.';
       } else if ((st.yt || 'red') === 'green') {
@@ -2764,6 +2769,7 @@ function refreshSetupStatus(deep = false, force = false) {
         ytAuthBtn.style.background = '#ecfdf5';
         ytAuthBtn.style.color = '#047857';
         ytAuthBtn.style.border = '1px solid #a7f3d0';
+        ytAuthBtn.style.cursor = 'pointer';
         ytAuthBtn.style.opacity = '1';
         ytAuthBtn.title = '구글 계정을 변경하거나 재인증하려면 클릭하세요';
         if (ytAuthHint) ytAuthHint.innerText = '유튜브 쇼츠 공식 API 인증이 완료되었습니다. (계정 변경 시 재인증 가능)';
@@ -2772,7 +2778,8 @@ function refreshSetupStatus(deep = false, force = false) {
         ytAuthBtn.innerText = '🔑 지금 구글 계정 인증하기';
         ytAuthBtn.style.background = 'var(--accent-blue)';
         ytAuthBtn.style.color = '#fff';
-        ytAuthBtn.style.border = 'none';
+        ytAuthBtn.style.border = '1px solid var(--accent-blue)';
+        ytAuthBtn.style.cursor = 'pointer';
         ytAuthBtn.style.opacity = '1';
         ytAuthBtn.title = '브라우저에서 구글 계정 로그인 및 유튜브 업로드 권한 인증을 진행합니다';
         if (ytAuthHint) ytAuthHint.innerText = 'client_secret.json 확인 완료! 클릭하면 브라우저에서 구글 인증 창이 열립니다.';
