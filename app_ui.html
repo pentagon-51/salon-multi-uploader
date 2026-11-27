@@ -4463,6 +4463,32 @@ function checkForUpdates(isManual = false) {
   });
 }
 
+function waitForServerRestartAndReload(maxWaitMs = 20000, onTimeout = null) {
+  const startedAt = Date.now();
+  const poll = () => {
+    if (Date.now() - startedAt >= maxWaitMs) {
+      const msg = '⚠️ 서버 재시작이 지연되고 있습니다. 실행 아이콘을 한 번 더 눌러주세요.';
+      showAppToast(msg);
+      appendUiLog(msg);
+      if (typeof onTimeout === 'function') onTimeout();
+      return;
+    }
+    fetch(`/api/release_info?t=${Date.now()}`, { cache: 'no-store' })
+      .then(r => {
+        if (r && r.ok) {
+          showAppToast('✅ 최신 버전 서버가 준비되었습니다! 화면을 새로고침합니다...');
+          setTimeout(() => window.location.reload(), 200);
+          return;
+        }
+        setTimeout(poll, 1000);
+      })
+      .catch(() => {
+        setTimeout(poll, 1000);
+      });
+  };
+  setTimeout(poll, 1200);
+}
+
 function runOneClickUpdate() {
   const rv = latestUpdateCheck && latestUpdateCheck.remote_version ? `v${latestUpdateCheck.remote_version}` : '최신 버전';
   const ok = confirm(
@@ -4474,6 +4500,7 @@ function runOneClickUpdate() {
 
   const btn = document.getElementById('btnApplyUpdate');
   const prevText = btn ? btn.innerText : '';
+  let restarting = false;
   if (btn) {
     btn.disabled = true;
     btn.innerText = '⏳ 업데이트 다운로드·검증 중...';
@@ -4482,10 +4509,27 @@ function runOneClickUpdate() {
   .then(r => r.json())
   .then(d => {
     if (d && d.ok) {
-      const banner = document.getElementById('updateAvailableBanner');
-      if (banner) banner.style.display = 'none';
-      loadReleaseInfo();
-      alert(`✅ ${d.msg || '업데이트 완료! 프로그램을 다시 실행해 주세요.'}`);
+      if (d.auto_restart) {
+        restarting = true;
+        if (btn) {
+          btn.disabled = true;
+          btn.innerText = '🔄 서버 자동 재시작 중...';
+        }
+        const noticeMsg = '✅ 업데이트 완료! 서버를 자동으로 재시작하고 화면을 새로고침합니다...';
+        showAppToast(noticeMsg);
+        appendUiLog(noticeMsg);
+        waitForServerRestartAndReload(20000, () => {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerText = prevText || '🚀 원클릭 업데이트';
+          }
+        });
+      } else {
+        const banner = document.getElementById('updateAvailableBanner');
+        if (banner) banner.style.display = 'none';
+        loadReleaseInfo();
+        alert(`✅ ${d.msg || '업데이트 완료! 프로그램을 다시 실행해 주세요.'}`);
+      }
     } else {
       alert(`⚠️ ${(d && d.msg) || '업데이트에 실패했습니다. 기존 버전은 안전하게 유지됩니다.'}`);
     }
@@ -4494,7 +4538,7 @@ function runOneClickUpdate() {
     alert('⚠️ 업데이트 요청 중 통신 오류가 발생했습니다. 기존 버전은 안전하게 유지됩니다.');
   })
   .finally(() => {
-    if (btn) {
+    if (!restarting && btn) {
       btn.disabled = false;
       btn.innerText = prevText || '🚀 원클릭 업데이트';
     }

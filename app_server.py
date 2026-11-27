@@ -6040,10 +6040,13 @@ class AppHandler(BaseHTTPRequestHandler):
             log('🚀 [원클릭 업데이트] GitHub 최신 버전 다운로드 및 안전 검증을 시작합니다...')
             res = apply_public_update(report=lambda pct, msg: log(f'🔄 [업데이트 {pct}%] {msg}'))
             if res.get('ok'):
-                log(f"✅ [업데이트 완료] {res.get('msg')}")
+                res['auto_restart'] = True
+                log(f"✅ [업데이트 완료] {res.get('msg')} (잠시 후 서버를 자동 재시작합니다...)")
+                self.send_json(res)
+                _schedule_server_restart(server_ref=self.server, delay_sec=0.6)
             else:
                 log(f"⚠️ [업데이트 실패] {res.get('msg')}")
-            self.send_json(res)
+                self.send_json(res)
         elif self.path == '/api/history/save':
             try:
                 with STATE_LOCK:
@@ -6259,8 +6262,73 @@ class AppHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404, 'Not Found')
 
+ACTIVE_HTTP_SERVER = None
+
+
+def _schedule_server_restart(server_ref=None, delay_sec=0.6):
+    """원클릭 업데이트 완료 응답을 브라우저에 먼저 전송한 뒤,
+    기존 포트(8765)를 안전 해제하고 새 파이썬 서버 프로세스를 독립 실행한 뒤 현재 프로세스를 종료."""
+    srv = server_ref or ACTIVE_HTTP_SERVER
+
+    def _do_restart():
+        try:
+            time.sleep(max(0.2, float(delay_sec)))
+            log('🔄 [자동 재시작] 기존 서버 포트를 해제하고 최신 버전 서버를 시작합니다...')
+            if srv is not None:
+                try:
+                    srv.shutdown()
+                except Exception:
+                    pass
+                try:
+                    srv.server_close()
+                except Exception:
+                    pass
+
+            py_exe = sys.executable
+            script_path = os.path.abspath(__file__)
+            popen_kwargs = {
+                'cwd': BASE_DIR,
+                'close_fds': True,
+                'stdin': subprocess.DEVNULL,
+            }
+            if sys.platform == 'win32':
+                popen_kwargs['creationflags'] = (
+                    getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+                    | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+                    | getattr(subprocess, 'DETACHED_PROCESS', 0)
+                )
+                popen_kwargs['stdout'] = subprocess.DEVNULL
+                popen_kwargs['stderr'] = subprocess.DEVNULL
+            else:
+                popen_kwargs['start_new_session'] = True
+
+            subprocess.Popen([py_exe, script_path], **popen_kwargs)
+        except Exception as e:
+            try:
+                log(f'⚠️ [자동 재시작 오류] {e}')
+            except Exception:
+                pass
+        finally:
+            os._exit(0)
+
+    threading.Thread(target=_do_restart, daemon=True).start()
+
+
 class ReusableServer(ThreadingHTTPServer): allow_reuse_address = True
 if __name__ == '__main__':
     clean_and_unify_blackbox_files(clear_thumbs=True)
+    srv = None
+    last_bind_err = None
+    for attempt in range(5):
+        try:
+            srv = ReusableServer(('127.0.0.1', 8765), AppHandler)
+            break
+        except OSError as bind_err:
+            last_bind_err = bind_err
+            if attempt < 4:
+                time.sleep(0.5)
+    if srv is None:
+        raise last_bind_err or RuntimeError('127.0.0.1:8765 포트 바인딩에 실패했습니다.')
+    ACTIVE_HTTP_SERVER = srv
     print('🚀 서버 시작 (실시간 세부 로그 & 강제 중지 기능 탑재): http://127.0.0.1:8765', flush=True)
-    ReusableServer(('127.0.0.1', 8765), AppHandler).serve_forever()
+    srv.serve_forever()
