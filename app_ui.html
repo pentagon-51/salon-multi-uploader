@@ -2495,7 +2495,7 @@ const PLATFORM_SETUP_GUIDES = {
   fb: {
     name: '페이스북(개인)',
     steps: [
-      '하단 [바로 이동하기 ↗] 버튼으로 페이스북에 접속해 릴스를 게시할 계정으로 로그인합니다.',
+      '하단 [바로 이동하기 ↗] 버튼으로 페이스북에 접속해 릴스를 게시할 계정으로 로그인하고, 페이스북 메인 피드 화면을 확인한 뒤 창을 닫아 주세요.',
       '프로필 설정에서 릴스 기본 공개 범위가 [전체 공개]로 되어 있는지 확인하고, <b>[프로필 → 정보 → 연락처 및 기본 정보 → 웹사이트 추가]</b>(또는 프로필 편집 링크 칸)에 인포크링크를 1회 등록합니다.',
       '페이스북 개인·매장 페이지는 동일한 페이스북 계정 쿠키를 공유하므로 한 번만 로그인하면 둘 다 연동됩니다.'
     ],
@@ -2939,7 +2939,8 @@ function loginSinglePlatform(key) {
     if (!d.ok) alert(d.msg);
     else {
       const naverTip = (key === 'naver' || key === 'clip') ? " (네이버 로그인 시 반드시 '로그인 상태 유지' 체크!)" : '';
-      showAppToast(`🔐 [${label}] 단독 로그인 창을 열었습니다. 로그인 후 창을 닫으면 신호등이 즉시 갱신됩니다.${naverTip}`);
+      const fbTip = (key === 'fb' || key === 'fb_page') ? ' (페이스북 메인 피드 화면을 확인한 뒤 창을 닫아 주세요!)' : '';
+      showAppToast(`🔐 [${label}] 단독 로그인 창을 열었습니다. 로그인 후 창을 닫으면 신호등이 즉시 갱신됩니다.${naverTip}${fbTip}`);
     }
   });
 }
@@ -2975,7 +2976,8 @@ function loginMissingPlatforms() {
     if (!d.ok) alert(d.msg);
     else {
       const naverTip = (flags.use_naver || flags.use_clip) ? " · 네이버 로그인 시 반드시 '로그인 상태 유지' 체크!" : '';
-      showAppToast(`🔐 전용 크롬 1창에 선택한 미로그인 SNS 탭만 순서대로 띄웁니다. 로그인 후 창 X로 닫아주세요!${naverTip}`);
+      const fbTip = (flags.use_fb || flags.use_fb_page) ? ' · 페이스북은 메인 피드 화면을 확인한 뒤 창을 닫아 주세요!' : '';
+      showAppToast(`🔐 전용 크롬 1창에 선택한 미로그인 SNS 탭만 순서대로 띄웁니다. 로그인 후 창 X로 닫아주세요!${naverTip}${fbTip}`);
     }
   });
 }
@@ -3770,6 +3772,9 @@ function transformData(btn) {
     const previewSec = document.getElementById('previewSection');
     if (previewSec) previewSec.style.display = 'block';
     syncPreviewCardsVisibility();
+    if (d.used_sample_text || d.used_demo_profile) {
+      showAppToast('💡 테스트용 샘플 원고·예시 정보로 미리보기를 생성했습니다. (실제 발행 전 2단계에서 내 매장 정보를 입력해 주세요)');
+    }
   })
   .catch(err => {
     console.error('transformData error:', err);
@@ -3857,7 +3862,7 @@ function startAuthCheck() {
 
 function startUpload(overrideTargets = null, opts = {}) {
   const testMode = Boolean(opts && opts.testMode);
-  if (!isProfileConfigured) {
+  if (!testMode && !isProfileConfigured) {
     if (confirm('⚠️ 아직 매장 기본 정보가 설정되지 않았습니다.\n초기 설정 마법사에서 매장명과 기본 정보를 먼저 입력하시겠습니까?')) {
       openSetupGuide(1);
     }

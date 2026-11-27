@@ -384,6 +384,38 @@ def sync_cookies_from_persistent_context(context, verified_platforms=None, check
     if not isinstance(all_cookies, list):
         return []
 
+    # 페이스북이 accountscenter.facebook.com 등 메타 하위 도메인에 머무르더라도
+    # facebook.com 도메인 계열 핵심 쿠키(c_user, xs)가 누락되지 않도록 URL 지정 조회를 병합
+    try:
+        fb_extra = context.cookies([
+            "https://www.facebook.com/",
+            "https://business.facebook.com/",
+            "https://accountscenter.facebook.com/",
+        ]) or []
+        if fb_extra:
+            seen_keys = {
+                (
+                    (c.get("name") or "").strip().lower(),
+                    (c.get("domain") or "").lstrip(".").lower(),
+                    (c.get("path") or "/").strip(),
+                )
+                for c in all_cookies
+                if isinstance(c, dict)
+            }
+            for c in fb_extra:
+                if not isinstance(c, dict):
+                    continue
+                ck = (
+                    (c.get("name") or "").strip().lower(),
+                    (c.get("domain") or "").lstrip(".").lower(),
+                    (c.get("path") or "/").strip(),
+                )
+                if ck not in seen_keys:
+                    seen_keys.add(ck)
+                    all_cookies.append(c)
+    except Exception:
+        pass
+
     verified_set = set(verified_platforms or ())
     checked_set = set(checked_filenames or ())
     synced = []
@@ -456,6 +488,31 @@ def _sanitize_cookie_for_playwright(c):
     if same_site in ("Strict", "Lax", "None"):
         item["sameSite"] = same_site
     return item
+
+
+def has_valid_facebook_auth_cookies(context, live_cookies=None):
+    """영구 크롬 프로필 컨텍스트 전체에서 facebook.com 도메인 계열 핵심 인증 쿠키(c_user, xs)가
+    유효하게 존재하는지 확인 (accountscenter.facebook.com 등 메타 하위 도메인 체류 시에도 누락 방지)."""
+    if context is None and live_cookies is None:
+        return False
+    cookies = list(live_cookies) if live_cookies is not None else []
+    if context is not None and not cookies:
+        try:
+            cookies = list(context.cookies() or [])
+        except Exception:
+            cookies = []
+        try:
+            fb_extra = context.cookies([
+                "https://www.facebook.com/",
+                "https://business.facebook.com/",
+                "https://accountscenter.facebook.com/",
+            ]) or []
+            if fb_extra:
+                cookies.extend(fb_extra)
+        except Exception:
+            pass
+    matched = [c for c in cookies if isinstance(c, dict) and _domain_matches(c.get("domain"), ("facebook.com",))]
+    return _has_logged_in_session_cookie("facebook_cookies.json", matched, {"c_user", "xs"})
 
 
 def has_valid_naver_auth_cookies(context, live_cookies=None):
@@ -1553,6 +1610,10 @@ def release_held_playwright_sessions(kill_chrome_fn=None):
                     pass
         except Exception:
             pass
+
+    # 3) Windows 환경에서는 직전 크롬 종료 후 영구 프로필 파일 잠금 해제가 지연될 수 있어 1.8초 안전 대기
+    if sys.platform == "win32" and (had_held or callable(kill_chrome_fn)):
+        time.sleep(1.8)
 
     cleanup_chrome_profile_locks()
     return had_held

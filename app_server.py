@@ -59,6 +59,7 @@ from os_utils import (
     open_playwright_session,
     finalize_playwright_session,
     create_blackbox_record_dir,
+    has_valid_facebook_auth_cookies,
 )
 
 BASE_DIR = get_base_dir()
@@ -3300,6 +3301,155 @@ def _parse_titles_block(titles_block):
     return parsed
 
 
+DEMO_FALLBACK_PROFILE = {
+    'salon_name': '플랜에이치 마곡나루점',
+    'region_keyword': '마곡나루미용실, 마곡미용실, 발산역미용실',
+    'designer_name': '카일 원장',
+    'specialty': '남자 다운펌·드롭컷·열펌 / 집에서 손질 편한 머리를 추구합니다',
+    'salon_address': '서울 강서구 마곡센트럴타워2 310, 311호',
+    'location_guide': '마곡나루역 1번출구',
+    'parking_guide': '건물 지하주차장 매장이용시간 지원',
+}
+
+
+def _build_effective_demo_profile(prof=None):
+    """미설정 프로필 필드를 메모리에서만 DEMO_FALLBACK_PROFILE로 임시 병합 (user_profile.json 미저장)."""
+    base = dict(prof) if isinstance(prof, dict) else dict(load_profile() or {})
+    used_demo = False
+    for k, demo_val in DEMO_FALLBACK_PROFILE.items():
+        if not str(base.get(k) or '').strip():
+            base[k] = demo_val
+            used_demo = True
+    return base, used_demo
+
+
+def build_demo_sample_master_text(profile=None):
+    """온보딩 2단계 예시(또는 현재 프로필)를 반영한 풍성한 시술 마스터 샘플 원고 조립."""
+    eff_prof, _ = _build_effective_demo_profile(profile)
+    salon_name = str(eff_prof.get('salon_name') or DEMO_FALLBACK_PROFILE['salon_name']).strip()
+    designer_name = str(eff_prof.get('designer_name') or DEMO_FALLBACK_PROFILE['designer_name']).strip()
+    specialty = str(eff_prof.get('specialty') or DEMO_FALLBACK_PROFILE['specialty']).strip()
+    raw_regions = [
+        r.strip().lstrip('#')
+        for r in re.split(r'[,\n]+', str(eff_prof.get('region_keyword') or DEMO_FALLBACK_PROFILE['region_keyword']))
+        if r.strip().lstrip('#')
+    ]
+    if not raw_regions:
+        raw_regions = ['마곡나루미용실', '마곡미용실', '발산역미용실']
+
+    primary_region_tag = raw_regions[0]
+    region_base = re.sub(r'(미용실|헤어샵|헤어살롱|헤어)$', '', primary_region_tag).strip() or '마곡나루'
+    region_hash_list = []
+    for r in raw_regions[:3]:
+        clean_r = re.sub(r'\s+', '', r)
+        if clean_r and clean_r not in region_hash_list:
+            region_hash_list.append(clean_r)
+
+    main_tags = region_hash_list + [
+        '남자드롭컷', '전체다운펌', '남자짧은머리', '옆머리다운펌',
+        '반곱슬남자머리', '손질편한머리', '남자머리추천', '남자헤어스타일',
+        '다운펌잘하는곳',
+    ]
+    seen_main = set()
+    dedup_main_tags = []
+    for t in main_tags:
+        tl = t.lower()
+        if tl not in seen_main:
+            seen_main.add(tl)
+            dedup_main_tags.append(f'#{t}')
+
+    sub_tags = ['뜨는옆머리', '구레나룻다운펌', '남자직모머리', '직장인남자머리', '남자드라이팁']
+    dedup_sub_tags = [f'#{t}' for t in sub_tags if t.lower() not in seen_main][:5]
+
+    file_region = re.sub(r'\s+', '', primary_region_tag) or '마곡나루미용실'
+    specialty_note = ''
+    if '/' in specialty:
+        specialty_note = specialty.split('/', 1)[1].strip()
+    if not specialty_note:
+        specialty_note = '집에서 손질 편한 머리를 추구합니다'
+
+    intro_greeting = f"안녕하세요. {region_base} 미용실 {salon_name} {designer_name}입니다."
+    short_signature = f"{salon_name} {designer_name}"
+
+    return f"""[파일제목]
+{file_region}_남자_드롭컷_전체다운펌_반곱슬_손질편한_짧은머리
+
+[제목3종]
+1. 숱 많고 뜨는 반곱슬 옆머리, 드롭컷 + 전체 다운펌으로 10초 완성
+2. 아침마다 부스스하게 뜨는 남자 짧은 머리, 전체 다운펌으로 깔끔하게 정리
+3. {region_base} 미용실 남자 드롭컷 전체 다운펌 자연스러운 볼륨과 슬림한 라인
+
+[해시태그]
+{' '.join(dedup_main_tags)}
+
+[숏폼 전용 본문]
+숱이 많고 반곱슬이라 조금만 길어도 옆머리가 붕 뜨고
+아침마다 눌러주느라 스트레스받던 모발입니다.
+
+얼굴형에 맞춰 앞머리 기장을 정돈한 드롭컷으로 가벼운 결감을 살리고,
+강하게 뜨는 옆머리와 구레나룻·뒷머리 아래쪽은 두상에 맞게 전체 다운펌으로 차분하게 밀착시켰습니다.
+
+시술 후에는 샴푸하고 타월 드라이한 뒤
+앞쪽 방향으로 10초만 툭툭 털어 말려 주시면 별다른 세팅 없이도 깔끔한 실루엣이 유지됩니다.
+
+{specialty_note}.
+편한 손질과 단정한 인상을 원하신다면 {short_signature}에게 상담해 주세요.
+
+[블로그 전용 본문]
+{intro_greeting}
+{specialty_note}. 오늘은 숱이 많고 반곱슬 기질이 있어 옆머리가 금방 부해지던 고객님의 **드롭컷과 전체 다운펌 시술 과정**을 정리해 드리겠습니다.
+
+**오늘의 시술 요약**
+시술명 : 남자 드롭컷 + 전체 다운펌
+모발 상태 : 숱이 많고 옆·뒷머리가 강하게 뜨는 반곱슬 모발
+추천 대상 : 아침 10초 드라이만으로 깔끔한 짧은 머리를 유지하고 싶은 분
+
+[미디어 자료1]
+
+모발 상태와 두상 고민 진단
+
+시술 전 상담에서 가장 크게 말씀해 주신 고민은 머리가 조금만 자라도 관자놀이와 옆머리가 바깥으로 뻗쳐 얼굴형이 넓어 보인다는 점이었습니다.
+반곱슬 특유의 부스스함과 많은 머리숱이 겹치면서 윗머리 볼륨과 옆머리 라인의 경계가 무너져 보이기 쉬운 상태였습니다.
+무조건 짧게 밀어 올리기보다 두상 굴곡에 맞춰 옆선은 슬림하게 눌러 주고 윗머리의 자연스러운 입체감은 살리는 방향으로 디자인을 잡았습니다.
+
+[미디어 자료2]
+
+얼굴형 맞춘 드롭컷 라인 설계
+
+앞머리는 이마를 과하게 가리지 않으면서도 부드러운 인상을 주는 눈썹 위 기장으로 설정했습니다.
+드롭컷의 핵심은 앞쪽 중앙으로 자연스럽게 모이는 흐름과 가벼운 질감 처리이기 때문에, 숱이 뭉치기 쉬운 구역을 꼼꼼하게 덜어내어 말리기만 해도 결이 살아나도록 커트했습니다.
+구레나룻과 귀 뒤 라인은 깔끔하게 정돈해 정면은 물론 옆모습까지 단정하게 연결했습니다.
+
+[미디어 자료3]
+
+모질에 맞춘 전체 다운펌 과정
+
+옆머리와 뒷머리 하단처럼 뻗치는 힘이 강한 구간은 모발 굵기와 자라는 방향을 확인해 약제를 세밀하게 도포했습니다.
+과하게 눌려 두상에 납작하게 붙어 보이지 않도록 관자놀이와 뒤통수 볼륨 포인트는 자연스럽게 연결해 입체감을 유지했습니다.
+반곱슬로 부해지기 쉬운 부분의 결을 함께 정돈해 시간이 지나 머리가 자라도 지저분하게 뜨지 않도록 마무리했습니다.
+
+[미디어 자료4]
+
+아침 10초 털어 말리는 손질법
+
+집에서 손질하실 때는 샴푸 후 수건으로 물기를 충분히 털어낸 뒤 드라이기 바람을 위에서 앞쪽 방향으로 보내 10초 정도 가볍게 털어 말려 주시면 됩니다.
+옆머리는 바람을 살짝 쐰 뒤 손바닥으로 2~3초 눌러 열을 식혀 주시면 하루 종일 슬림한 라인이 안정적으로 유지됩니다.
+매트 왁스나 가벼운 에센스를 소량만 손끝에 덜어 앞머리 결감만 살짝 잡아 주셔도 깔끔한 스타일이 완성됩니다.
+
+[미디어 자료5]
+
+숱이 많거나 반곱슬 때문에 짧은 머리를 망설이셨다면 두상과 모질에 맞춘 드롭컷과 전체 다운펌 조합이 좋은 해답이 될 수 있습니다.
+{salon_name} {designer_name}이 고객님 한 분 한 분의 모발 방향과 손질 습관에 맞춰 집에서도 가장 편하게 유지할 수 있는 스타일을 제안해 드리겠습니다.
+
+[대댓글 유도용 텍스트]
+평소 옆머리가 금방 뜨거나 반곱슬 때문에 아침 손질이 번거로우셨나요?
+현재 기장이나 모발 고민을 댓글로 남겨주시면 어울리는 드롭컷 기장과 다운펌 방향을 편하게 안내해 드릴게요!
+{' '.join(dedup_sub_tags)}"""
+
+
+DEMO_SAMPLE_MASTER_TEXT = build_demo_sample_master_text(DEMO_FALLBACK_PROFILE)
+
+
 def convert_master_content(data_text, video_name='', profile_override=None):
     """순수 파이썬 메인 원고 변환 엔진 (API 키 불필요 · 8개 플랫폼 파싱·규격 분배 전용)"""
     nl = chr(10)
@@ -3712,6 +3862,8 @@ def worker_auth_check(payload):
         seen_non_login_page = set()
         fb_logged_in_any = False
         fb_seen_any = False
+        fb_explicit_login_seen = False
+        fb_has_auth_cookies = has_valid_facebook_auth_cookies(ctx)
         for pg in pages:
             try:
                 if pg.is_closed():
@@ -3721,7 +3873,12 @@ def worker_auth_check(payload):
                     continue
                 if 'facebook.com' in cur_u:
                     fb_seen_any = True
-                    if is_facebook_logged_in(pg):
+                    is_explicit_fb_login = any(
+                        mk in cur_u for mk in ('facebook.com/login', 'login.php', 'checkpoint', '/recover', 'two_step_verification')
+                    )
+                    if is_explicit_fb_login:
+                        fb_explicit_login_seen = True
+                    elif is_facebook_logged_in(pg) or fb_has_auth_cookies:
                         fb_logged_in_any = True
                     continue
                 for cfile, login_markers, dom_markers in LOGIN_PAGE_REDIRECT_RULES:
@@ -3736,13 +3893,16 @@ def worker_auth_check(payload):
                                     log(f'🔗 [프로필 자동 연동] 인스타그램 아이디(@{new_ig})를 자동 추출해 바로가기에 연결했습니다.')
             except Exception:
                 pass
-        if fb_seen_any:
+        if fb_has_auth_cookies and not fb_explicit_login_seen:
+            fb_logged_in_any = True
+        if fb_seen_any or fb_logged_in_any:
             if fb_logged_in_any:
                 verified_platforms.add('facebook_cookies.json')
                 seen_non_login_page.add('facebook_cookies.json')
             else:
                 verified_platforms.discard('facebook_cookies.json')
-                seen_login_page.add('facebook_cookies.json')
+                if fb_explicit_login_seen:
+                    seen_login_page.add('facebook_cookies.json')
         active_login_page_cfiles.clear()
         for cf in seen_login_page:
             if cf not in seen_non_login_page:
@@ -3899,7 +4059,10 @@ def worker_auth_check(payload):
                 log('🔑 [통합 로그인] 열린 브라우저 창에서 로그인을 완료한 뒤 창 [X]로 닫아주세요. 닫는 즉시 로그인 상태를 정밀 확인합니다!')
                 if any(k in ('naver', 'clip') for k, _, _, _ in requested_items):
                     log("💡 [네이버 로그인 안내] 네이버 로그인 시 반드시 '로그인 상태 유지'를 체크해 주세요!")
+                if any(k in ('fb', 'fb_page') for k, _, _, _ in requested_items):
+                    log("💡 [페이스북 로그인 안내] 로그인 완료 후 페이스북 메인 피드 화면(facebook.com)을 확인한 뒤 창을 닫아 주세요!")
 
+            fb_ac_hint_logged = False
             last_sync_ts = 0.0
             while not context_closed[0] and not all_tabs_closed[0]:
                 if _is_stop_requested(my_run_id):
@@ -3917,6 +4080,11 @@ def worker_auth_check(payload):
                     try:
                         _capture_open_tabs_diag(context)
                         _sync_and_enforce_checked(context)
+                        if (not fb_ac_hint_logged) and ('facebook_cookies.json' in checked_cookie_files):
+                            if any('accountscenter.facebook.com' in ((pg.url or '').lower()) for pg in open_pages):
+                                if not has_valid_facebook_auth_cookies(context):
+                                    fb_ac_hint_logged = True
+                                    log("💡 [페이스북 로그인 안내] 현재 계정 센터(accountscenter.facebook.com) 화면에 머물러 있습니다. 페이스북 메인 피드(facebook.com) 화면을 확인한 뒤 창을 닫아 주세요!")
                     except Exception:
                         pass
                     last_sync_ts = now_ts
@@ -4187,6 +4355,8 @@ def worker_publish(payload):
         else:
             log('⚠️ [테스트 모드] 1초 테스트용 샘플 영상 자동 생성에 실패했습니다. (FFmpeg/imageio-ffmpeg 설치 확인 필요)')
     default_place = get_place_search_keyword(prof)
+    if test_mode and not default_place:
+        default_place = DEMO_FALLBACK_PROFILE['salon_name']
     mode_label = '테스트 모드' if test_mode else '실업로드'
 
     def _resolve_valid_cover_image(*candidates):
@@ -6178,7 +6348,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 thumbs = extract_10_thumbnails(vp, count=6) if (vp and os.path.exists(vp)) else []
                 v_meta = probe_video_metadata(vp) if (vp and os.path.exists(vp)) else None
                 prev_info = ensure_browser_preview_video(vp) if (vp and os.path.exists(vp)) else {}
-                converted = convert_master_content(req.get('data_text', ''), vn)
+                raw_data_text = str(req.get('data_text') or '')
+                used_sample_text = not bool(raw_data_text.strip())
+                effective_prof, used_demo_profile = _build_effective_demo_profile()
+                effective_text = build_demo_sample_master_text(effective_prof) if used_sample_text else raw_data_text
+                converted = convert_master_content(effective_text, vn, profile_override=effective_prof)
                 self.send_json({
                     'ok': True,
                     'data': converted,
@@ -6186,6 +6360,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     'video_meta': v_meta,
                     'preview_url': prev_info.get('preview_url', ''),
                     'preview_transcoded': bool(prev_info.get('transcoded', False)),
+                    'used_sample_text': used_sample_text,
+                    'used_demo_profile': used_demo_profile,
                 })
             except Exception as e:
                 log(f'⚠️ [미리보기 변환 오류] {e}')
@@ -6218,7 +6394,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 'msg': '브라우저에서 구글 계정 인증 창을 열었습니다. 로그인 후 권한을 허용해 주세요.',
             })
         elif self.path in ('/api/publish', '/api/upload'):
-            if not is_profile_ready(load_profile()):
+            is_test = bool(req.get('test_mode', False))
+            if (not is_test) and (not is_profile_ready(load_profile())):
                 return self.send_json({
                     'ok': False,
                     'need_onboarding': True,
@@ -6228,7 +6405,6 @@ class AppHandler(BaseHTTPRequestHandler):
                 is_busy = STATE['busy']
                 state_vn = STATE['video_name']
             if is_busy: return self.send_json({'ok': False, 'msg': BUSY_TASK_MSG})
-            is_test = bool(req.get('test_mode', False))
             save_history_flag = (not is_test) and bool(req.get('save_history', False))
             resolved_history_id = str(req.get('history_id') or '').strip() if (not is_test) else ''
             rec = None

@@ -1177,19 +1177,82 @@ def upload_to_naver_blog(title, body="", tags=None, video_path=None, category=No
             print("✅ [네이버 블로그] 로그인 점검 및 쿠키 저장 완료!", flush=True)
             return True
 
+        def _dismiss_blog_editor_popups(pg, ed):
+            """네이버 블로그 스마트에디터 진입 시 뜨는 임시저장 복구('작성 중인 글이 있습니다') 및 도움말·안내 팝업 안전 닫기"""
+            popup_cancel_sels = [
+                ".se-popup-button-cancel",
+                ".se-popup-alert-confirm .se-popup-button-cancel",
+                ".se-popup-alert .se-popup-button-cancel",
+                ".se-popup-close-button",
+                ".se-help-panel-close-button",
+            ]
+            for sel in popup_cancel_sels:
+                try:
+                    loc = find_in_both(pg, ed, sel)
+                    if loc.count() > 0 and loc.first.is_visible(timeout=400):
+                        loc.first.click(timeout=2500)
+                        time.sleep(0.4)
+                except Exception:
+                    pass
+            # '작성 중인 글이 있습니다' / 임시저장 불러오기 알림 팝업 텍스트 기반 취소 폴백
+            try:
+                alert_box = find_in_both(pg, ed, ".se-popup-alert, .se-popup-container")
+                if alert_box.count() > 0 and alert_box.first.is_visible(timeout=300):
+                    txt = (alert_box.first.inner_text(timeout=500) or "")
+                    if ("작성 중인 글" in txt) or ("임시저장" in txt):
+                        cancel_btn = find_in_both(pg, ed, '.se-popup-alert button:has-text("취소"), .se-popup-container button:has-text("취소")')
+                        if cancel_btn.count() > 0 and cancel_btn.first.is_visible(timeout=300):
+                            cancel_btn.first.click(timeout=2500)
+                            time.sleep(0.5)
+            except Exception:
+                pass
+
         editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+        title_clicked = False
+        last_title_err = None
+        for attempt in (1, 2):
+            editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+            _dismiss_blog_editor_popups(page, editor)
 
-        cb = find_in_both(page, editor, ".se-popup-button-cancel")
-        if cb.count() > 0:
-            cb.first.click()
-            time.sleep(1)
-        hc = find_in_both(page, editor, ".se-help-panel-close-button")
-        if hc.count() > 0:
-            hc.first.click()
-            time.sleep(0.5)
+            wait_limit = 15.0 if attempt == 1 else 22.0
+            deadline = time.time() + wait_limit
+            ta = None
+            while time.time() < deadline:
+                if callable(stop_checker) and stop_checker():
+                    raise RuntimeError("사용자 강제 중지 요청")
+                editor = page.frame_locator("#mainFrame") if page.locator("#mainFrame").count() > 0 else page
+                _dismiss_blog_editor_popups(page, editor)
+                cand = find_in_both(page, editor, ".se-title-text")
+                try:
+                    if cand.count() > 0 and cand.first.is_visible(timeout=500):
+                        ta = cand
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.6)
 
-        ta = find_in_both(page, editor, ".se-title-text")
-        ta.first.click()
+            if ta is not None:
+                try:
+                    _dismiss_blog_editor_popups(page, editor)
+                    ta.first.click(timeout=10000)
+                    title_clicked = True
+                    break
+                except Exception as click_err:
+                    last_title_err = click_err
+            else:
+                last_title_err = TimeoutError(f"네이버 블로그 제목 입력칸(.se-title-text) 대기 타임아웃 ({int(wait_limit)}초)")
+
+            if attempt == 1:
+                print("⚠️ [네이버 블로그] 제목 입력칸(.se-title-text) 로딩 지연 — 글쓰기 페이지를 1회 새로고침 후 재시도합니다...", flush=True)
+                try:
+                    page.reload(wait_until="domcontentloaded", timeout=45000)
+                except Exception:
+                    page.goto("https://blog.naver.com/GoBlogWrite.naver", wait_until="domcontentloaded", timeout=45000)
+                time.sleep(3.0)
+
+        if not title_clicked:
+            raise last_title_err or TimeoutError("네이버 블로그 제목 입력칸(.se-title-text)을 찾지 못했습니다.")
+
         time.sleep(0.3)
         copy_to_clipboard(final_title)
         page.keyboard.press(f"{MOD_KEY}+v")
