@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>미용실 멀티업로더 — 8개 SNS 원클릭 동시 업로드 무료 프로그램</title>
+  <meta name="description" content="유튜브 쇼츠·네이버 블로그·네이버 클립·인스타그램·틱톡·페이스북·핀터레스트까지 한 번에! 미용실 원장님을 위한 100% 무료 자동 업로드 프로그램 (Mac / Windows)" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="미용실 멀티업로더 (@hair_auto_lab)" />
+  <meta property="og:title" content="미용실 멀티업로더 — 8개 SNS 원클릭 동시 업로드 무료 프로그램" />
+  <meta property="og:description" content="시술 영상 하나로 유튜브 쇼츠·네이버 블로그·클립·인스타·틱톡·페이스북·핀터레스트까지 원클릭 동시 발행. Mac / Windows 100% 무료 다운로드." />
+  <meta property="og:url" content="https://pentagon-51.github.io/salon-multi-uploader/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="미용실 멀티업로더 — 8개 SNS 원클릭 동시 업로드" />
+  <meta name="twitter:description" content="미용실 원장님을 위한 100% 무료 SNS 멀티업로더 (Mac / Windows)" />
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --text: #0f172a;
+      --muted: #475569;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --dark: #0f172a;
+      --dark-hover: #1e293b;
+      --soft-blue: #eff6ff;
+      --soft-green: #f0fdf4;
+      --green-text: #166534;
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 28px 18px 64px;
+    }
+    .hero {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 40px 26px 34px;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
+    }
+    .badge-row {
+      display: inline-flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      color: var(--primary);
+    }
+    .badge.version {
+      background: #f1f5f9;
+      color: #334155;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: clamp(26px, 5vw, 38px);
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      margin: 0 auto 26px;
+      max-width: 580px;
+      font-size: 15.5px;
+      color: var(--muted);
+    }
+    .dl-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      max-width: 540px;
+      margin: 0 auto 14px;
+    }
+    .dl-btn {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 16px 18px;
+      border-radius: 14px;
+      text-decoration: none;
+      font-weight: 800;
+      font-size: 16px;
+      transition: transform 0.12s ease, background 0.15s ease, box-shadow 0.15s ease;
+    }
+    .dl-btn:hover { transform: translateY(-1px); }
+    .dl-btn small {
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.88;
+    }
+    .dl-mac {
+      background: var(--dark);
+      color: #ffffff;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+    }
+    .dl-mac:hover { background: var(--dark-hover); }
+    .dl-win {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.24);
+    }
+    .dl-win:hover { background: var(--primary-hover); }
+    .release-meta {
+      font-size: 12.5px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+    .release-meta a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .release-meta a:hover { text-decoration: underline; }
+
+    .section {
+      margin-top: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 26px 24px;
+    }
+    .section h2 {
+      margin: 0 0 14px;
+      font-size: 19px;
+      letter-spacing: -0.01em;
+    }
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .plat-item {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 10px;
+      text-align: center;
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+    .plat-item span {
+      display: block;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #64748b;
+      margin-top: 3px;
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .step-card {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+    .step-card h3 {
+      margin: 0 0 6px;
+      font-size: 15px;
+    }
+    .step-card p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .code-tag {
+      display: inline-block;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 4px;
+    }
+    .privacy-box {
+      margin-top: 22px;
+      background: var(--soft-green);
+      border: 1px solid #bbf7d0;
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      color: var(--green-text);
+      font-size: 13.5px;
+    }
+    .privacy-box strong {
+      display: block;
+      font-size: 14.5px;
+      margin-bottom: 4px;
+    }
+    .community {
+      margin-top: 22px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+    .community p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .community strong { color: var(--text); }
+    .link-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .ext-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 15px;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      color: var(--text);
+      background: #fff;
+    }
+    .ext-btn:hover { background: #f1f5f9; }
+    .ext-btn.ig {
+      background: #0f172a;
+      color: #fff;
+      border-color: #0f172a;
+    }
+    .ext-btn.ig:hover { background: #1e293b; }
+    footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    @media (max-width: 680px) {
+      .hero { padding: 30px 18px 26px; }
+      .dl-grid { grid-template-columns: 1fr; }
+      .platform-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .steps { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="badge-row">
+        <span class="badge">✨ 100% 무료 공개 프로젝트 · API 키 불필요</span>
+        <span class="badge version" id="versionBadge">최신 버전 확인 중...</span>
+      </div>
+      <h1>미용실 멀티업로더</h1>
+      <p class="subtitle">
+        시술 영상 하나와 원고 한 번으로 <strong>8개 SNS 채널에 원클릭 동시 업로드</strong>하세요.<br />
+        복잡한 깃허브 화면 없이 아래 버튼으로 바로 내려받을 수 있습니다.
+      </p>
+
+      <div class="dl-grid">
+        <a id="btnMac" class="dl-btn dl-mac" href="https://github.com/pentagon-51/salon-multi-uploader/releases/latest" target="_blank" rel="noopener noreferrer">
+          <span>🍎 맥(Mac) 다운로드</span>
+          <small id="macSub">macOS용 최신 배포판 받기</small>
+        </a>
+        <a id="btnWin" class="dl-btn dl-win" href="https://github.com/pentagon-51/salon-multi-uploader/releases/latest" target="_blank" rel="noopener noreferrer">
+          <span>🪟 윈도우(Windows) 다운로드</span>
+          <small id="winSub">Windows용 최신 배포판 받기</small>
+        </a>
+      </div>
+
+      <div class="release-meta" id="releaseMeta">
+        릴리즈 페이지: <a href="https://github.com/pentagon-51/salon-multi-uploader/releases/latest" target="_blank" rel="noopener noreferrer">GitHub Releases 바로가기 ↗</a>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>🚀 8개 핵심 플랫폼 원클릭 동시 업로드</h2>
+      <div class="platform-grid">
+        <div class="plat-item">유튜브 쇼츠<span>공식 무료 API</span></div>
+        <div class="plat-item">네이버 블로그<span>6컷 사진·GIF·지도</span></div>
+        <div class="plat-item">네이버 클립<span>플레이스 연동 숏폼</span></div>
+        <div class="plat-item">인스타그램<span>릴스·위치·해시태그</span></div>
+        <div class="plat-item">틱톡<span>커버·위치 자동 입력</span></div>
+        <div class="plat-item">페이스북(개인)<span>개인 릴스 업로드</span></div>
+        <div class="plat-item">페이스북(매장)<span>비즈니스 스위트 릴스</span></div>
+        <div class="plat-item">핀터레스트<span>보드·링크 자동 연결</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>🛠️ 3단계 초간단 설치 안내</h2>
+      <div class="steps">
+        <div class="step-card">
+          <div class="step-num">1</div>
+          <h3>다운로드 후 압축 풀기</h3>
+          <p>내려받은 ZIP 파일의 압축을 바탕화면 등 편한 폴더에 풀어 주세요.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">2</div>
+          <h3>최초 1회 설치 실행</h3>
+          <p>
+            운영체제에 맞는 설치 파일을 한 번만 더블클릭해 주세요.<br />
+            <span class="code-tag">Mac: 2-1. 맥북 최초설치</span><br />
+            <span class="code-tag">Win: 1-1. 윈도우 최초설치</span>
+          </p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">3</div>
+          <h3>프로그램 실행 및 사용</h3>
+          <p>
+            실행 파일을 누르면 브라우저 대시보드가 자동으로 열립니다.<br />
+            <span class="code-tag">Mac: 2-2. 맥북 프로그램 실행</span><br />
+            <span class="code-tag">Win: 1-2. 윈도우 프로그램 실행</span>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="privacy-box">
+      <strong>🔒 개인정보 미수집 및 100% 내 PC 로컬 실행 안내</strong>
+      SNS 아이디·비밀번호·로그인 세션·시술 영상·매장 정보 등 모든 개인 데이터는 원장님 PC 내부에만 안전하게 저장되며 외부 서버로 절대 수집·전송되지 않습니다. (프로그램 개선을 위해 개인을 식별할 수 없는 익명 실행 여부·OS·버전 정보만 최소한으로 집계될 수 있습니다.)
+    </section>
+
+    <section class="community">
+      <div>
+        <strong>공식 채널 &amp; 업데이트 소식</strong>
+        <p>사용법·업데이트 안내와 원장님 소통은 공식 채널에서 확인해 주세요.</p>
+      </div>
+      <div class="link-group">
+        <a class="ext-btn ig" href="https://www.instagram.com/hair_auto_lab/" target="_blank" rel="noopener noreferrer">📸 인스타그램 @hair_auto_lab</a>
+        <a class="ext-btn" href="https://open.kakao.com/o/gixPiVXi" target="_blank" rel="noopener noreferrer">💬 공식 소통·업데이트방</a>
+      </div>
+    </section>
+
+    <footer>
+      © 미용실 멀티업로더 · 오픈소스 무료 공개 프로젝트 (<a href="https://github.com/pentagon-51/salon-multi-uploader" target="_blank" rel="noopener noreferrer" style="color:inherit;">pentagon-51/salon-multi-uploader</a>)
+    </footer>
+  </main>
+
+  <script>
+    (function () {
+      const REPO_OWNER = "pentagon-51";
+      const REPO_NAME = "salon-multi-uploader";
+      const RELEASES_FALLBACK = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
+      const API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
+
+      const versionBadge = document.getElementById("versionBadge");
+      const btnMac = document.getElementById("btnMac");
+      const btnWin = document.getElementById("btnWin");
+      const macSub = document.getElementById("macSub");
+      const winSub = document.getElementById("winSub");
+      const releaseMeta = document.getElementById("releaseMeta");
+
+      function pickAssetUrl(assets, osType) {
+        if (!Array.isArray(assets) || !assets.length) return "";
+        const lowerAssets = assets
+          .filter(a => a && a.browser_download_url)
+          .map(a => ({ name: String(a.name || "").toLowerCase(), url: a.browser_download_url }));
+
+        if (osType === "mac") {
+          const macSpecific = lowerAssets.find(a => /mac|darwin|osx|\.dmg$/.test(a.name));
+          if (macSpecific) return macSpecific.url;
+        } else if (osType === "win") {
+          const winSpecific = lowerAssets.find(a => /win|windows|\.exe$|\.msi$/.test(a.name));
+          if (winSpecific) return winSpecific.url;
+        }
+        const universalZip = lowerAssets.find(a => a.name.endsWith(".zip"));
+        return universalZip ? universalZip.url : (lowerAssets[0] ? lowerAssets[0].url : "");
+      }
+
+      fetch(API_URL, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" })
+        .then(res => {
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          return res.json();
+        })
+        .then(rel => {
+          const tag = rel.tag_name || rel.name || "";
+          const published = rel.published_at ? String(rel.published_at).slice(0, 10) : "";
+          const releaseUrl = rel.html_url || RELEASES_FALLBACK;
+          const assets = rel.assets || [];
+
+          const macUrl = pickAssetUrl(assets, "mac") || rel.zipball_url || releaseUrl;
+          const winUrl = pickAssetUrl(assets, "win") || rel.zipball_url || releaseUrl;
+
+          if (tag) {
+            versionBadge.textContent = `최신 버전 ${tag}${published ? " · " + published : ""}`;
+          } else {
+            versionBadge.textContent = "최신 릴리즈 준비 완료";
+          }
+
+          btnMac.href = macUrl;
+          btnWin.href = winUrl;
+          if (tag) {
+            macSub.textContent = `macOS용 ${tag} 바로 다운로드`;
+            winSub.textContent = `Windows용 ${tag} 바로 다운로드`;
+          }
+          releaseMeta.innerHTML = `최신 릴리즈: <a href="${releaseUrl}" target="_blank" rel="noopener noreferrer">${tag || "Releases"} 안내 보기 ↗</a>`;
+        })
+        .catch(() => {
+          versionBadge.textContent = "최신 버전 GitHub 릴리즈 연동";
+          btnMac.href = RELEASES_FALLBACK;
+          btnWin.href = RELEASES_FALLBACK;
+        });
+    })();
+  </script>
+</body>
+</html>

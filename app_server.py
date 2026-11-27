@@ -6516,5 +6516,10 @@ if __name__ == '__main__':
     if srv is None:
         raise last_bind_err or RuntimeError('127.0.0.1:8765 포트 바인딩에 실패했습니다.')
     ACTIVE_HTTP_SERVER = srv
+    try:
+        from telemetry import report_daily_active_async
+        report_daily_active_async()
+    except Exception:
+        pass
     print('🚀 서버 시작 (실시간 세부 로그 & 강제 중지 기능 탑재): http://127.0.0.1:8765', flush=True)
     srv.serve_forever()
