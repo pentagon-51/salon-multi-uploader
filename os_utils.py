@@ -2240,8 +2240,59 @@ def recommend_blog_category(text, categories, men_keywords=None):
     return cats[0]
 
 
+DESIGNER_TITLE_SUFFIXES = (
+    "대표원장",
+    "수석디자이너",
+    "수석실장",
+    "부원장",
+    "디자이너",
+    "선생님",
+    "원장",
+    "실장",
+    "팀장",
+    "점장",
+    "매니저",
+    "쌤",
+)
+
+
+def _extract_designer_banned_variants(designer_name):
+    """디자이너 이름·직책에서 (1) 공백 제거 전체 형태(예: '카일원장')와
+    (2) 직책을 떼어낸 순수 이름 형태(예: '카일')를 소문자 set으로 추출."""
+    raw = str(designer_name or "").strip()
+    if not raw:
+        return set()
+    variants = set()
+    compact = re.sub(r"\s+", "", raw).lower()
+    if compact:
+        variants.add(compact)
+
+    # 1) 공백 분리 토큰에서 직책 토큰 제거
+    title_set = {t.lower() for t in DESIGNER_TITLE_SUFFIXES}
+    tokens = [tok.strip() for tok in re.split(r"\s+", raw) if tok.strip()]
+    non_title_tokens = [tok for tok in tokens if tok.lower() not in title_set]
+    base_cand = re.sub(r"\s+", "", "".join(non_title_tokens)).lower() if non_title_tokens else compact
+
+    # 2) 붙여 쓴 직책 접미사/접두사 제거 (예: '카일원장' -> '카일', '지민쌤' -> '지민')
+    stripped = base_cand
+    for title in DESIGNER_TITLE_SUFFIXES:
+        t_low = title.lower()
+        if stripped.endswith(t_low) and len(stripped) > len(t_low):
+            stripped = stripped[: -len(t_low)]
+            break
+    for title in DESIGNER_TITLE_SUFFIXES:
+        t_low = title.lower()
+        if stripped.startswith(t_low) and len(stripped) > len(t_low):
+            stripped = stripped[len(t_low):]
+            break
+
+    if stripped:
+        variants.add(stripped)
+    return variants
+
+
 def get_effective_banned_tags(profile=None):
-    """매장 공통 금지태그 + 개인 제외 태그 + 디자이너명(띄어쓰기 제거)을 소문자 set으로 병합 반환."""
+    """매장 공통 금지태그 + 개인 제외 태그(하위 호환) + 디자이너명(전체·직책 제거 순수 이름)을 소문자 set으로 병합 반환."""
     prof = profile if isinstance(profile, dict) else load_profile()
     banned = {t.strip().lower() for t in COMMON_BANNED_TAGS if t and t.strip()}
 
@@ -2254,9 +2305,7 @@ def get_effective_banned_tags(profile=None):
 
     d_name = (prof.get("designer_name") or "").strip()
     if d_name:
-        compact_name = d_name.replace(" ", "").lower()
-        if compact_name:
-            banned.add(compact_name)
+        banned.update(_extract_designer_banned_variants(d_name))
 
     return banned
 

@@ -344,6 +344,62 @@ def validate_youtube_oauth_token(attempt_refresh=False):
     }
 
 
+def worker_youtube_auth():
+    """온보딩 1단계 [🔑 지금 구글 계정 인증하기] 전용 워커:
+    auth_data/client_secret.json으로 로컬 브라우저 OAuth 인증(120초 타임아웃)을 실행해
+    auth_data/youtube_token.json을 저장하고, 종료 시 대시보드·온보딩 신호등을 즉시 갱신."""
+    global ACTIVE_WORKER_THREAD
+    with STATE_LOCK:
+        STATE['busy'] = True
+        STATE['stop_requested'] = False
+        STATE['active_run_id'] += 1
+        my_run_id = STATE['active_run_id']
+        ACTIVE_WORKER_THREAD = threading.current_thread()
+
+    try:
+        migrate_legacy_auth_files()
+        secret_path = get_auth_file('client_secret.json')
+        token_path = get_auth_file('youtube_token.json')
+        if not _is_valid_youtube_client_secret(secret_path):
+            log('⚠️ [유튜브 인증] auth_data/client_secret.json 파일이 없거나 형식이 올바르지 않습니다.')
+            return
+
+        log('🔑 [유튜브 인증] 브라우저에서 구글 계정 인증 창을 여는 중입니다... (120초 이내 로그인·권한 허용 완료)')
+        flow = InstalledAppFlow.from_client_secrets_file(secret_path, YOUTUBE_SCOPES)
+        try:
+            try:
+                creds = flow.run_local_server(port=0, prompt='select_account', timeout_seconds=120)
+            except TypeError:
+                creds = flow.run_local_server(port=0, prompt='select_account')
+        except Exception as auth_err:
+            log(f'⚠️ [유튜브 인증] 구글 계정 인증이 취소되었거나 시간이 초과(120초)되었습니다: {auth_err}')
+            return
+
+        if not (creds and creds.valid):
+            log('⚠️ [유튜브 인증] 유효한 인증 토큰을 받지 못했습니다. 다시 시도해 주세요.')
+            return
+
+        os.makedirs(os.path.dirname(token_path), exist_ok=True)
+        tmp_path = f'{token_path}.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            f.write(creds.to_json())
+        os.replace(tmp_path, token_path)
+        log('✅ [유튜브 인증] 구글 계정 인증 및 youtube_token.json 저장이 완료되었습니다! (유튜브 쇼츠 🟢 연결됨)')
+    except Exception as e:
+        log(f'⚠️ [유튜브 인증 오류] {e}')
+    finally:
+        invalidate_deep_status_cache()
+        with STATE_LOCK:
+            STATE['auth_check_seq'] = int(STATE.get('auth_check_seq', 0)) + 1
+            if STATE['active_run_id'] == my_run_id:
+                STATE['busy'] = False
+                STATE['stop_requested'] = False
+            elif not STATE['busy']:
+                STATE['stop_requested'] = False
+            if ACTIVE_WORKER_THREAD is threading.current_thread():
+                ACTIVE_WORKER_THREAD = None
+
+
 DEEP_STATUS_COOLDOWN_SEC = 30 * 60  # 30분 쿨다운 캐시 (대시보드 재로딩 시 불필요한 네이버/SNS 로그인 이력 누적 방지)
 DEEP_STATUS_CACHE_LOCK = threading.Lock()
 DEEP_STATUS_CACHE = {
@@ -4014,6 +4070,65 @@ def _set_last_result(key, ok, msg, run_id=None, history_id='', history_rec=None,
                         cur.append(norm_k)
                     STATE['active_uploaded_platforms'] = cur
 
+def _create_test_sample_video(run_id=0):
+    """[테스트 모드] 영상 미첨부 시 내장 FFmpeg(imageio-ffmpeg 포함)로 1초 초경량 세로(9:16, 720x1280)
+    단색 샘플 영상(test_sample.mp4)을 임시 폴더에 자동 생성해 (sample_dir, sample_path) 반환."""
+    os.makedirs(THUMB_DIR, exist_ok=True)
+    sample_dir = os.path.join(THUMB_DIR, f'_test_sample_{run_id}_{int(time.time() * 1000)}')
+    os.makedirs(sample_dir, exist_ok=True)
+    sample_path = os.path.join(sample_dir, 'test_sample.mp4')
+    ffmpeg_bin = get_ffmpeg_bin()
+    cmd = [
+        ffmpeg_bin, '-y',
+        '-f', 'lavfi', '-i', 'color=c=#1e293b:s=720x1280:d=1:r=24',
+        '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo',
+        '-t', '1',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
+        '-c:a', 'aac', '-shortest', '-movflags', '+faststart',
+        sample_path,
+    ]
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            timeout=25,
+            **_win_no_window_kwargs(),
+        )
+        if proc.returncode == 0 and os.path.isfile(sample_path) and os.path.getsize(sample_path) > 512:
+            return sample_dir, sample_path
+    except Exception:
+        pass
+
+    # 무음 트랙 포함 인코딩이 실패한 환경용 비디오 단독 경량 폴백
+    fallback_cmd = [
+        ffmpeg_bin, '-y',
+        '-f', 'lavfi', '-i', 'color=c=#1e293b:s=720x1280:d=1:r=24',
+        '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-preset', 'ultrafast',
+        '-movflags', '+faststart',
+        sample_path,
+    ]
+    try:
+        proc2 = subprocess.run(
+            fallback_cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='ignore',
+            timeout=25,
+            **_win_no_window_kwargs(),
+        )
+        if proc2.returncode == 0 and os.path.isfile(sample_path) and os.path.getsize(sample_path) > 512:
+            return sample_dir, sample_path
+    except Exception:
+        pass
+
+    _force_rmtree(sample_dir)
+    return '', ''
+
+
 def worker_publish(payload):
     global ACTIVE_WORKER_THREAD
     test_mode = bool(payload.get('test_mode', False))
@@ -4062,6 +4177,15 @@ def worker_publish(payload):
     prof = load_profile()
     vn = payload.get('video_name') or state_vn
     video_path = os.path.join(UPLOAD_DIR, os.path.basename(vn)) if vn else state_vp
+    auto_sample_dir = ''
+    if test_mode and (not video_path or not os.path.isfile(video_path)):
+        auto_sample_dir, sample_vp = _create_test_sample_video(run_id=my_run_id)
+        if sample_vp and os.path.isfile(sample_vp):
+            video_path = sample_vp
+            vn = os.path.basename(sample_vp)
+            log('🎬 [테스트 모드] 영상 미첨부로 1초 테스트용 샘플 영상을 자동 생성했습니다. (test_sample.mp4 · 720x1280)')
+        else:
+            log('⚠️ [테스트 모드] 1초 테스트용 샘플 영상 자동 생성에 실패했습니다. (FFmpeg/imageio-ffmpeg 설치 확인 필요)')
     default_place = get_place_search_keyword(prof)
     mode_label = '테스트 모드' if test_mode else '실업로드'
 
@@ -4611,6 +4735,10 @@ def worker_publish(payload):
             _finalize_blackbox_session_merge_once()
             clean_and_unify_blackbox_files(clear_thumbs=(False if test_mode else naver_completed))
 
+        # 테스트 모드용 임시 1초 샘플 영상 폴더 정리
+        if auto_sample_dir and os.path.isdir(auto_sample_dir):
+            _force_rmtree(auto_sample_dir)
+
 def open_blackbox_folder():
     """blackbox/ 폴더가 없으면 생성한 뒤 OS 기본 탐색기(macOS open, Windows explorer)로 열기"""
     os.makedirs(BLACKBOX_DIR, exist_ok=True)
@@ -4626,11 +4754,11 @@ def open_blackbox_folder():
             subprocess.Popen(['xdg-open', BLACKBOX_DIR])
     except Exception as e:
         return {'ok': False, 'msg': f'오류 폴더를 열지 못했습니다: {e}'}
-    log('📂 [오류 폴더 열기] report_upload.md / report_test.md와 영상(upload.mp4 / test.mp4)을 소통방에 첨부해 문의해 주세요.')
+    log('📂 [오류 폴더 열기] 프로그램 폴더 내 blackbox 폴더의 report_upload.md / report_test.md와 영상(upload.mp4 / test.mp4)을 소통방에 첨부해 문의해 주세요.')
     return {
         'ok': True,
         'path': BLACKBOX_DIR,
-        'msg': 'report_upload.md / report_test.md와 영상을 소통방에 첨부해 문의해 주세요.',
+        'msg': '프로그램 폴더 내 blackbox 폴더의 report_upload.md / report_test.md와 영상을 소통방에 첨부해 문의해 주세요.',
     }
 
 
@@ -6069,6 +6197,23 @@ class AppHandler(BaseHTTPRequestHandler):
             if is_busy: return self.send_json({'ok': False, 'msg': BUSY_TASK_MSG})
             threading.Thread(target=worker_auth_check, args=(req,), daemon=True).start()
             self.send_json({'ok': True})
+        elif self.path == '/api/youtube_auth':
+            with STATE_LOCK:
+                is_busy = bool(STATE['busy'])
+            if is_busy:
+                return self.send_json({'ok': False, 'msg': BUSY_TASK_MSG})
+            migrate_legacy_auth_files()
+            secret_path = get_auth_file('client_secret.json')
+            if not _is_valid_youtube_client_secret(secret_path):
+                return self.send_json({
+                    'ok': False,
+                    'msg': 'auth_data/client_secret.json 파일이 없거나 유효하지 않습니다. 먼저 1~6단계에 따라 JSON 파일을 auth_data/ 폴더에 넣어주세요.',
+                })
+            threading.Thread(target=worker_youtube_auth, daemon=True).start()
+            self.send_json({
+                'ok': True,
+                'msg': '브라우저에서 구글 계정 인증 창을 열었습니다. 로그인 후 권한을 허용해 주세요.',
+            })
         elif self.path in ('/api/publish', '/api/upload'):
             if not is_profile_ready(load_profile()):
                 return self.send_json({
